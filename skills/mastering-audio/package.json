@@ -1,0 +1,11 @@
+{
+  "name": "mastering-audio-skill",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "audio-master": "./scripts/master.mjs"
+  },
+  "dependencies": {
+    "fft.js": "^4.0.4"
+  }
+}

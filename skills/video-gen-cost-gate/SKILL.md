@@ -1,0 +1,207 @@
+---
+name: video-gen-cost-gate
+description: >
+  The generation call and its GO: picks the venue (Higgsfield Seedance 2.5, fal Seedance/H3, kie
+  image models) for a video seed or a still, prints the cost line with the refs-gate table and waits for
+  the operator's explicit go, submits through the one gated path, persists the receipt at the moment the
+  venue accepts the job, polls detached, and hands the landed seeds to the operator as clips. Use when a
+  seed, still, extension or upscale is about to be bought, when credits or dollars are being estimated,
+  when a job hangs, refuses (nsfw, content policy), 503s or is refunded, or when a poller must be armed.
+  Triggers — "cost line", "GO", "how many credits", "submit the seeds", "poll the takes", "refunded",
+  "nsfw refusal", "which venue", "fal or Higgsfield", "kie still". Not for building the reference set
+  or the start image the call needs — use video-refs-continuity. Not for the prompt's wording — use
+  video-prompt-dialects. Not for upscale or grade — use video-finish.
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash(python3*), Bash(higgsfield*), Bash(ffprobe*), Bash(ls*), Bash(df*)
+---
+
+# Video Gen & Cost Gate
+
+Every generation call is production: nothing is bought on a test, and nothing is bought without the
+operator's explicit **GO** on a cost line — however small the amount. The
+call itself goes through ONE gated path per venue, so the refs gate, the cost, the receipt and the
+poller cannot be skipped by hand. Three words carry the method: **GO** (the operator's yes to a named
+cost, per batch, never standing), **receipt** (the venue's job handle persisted the instant it accepts
+the job — billing happens at acceptance, not at fetch), **clip** (a landed seed reaches the operator as
+a file path; the pick is theirs).
+
+**What varies.** The venues, prices, modes, caps and the stills model are the established chain's, dated in
+[`references/VENUES.md`](references/VENUES.md); the balance sets the batch size. The GO, the receipt, the one gated path
+and the clip handover do not move — `video-production/references/WHAT-VARIES.md` § Generator, venue and native raster.
+
+## 1. Pick the venue from the table
+
+Rule for images and video alike: **quality and prompt-adherence first, permissiveness as the fallback
+criterion.** The table — modes, prices, caps, moderation classes, upload conventions — is
+[`references/VENUES.md`](references/VENUES.md). The decisions it settles:
+
+- Video with people in the references → Higgsfield `seedance_2_5 --mode omni_reference` (accepts person
+  refs, start image + image refs + video refs together, 480p at 2.5 cr/s). fal's Seedance refuses any
+  photoreal person in a reference (`content_policy_violation`, billed 0) — fal only for people-free
+  shots. MiniMax H3 is 768p minimum and a different look.
+- A continuation of a keeper → `--mode video_extension` on the keeper's own job id (same price as a
+  fresh gen).
+- Stills → **GPT Image 2.5 is the default image model for every still, plate and reference, and kie is the
+  FIRST venue for image gens (house rule, 2026-09-10)**: kie `gpt-image-2-5-flare-image-to-image` ($0.05 at
+  2K; validated 09-10 — one still matched the scene proxy's end table with no invented element), Higgsfield
+  `gpt_image_2_5` second (2–2.5 cr at 2k; `--variant sunburst` for the precision tier); **Nano Banana Pro is
+  the fallback** —
+  surgical edits (a count, a ghost, one limb) and garment text the OpenAI-moderated model refuses (kie
+  `nano-banana-pro` / Higgsfield `nano_banana_pro`), or the copy route (`video-refs-continuity`). GPT Image 2
+  is superseded; never start a new still on it.
+- Generation resolution is **480p**, always, on the 480p chain; MiniMax H3 generates at its 768p minimum on fal (a
+  house rule) or at 2K, its only tier, on Higgsfield; approval, then a reconstructive upscale (`video-finish`). A take
+  generated above 480p moves every pixel number downstream — the face floor, the upscale tier, the review instruments'
+  limits.
+- A new venue or model is proven on the HARDEST shot first (a lipsync line, the product close-up),
+  never the easiest — passing the easy spot proves the chain runs, not that the hard parts work.
+- **A vendor limit is READ, never inferred.** A cap not read from the vendor's own schema, estimator or error is
+  UNKNOWN — never the largest value you happen to have used: a multi-call extension workaround was once designed
+  around an 8 s "ceiling" taken from a production's own receipts, for a model whose estimator names the real cap in one
+  free call (`higgsfield generate cost <model> --duration 40` → the error states the maximum; never with `--mode`).
+  The cap is read before a shot list splits any action (`video-production/references/PREPRODUCTION-CORE.md` § 2).
+
+### Mode by what the shot must hold
+
+Higgsfield's `omni_reference` takes image refs, a start image, an end image and video refs together, so the
+mode is a per-SHOT choice, never a house default. Refs-only is not the consistency optimum by itself and
+neither is a start image — each holds different things (measured 2026-09-10, one family-room scene, 72 cr):
+
+| the shot must hold | set-up | why |
+|---|---|---|
+| a whole CONTINUITY PARTITION — several beats that must hold the same people, objects, setting and look — as ONE long generation within the read cap | refs only (r2v): the reference set carries identity, wardrobe, room and look (a look plate per light context); no start or end frame pinning what the model composes; the negatives scoped to a long take (`video-prompt-dialects` HOUSE-TEMPLATE § The negative tail) | consistency is free inside one generation and a gamble between generations; a long refs-only take composes its own coverage, and a start image re-renders the frame it was given — where separate gens were joined, two seams measured above the take's own maximum (house rule, 2026-09-13) |
+| a NEW angle; cast and room carried by references; static or a small move | on Seedance: refs only — the keeper as the appearance ref + the scene proxy's grey frame of the new camera under the layout-only role; no start image, no still to buy. On H3: with the keeper in the reference set the model frames on the KEEPER in either position (n=2) — a grey still as `<Picture N>` is ignored, a baked still beside the keeper is too, and a static clip carries no angle — so a NEW static angle on H3 = bake the still (GPT Image 2.5 from the keeper + cast + the grey frame), ACCEPT it as a room ref (the rule list + `refs_gate.py --accept`), cite it as the ONLY room picture `<Picture 1>` with the keeper OUT of the set, and ship a static proxy clip at that camera as `<Video 1>` (frame 0 on the still, held, 3 of 3 — a spoken line beside it lands too, 1 of 1); a new angle WITH a move stays the orbit clip (2 of 2). A static shot at the keeper's angle ships a static proxy clip as `<Video 1>` — it pins the camera, and a spoken line lands beside it | Seedance r2v: frame 0 opened on the authored angle first try; H3: frame 0 stayed on the keeper and the camera invented a push-in (09-10, n=1); a static clip as `<Video 1>` then held it at 54–66 dB (n=1); the kie still as `<Picture 1>` + the keeper as `<Picture 3>` + a static clip at the new camera → frame 0 on the keeper again (n=1); the still as the ONLY room picture + the static clip → frame 0 on the still, held (3 of 3; with a `<d>` line 1 of 1); without the grey frame a new angle is re-invented from prose |
+| a defined camera MOVE with an arrival, on Seedance | a start image (the keeper, or an accepted still) + an END still baked from the proxy's arrival frame; the clause states the arrival; no clip | a smooth, true-parallax arc arriving on the still; a clip beside a start image moved ≈3° of 25°, without one ≈55 % |
+| a defined move on MiniMax H3 | refs + the proxy clip as `<Video 1>` with the timecoded clause and the role sentence | ≈ the full arc with the room held; the clause alone re-staged the room |
+| an EXACT continuation — a named state, a held prop, the last pose | start image = the keeper's LAST frame (the standing rule), refs for identity | a start image carries the state pixel-exact; refs-only re-imagines it |
+| a face at medium framing, a spoken line | whichever row above fits; the FACE at the right size — in the start image or a tight ref — decides, not the mode | an unreferenced element is invented (the 08-30 r2v evidence) |
+
+Refs-only skips the still (≈2 cr or $0.05) but also skips the one reviewable frame before a 10 cr take: when
+the angle is risky, buy the still and start from it. The scene is complete first (`video-refs-continuity`
+SCENE-PROXY.md § Build it) and every render rides under its role line (`video-prompt-dialects` LINT L26).
+
+**Done when:** venue, mode (per shot, by the table), resolution, duration and rate are named for the batch, and every reference
+the call carries is legal on that venue.
+
+## 2. The cost line and the GO
+
+```
+REFS-GATE PASS  (table pasted)          ← video-refs-continuity, for THESE refs and THIS start image
+S02-G4 · omni_reference · 480p · 8 s · 3 seeds × 8 s × 2.5 = 60 cr  (balance 480 → 420)   GO?
+```
+
+One line per batch: seeds × seconds × rate, the balance before and after, dollars for stills at the model's
+rate in [`references/VENUES.md`](references/VENUES.md) — the ONE price table; a price written anywhere else is a
+pointer to it, and when two figures disagree the table wins — and the free steps named as free. Then wait. The
+rules the operator set on this line, in their words, are in [`references/COST-AND-GO.md`](references/COST-AND-GO.md);
+the ones that bind every ask:
+
+- **The reference dress rehearsal before an expensive video call.** In reference-driven generation the reference
+  set IS the product: before any refs-only call, and before any batch over ~30 cr on any mode, ONE still is
+  generated from the SAME reference set with a condensed prompt at the clip's aspect (`gen_stills.py`, cents) and
+  read for identity, wardrobe, setting and look; its path rides in the cost line, so the GO is given against a
+  seen preview, never a description. A still costs cents; a wrong reference costs the whole batch (operator
+  ruling 2026-09-13; COST-AND-GO.md § The reference dress rehearsal).
+
+- **Free before billed.** Whisper the existing takes for the words, RMS-scan for the onset, cut a
+  keeper frame as a reference, re-run an edit — search the disk before a regen. Order of spend: disk →
+  still → seed.
+- **The pre-GO checks are one table, not prose**: refs present and uploaded · cast closed · every noun
+  and action traced to the script or the ledger · the start image accepted · anatomy counted · the
+  eyeline written per character · the door sentence copied · text legible · product size pinned. Each
+  row is a correction that cost credits once.
+- **Budget final ⇒ a seed that meets every named constraint goes forward**; free checks (upscale after
+  approval, hero pass, frame sheets, the build) never wait for a GO; a residual doubt goes in the
+  delivery note with its frame time — never as a re-roll question. Tight budget ⇒ one seed at a time,
+  checked before the next.
+- Decisions go to the operator as **numbered plain questions** with the cost and the file path inline.
+- Never `higgsfield generate cost` with `--mode` (it hung); the price is known per resolution.
+
+**Done when:** the GO ask carries the gate table, the resolved reference names in slot order, the cost
+line with balances, and the operator's explicit yes is in hand for exactly that batch.
+
+## 3. Submit through the one path
+
+```
+python3 scripts/hf_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \
+    --mode omni_reference --duration 8 --refs ROOM,W1,PRODUCT-sheet --start-image S02-G4-start --seeds 3 [--go]
+python3 scripts/gen_stills.py --root <project> --only S02-G4-start [--model gpt25|gpt25s|nano|gpt2] [--fresh-scene] [--go]
+python3 scripts/gen_video_fal.py --root <project> --prompt-file … --engine seedance|h3 --mode r2v --refs … [--go]
+```
+
+Dry run by default; `--go` spends. Each path runs the refs gate first and refuses on FAIL, prints the
+cost, parses the venue's reply shape-safely (Higgsfield `generate create --json` returns a bare LIST of
+job ids), writes the raw reply to `receipts/raw/`, appends a ledger record per seed BEFORE polling,
+and detaches the poller. Reference names resolve through `receipts/<NAME>-upload-id.txt`
+(`scripts/hf_upload.py`) or `refs-urls.json` (`scripts/kie_upload.py`, which MERGES — an overwrite once
+dropped eleven live URLs); a raw UUID is refused because the gate must see a name. kie URLs expire in
+about 24 h ("Image fetch failed" = expired, billed 0 → re-upload). A prompt over 5000 chars is warned
+(6629 worked; 7840 was trimmed).
+
+**Done when:** `receipts/hf-jobs-<scene>.json` (or the fal/kie receipt) holds every job id and the
+ledger has one record per seed, before any result is read.
+
+## 4. Poll detached, one waiter, sentinel-checked
+
+The poller is detached (`hf_submit.py` starts it in its own session; restart one by hand with
+`video-production/scripts/detach.py`, absolute paths) and logs to
+`takes/hf-poll-<scenekey>.log`; every line starts with a timestamp, so a monitor matches
+`" DONE | FAILED|HF-POLL-END"` anywhere in the line, never `^DONE`. One background waiter at a time;
+never `tail -f | grep`. Mechanics in [`references/RECEIPTS-AND-POLLING.md`](references/RECEIPTS-AND-POLLING.md):
+
+- `COMPLETED` is not success — only a result with a file is. Refusals (`nsfw`, `ip_detected`, a 422)
+  are free; check `higgsfield account transactions` for the refund, then resubmit a refunded batch
+  **inside the original GO**. A 503 on one seed is resubmitted under a NEW scene key, never the same
+  (it would clobber the batch receipts). A billed job is never resubmitted — its result persists;
+  re-fetch it.
+- Two 504s in a row is an outage: stop paying to find out; switch venue on the next GO.
+- The billing header on fal is late, not absent: re-fetch the result URL until it appears; never record
+  a missing header as zero. Seedance bills actual output seconds; H3 bills the requested integer.
+- A hanging Higgsfield Topaz or Starlight submission (no job, no charge) is retried once, then the
+  route switches (local Rhea) — never loop on a hanging route.
+
+**Done when:** the log ends `HF-POLL-END N of N downloaded`, every take is on disk with a receipt naming
+its job id, URL, bytes and dimensions, and any refusal is classified free or billed from the venue's
+own record.
+
+## 5. Hand over clips; then nothing moves until the pick
+
+Seeds go to the operator as clips — the full path (chat send only under ~20–30 MiB) — the moment
+each lands; contact sheets and audio envelopes are the agent's notes, one line each. A sheet cannot
+show the timing of a gag. The pick is the operator's, named by path. No upscale, hero pass or edit
+starts on a seed before that pick.
+
+**Done when:** the operator has named the keeper(s) by path and the pick is recorded (continuity
+ledger, receipts), or every seed is voided with the reason.
+
+## ❌/✅
+
+```
+❌ "Generating 3 seeds now" → submit                       ✅ cost line + gate table → wait for the GO
+❌ higgsfield generate create … by hand                    ✅ hf_submit.py --go (gate, receipt, poller)
+❌ Receipt written after the download                      ✅ ledger line at task creation, before polling
+❌ `except URLError` on the poll                           ✅ `except Exception` with a miss budget
+❌ COMPLETED → "done"                                      ✅ a file on disk + a 2xx result = done
+❌ Resubmit a billed job that "went missing"               ✅ re-fetch the result by job id
+❌ 503 on seed 2 → resubmit under the same scene key       ✅ a NEW scene key for the resubmission
+❌ "Approve, or re-roll for the fleck?" after a final top-up ✅ the seed meets the constraints → forward
+❌ Contact sheets to the operator for a gag                ✅ the clips, by path
+❌ Rhea started on a seed before the pick                  ✅ the chain begins at the pick
+❌ `cmd | tail -3; echo $?`                                ✅ `rc=$?` on the invocation line
+```
+
+## Failure behavior
+
+- Gate FAIL → nothing is submitted; the ask names what is missing (upload / cut / declare).
+- A venue error that reads as a refusal is confirmed from the venue's own record (job status,
+  transactions) before it is called free.
+- Three rounds on one shot without convergence → stop generating; put the alternatives (extension,
+  insert, reframe, drop) to the operator as numbered questions with costs.
+- Disk is a production resource: check the drive's free space before a batch and before every finish
+  (a full drive took the whole environment down).
+
+## Cross-references
+
+- `video-refs-continuity` — the reference set, the start image and the refs gate the call depends on.
+- `video-finish` — the reconstructive upscale and grade, after approval only.
+- `~/.claude/skills/video-production/references/CHAIN.md` — handoff budget and stop conditions.
+- Deeper context — the upstream projects behind the rules here: `video-production/references/CONTEXT-MAP.md` § Where the deeper context lives.

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.bak-*
+.DS_Store
+node_modules/
+renders/
+# fetched bases and generated previews (look-library/README.md); the baked cubes and the .drx grades ship
+look-library/spectral_luts/
+look-library/preview/
+.env

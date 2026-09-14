@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""status_line.py — the status template every turn of a video production carries: the deliverable path, the balances
+(read where an API allows a FREE read; said to be UNREADABLE where it does not — never shown as 0), the free space on the working drive (a mezzanine pair per version fills
+it), the background jobs (named, or "none"), and the open items. Nothing here spends; every read is free.
+
+  status_line.py --root <project> [--deliverable deliver/<file>.mp4] [--drive /mnt/c] [--min-free-gb 6]
+                 [--higgsfield] [--elevenlabs] [--open "the client's verdict on S02"] [--job "rhea A2F (log: …)"]
+--higgsfield runs `higgsfield account status` (the CLI's free read: balance, plan, recent transactions) when the CLI is on the PATH; --elevenlabs reads the plan's
+character count with ELEVENLABS_API_KEY from the environment. Vendors with no balance endpoint are reported as unreadable.
+"""
+import argparse, json, os, shutil, subprocess, time, urllib.request
+
+
+def sh(cmd, timeout=20):
+    try: r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout); return r.stdout.strip() or r.stderr.strip()
+    except Exception as ex: return f'unreadable ({type(ex).__name__})'
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--root', default='.'); ap.add_argument('--deliverable'); ap.add_argument('--drive', default='.'); ap.add_argument('--min-free-gb', type=float, default=6)
+    ap.add_argument('--higgsfield', action='store_true'); ap.add_argument('--elevenlabs', action='store_true'); ap.add_argument('--open', action='append', default=[]); ap.add_argument('--job', action='append', default=[])
+    a = ap.parse_args(); os.chdir(a.root); now = time.strftime('%Y-%m-%d %H:%M'); lines = [f'STATUS {now}']
+    if a.deliverable:
+        ok = os.path.exists(a.deliverable); lines.append(f"deliverable: {a.deliverable}" + (f" ({os.path.getsize(a.deliverable) / 2 ** 20:.1f} MiB)" if ok else ' — MISSING'))
+    du = shutil.disk_usage(a.drive); free = du.free / 1e9; lines.append(f"drive {a.drive}: {free:.0f} GB free" + (' — ⚠ under the floor, stop heavy work' if free < a.min_free_gb else ''))
+    bal = []
+    if a.higgsfield: bal.append('Higgsfield: ' + (sh(['higgsfield', 'account', 'status']).splitlines()[0] if shutil.which('higgsfield') else 'unreadable (CLI not on PATH)'))
+    if a.elevenlabs:
+        key = os.environ.get('ELEVENLABS_API_KEY')
+        if not key: bal.append('ElevenLabs: unreadable (no ELEVENLABS_API_KEY in the environment)')
+        else:
+            try: o = json.load(urllib.request.urlopen(urllib.request.Request('https://api.elevenlabs.io/v1/user/subscription', headers={'xi-api-key': key}), timeout=20)); bal.append(f"ElevenLabs: {o['character_count']}/{o['character_limit']} chars ({o.get('tier', '?')})")
+            except Exception as ex: bal.append(f'ElevenLabs: unreadable ({type(ex).__name__})')
+    bal.append('other vendors: no balance endpoint (track spend from the receipts)')
+    lines.append('balances: ' + ' · '.join(bal))
+    lines.append('background jobs: ' + ('; '.join(a.job) if a.job else 'none'))
+    lines.append('open: ' + ('; '.join(a.open) if a.open else '—'))
+    print('\n'.join(lines))
+
+
+if __name__ == '__main__':
+    main()

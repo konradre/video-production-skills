@@ -1,0 +1,27 @@
+# film-portra — skin/lifestyle/people-first film look.
+# Base = Portra 400 -> Endura Premier (Darkroom spectral; §4b portrait variant).
+# Trims = postfx 01_portra_400 colour subset HALVED where the print base already supplies it
+# (WB 0.18 -> 0.09, tone 0.18 -> 0.14, black lift 0.012 -> 0.008 — the Endura base black
+# is already lifted ~0.035).
+id: film-portra
+genre: film
+description: Creamy warm skin, soft highlights — Portra 400 print base, people-first
+tags: [portra, skin, portrait, lifestyle, film]
+intensity: 0.9
+film_base: spectral_luts/portra_400_endura_premier.cube
+cube: { file: cubes/film-portra_33.cube, size: 33 }
+drx:  { file: drx/film-portra.drx, status: authored }
+params:
+  white_balance: { temp: 0.09, tint: 0.015 }
+  exposure: { stops: 0.04 }
+  lift_gamma_gain: { lift: [0.004, 0.002, 0.001], gamma: [1.015, 1.005, 0.995], gain: [1.015, 1.0, 0.98] }
+  highlight_rolloff: { knee: 0.66, strength: 0.4 }
+  tone_curve: { strength: 0.14, pivot: 0.46 }
+  split_toning:
+    shadow:    [-0.006, 0.0, 0.014]
+    highlight: [0.022, 0.012, -0.012]
+    strength: 0.4
+    balance: 0.5
+  black_point: { lift: 0.008 }
+  vibrance: { vibrance: 0.14, saturation: 1.04, skin_protect: 0.75 }
+compression: { grain: low-capped, mezzanine: yuv420p10le, sharpen: light, notes: "highest skin_protect of the film set" }

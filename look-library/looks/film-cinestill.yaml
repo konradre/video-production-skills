@@ -1,0 +1,27 @@
+# film-cinestill — night/neon/city; CineStill 800T = Vision3 500T without rem-jet.
+# Colour base = Vision3 500T -> 2383 (the 800T colour identity); the SIGNATURE RED HALATION
+# is spatial -> lives ONLY in the .drx (halation 0.75-1.1, §4b night column).
+# Trims from postfx 05_cinestill_800t with WB -0.28 -> -0.14 (the tungsten cast is already
+# in the 500T base); blue-lifted blacks kept as per-channel array.
+id: film-cinestill
+genre: film
+description: Tungsten teal night look, blue-lifted blacks — 500T/2383 base; red halation in the .drx
+tags: [cinestill, night, neon, tungsten, halation, film]
+intensity: 0.85
+film_base: spectral_luts/vision3_500t_2383.cube
+cube: { file: cubes/film-cinestill_33.cube, size: 33 }
+drx:  { file: drx/film-cinestill.drx, status: authored }
+params:
+  white_balance: { temp: -0.14, tint: 0.03 }
+  exposure: { stops: 0.04 }
+  lift_gamma_gain: { lift: [0.0, 0.0, 0.005], gamma: [1.0, 1.0, 1.0], gain: [1.0, 0.995, 1.05] }
+  highlight_rolloff: { knee: 0.62, strength: 0.45 }
+  tone_curve: { strength: 0.24, pivot: 0.44 }
+  split_toning:
+    shadow:    [-0.02, 0.006, 0.03]
+    highlight: [0.02, 0.0, 0.01]
+    strength: 0.55
+    balance: 0.5
+  black_point: { lift: [0.016, 0.014, 0.024] }        # blue-lifted night blacks
+  vibrance: { vibrance: 0.14, saturation: 1.08, skin_protect: 0.5 }
+compression: { grain: low-capped, mezzanine: yuv420p10le, sharpen: light, notes: "banding-prone night gradients — 10-bit mezzanine mandatory (§6.3)" }

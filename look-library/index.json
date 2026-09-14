@@ -1,0 +1,162 @@
+{
+  "notes": "Colour tier of the look-library. Each look = .cube (this manifest, apply via ffmpeg lut3d everywhere) + .drx (Dehancer hero pass in Resolve, RECIPES.md). Params in looks/<id>.yaml are the deterministic buildCube source \u2014 bake from them, never hand-edit a .cube.",
+  "method": "GUIDE.md",
+  "looks": [
+    {
+      "id": "ads-clean",
+      "genre": "ads",
+      "description": "Neutral crisp commercial \u2014 accurate colour, polished skin, true blacks",
+      "tags": [
+        "clean",
+        "commercial",
+        "product",
+        "neutral",
+        "ecommerce"
+      ],
+      "intensity": 1.0,
+      "yaml": "looks/ads-clean.yaml",
+      "film_base": null,
+      "cube": {
+        "file": "cubes/ads-clean_33.cube",
+        "size": 33,
+        "sha256": "e83a790dc639290452d274da5b0ce552b13a8dd19be3fac64ea3690abdf0f9e1"
+      },
+      "drx": {
+        "file": "drx/ads-clean.drx",
+        "status": "authored",
+        "sha256": "142c9f341b7ce169afd069a720948561fdee51997a7427fd508420835ad082bb"
+      },
+      "compression": {
+        "grain": "off",
+        "mezzanine": "yuv420p10le",
+        "sharpen": "cap",
+        "notes": "\u00a76 \u2014 halation/grain off; high skin_protect"
+      }
+    },
+    {
+      "id": "ads-warm",
+      "genre": "ads",
+      "description": "Warm golden commercial \u2014 sun-kissed but restrained, ads-safe saturation",
+      "tags": [
+        "warm",
+        "golden",
+        "lifestyle",
+        "food",
+        "commercial"
+      ],
+      "intensity": 1.0,
+      "yaml": "looks/ads-warm.yaml",
+      "film_base": null,
+      "cube": {
+        "file": "cubes/ads-warm_33.cube",
+        "size": 33,
+        "sha256": "2502deacb4cce89eaf3d0a1f0b8772c5ee82600fd9becb43db3b8562efc64872"
+      },
+      "drx": {
+        "file": "drx/ads-warm.drx",
+        "status": "authored",
+        "sha256": "a387237d489c8a393e3f3b775b83a66885409f2de85c57973816fdd68eea5df3"
+      },
+      "compression": {
+        "grain": "off",
+        "mezzanine": "yuv420p10le",
+        "sharpen": "cap",
+        "notes": "warm split-tone kept luma-led (\u00a76.5)"
+      }
+    },
+    {
+      "id": "film-cinestill",
+      "genre": "film",
+      "description": "Tungsten teal night look, blue-lifted blacks \u2014 500T/2383 base; red halation in the .drx",
+      "tags": [
+        "cinestill",
+        "night",
+        "neon",
+        "tungsten",
+        "halation",
+        "film"
+      ],
+      "intensity": 0.85,
+      "yaml": "looks/film-cinestill.yaml",
+      "film_base": "spectral_luts/vision3_500t_2383.cube",
+      "cube": {
+        "file": "cubes/film-cinestill_33.cube",
+        "size": 33,
+        "sha256": "ac9026bd99b770963eeb44758376d3c48e45a61773a2fd141eb2de478d9072d7"
+      },
+      "drx": {
+        "file": "drx/film-cinestill.drx",
+        "status": "authored",
+        "sha256": "baf68eb5594cef69cae2cbb6f1afc3e75a1ecd76dc2ac792575261022cd350cd"
+      },
+      "compression": {
+        "grain": "low-capped",
+        "mezzanine": "yuv420p10le",
+        "sharpen": "light",
+        "notes": "banding-prone night gradients \u2014 10-bit mezzanine mandatory (\u00a76.3)"
+      }
+    },
+    {
+      "id": "film-portra",
+      "genre": "film",
+      "description": "Creamy warm skin, soft highlights \u2014 Portra 400 print base, people-first",
+      "tags": [
+        "portra",
+        "skin",
+        "portrait",
+        "lifestyle",
+        "film"
+      ],
+      "intensity": 0.9,
+      "yaml": "looks/film-portra.yaml",
+      "film_base": "spectral_luts/portra_400_endura_premier.cube",
+      "cube": {
+        "file": "cubes/film-portra_33.cube",
+        "size": 33,
+        "sha256": "537259e977b2c59d23c37ed303a261a08ca8ccdfb2f6b0afac58abf931262018"
+      },
+      "drx": {
+        "file": "drx/film-portra.drx",
+        "status": "authored",
+        "sha256": "3dbda863fd1d177ff0f157e99497236360fcf1e5a9ce886ee4b53861fdf62572"
+      },
+      "compression": {
+        "grain": "low-capped",
+        "mezzanine": "yuv420p10le",
+        "sharpen": "light",
+        "notes": "highest skin_protect of the film set"
+      }
+    },
+    {
+      "id": "film-teal-orange",
+      "genre": "film",
+      "description": "Blockbuster teal shadows / orange skin on Vision3 250D -> 2383 (= look01 base)",
+      "tags": [
+        "teal",
+        "orange",
+        "cinematic",
+        "vision3",
+        "blockbuster"
+      ],
+      "intensity": 0.85,
+      "yaml": "looks/film-teal-orange.yaml",
+      "film_base": "spectral_luts/vision3_250d_2383.cube",
+      "cube": {
+        "file": "cubes/film-teal-orange_33.cube",
+        "size": 33,
+        "sha256": "b9803b90870e7f30f7147bc1490b6283f1995dd35e5f9e74f12be756b177f503"
+      },
+      "drx": {
+        "file": "drx/film-teal-orange.drx",
+        "status": "authored",
+        "sha256": "cd8b3db4949545aad19dbbab462a147bed5d932e3ada0122d0537c31d3035444"
+      },
+      "compression": {
+        "grain": "low-capped",
+        "mezzanine": "yuv420p10le",
+        "sharpen": "light",
+        "notes": "QA on darkest-skinned subject (\u00a76.6)"
+      }
+    }
+  ]
+}

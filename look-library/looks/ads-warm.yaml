@@ -1,0 +1,26 @@
+# ads-warm — warm commercial (lifestyle/food/summer) held to ads discipline.
+# Derived from postfx 14_golden_warm colour subset, PULLED TOWARD the §4a ADS column:
+# WB +0.4 -> +0.18 (golden cast, not sunset), split strength 0.6 -> 0.4, sat capped 1.06,
+# skin_protect held at 0.7, black lift minimal. Spatial: halation OFF (ads rule §4b).
+id: ads-warm
+genre: ads
+description: Warm golden commercial — sun-kissed but restrained, ads-safe saturation
+tags: [warm, golden, lifestyle, food, commercial]
+intensity: 1.0
+film_base: null
+cube: { file: cubes/ads-warm_33.cube, size: 33 }
+drx:  { file: drx/ads-warm.drx, status: authored }
+params:
+  white_balance: { temp: 0.18, tint: 0.03 }
+  exposure: { stops: 0.06 }
+  lift_gamma_gain: { lift: [0.004, 0.002, 0.0], gamma: [1.01, 1.0, 0.99], gain: [1.04, 1.0, 0.95] }
+  highlight_rolloff: { knee: 0.68, strength: 0.5 }
+  tone_curve: { strength: 0.24, pivot: 0.46 }
+  split_toning:
+    shadow:    [-0.006, 0.0, 0.012]
+    highlight: [0.04, 0.02, -0.024]
+    strength: 0.4
+    balance: 0.5
+  black_point: { lift: 0.008 }
+  vibrance: { vibrance: 0.16, saturation: 1.06, skin_protect: 0.7 }
+compression: { grain: "off", mezzanine: yuv420p10le, sharpen: cap, notes: "warm split-tone kept luma-led (§6.5)" }

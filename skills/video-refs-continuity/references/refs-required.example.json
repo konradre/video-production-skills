@@ -1,0 +1,53 @@
+{
+ "_doc": "REFS GATE rules for scripts/refs_gate.py. Copy to <project>/prompts/refs-required.json. Each rule = an element (a regex over the prompt body, negated clauses removed) and the reference ROLES it needs; a role is met by any listed reference NAME that is in the call's --refs AND uploaded for the target (receipts/<NAME>-upload-id.txt for hf; refs-urls.json for kie), or inherited from the start image's own accepted gate record. Every capitalised subject in a prompt must be ruled here, declared --births (born in this gen) or --prose (a conscious prose-only decision). Add a rule the moment an element gets a locked reference. 'spots' restricts a rule to spot ids parsed from the prompt filename by spot_regex. require_ref_files and require_ref_acceptance make an unregistered or an unaccepted cited reference FAIL — a new project sets both (without them they WARN). look_plates lists the project's look plates: light or grade language in a prompt's prose then needs one of them cited (look_language overrides the default light vocabulary; --prose LOOK keeps a prose-only light on purpose). min_side is the smallest short side a reference file may have. Names below are examples — one SHAPE sheet and one SIZE ref per product colour, one PRODUCT sheet per SKU, one ROOM ref (the establishing frame, which embeds its cast) per set, one ref per recurring character, one LOOK plate per light context.",
+ "take_regex": "^S\\d\\d-[A-Z0-9]+(-v\\d+)?-s\\d+$",
+ "spot_regex": "(S\\d\\d)",
+ "require_ref_files": true,
+ "require_ref_acceptance": true,
+ "min_side": 256,
+ "look_plates": ["LOOK-interior-lamp", "LOOK-exterior-overcast"],
+ "caps_stoplist": ["BOOM", "CLANG", "WHACK", "KNOCK", "SILENCE", "POV", "OTS", "MCU", "VO", "SFX", "CTA", "SKU", "LED", "TV", "OK"],
+ "embeds": {
+  "S01-ROOM-ref": ["S01-W1-ref", "S01-W2-ref", "S01-W3-ref", "S01-LEAD-ref"]
+ },
+ "rules": [
+  {
+   "element": "product pieces",
+   "regex": "\\bpieces\\b|\\bburst\\b",
+   "roles": {
+    "SHAPE": ["PRODUCT-sheet-exact-colour1"],
+    "SIZE": ["PRODUCT-scale-ref-colour1"]
+   }
+  },
+  {
+   "element": "product (the device)",
+   "regex": "\\bdevice\\b|\\btube\\b",
+   "roles": {
+    "PRODUCT": ["PRODUCT-sheet-real-sku1"]
+   }
+  },
+  {
+   "element": "room (living room)",
+   "spots": ["S01", "S07"],
+   "regex": "living room|\\bcarpet\\b|\\bsofa\\b|\\bdoorway\\b",
+   "roles": {
+    "ROOM": ["S01-ROOM-ref", "S01-PLATE-A", "S01-PLATE-B"]
+   }
+  },
+  {
+   "element": "character W1",
+   "spots": ["S01", "S07"],
+   "regex": "\\bW1\\b|the woman in the red dress",
+   "roles": {
+    "W1": ["S01-W1-ref", "S01-ROOM-ref"]
+   }
+  },
+  {
+   "element": "prop (pouch)",
+   "regex": "\\bpouch\\b",
+   "roles": {
+    "POUCH": ["S01-POUCH-ref"]
+   }
+  }
+ ]
+}

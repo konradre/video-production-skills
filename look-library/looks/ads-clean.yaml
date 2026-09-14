@@ -1,0 +1,26 @@
+# ads-clean — neutral, crisp, accurate colour; e-commerce / beauty / product / corporate.
+# Colour tier ONLY (per-pixel ops -> .cube). Spatial physics live in the .drx recipe (drx/RECIPES.md).
+# Values = postfx 13_clean_commercial colour subset, per consensus §4a ADS column
+# (GUIDE.md §4).
+id: ads-clean
+genre: ads
+description: Neutral crisp commercial — accurate colour, polished skin, true blacks
+tags: [clean, commercial, product, neutral, ecommerce]
+intensity: 1.0            # recommended apply blend (deliver leg: full)
+film_base: null           # ads = no film-stock transform in the colour tier
+cube: { file: cubes/ads-clean_33.cube, size: 33 }
+drx:  { file: drx/ads-clean.drx, status: authored }   # recipe: RECIPES.md §ads-clean
+params:
+  white_balance: { temp: 0.03, tint: 0.0 }
+  exposure: { stops: 0.04 }
+  lift_gamma_gain: { lift: [0.0, 0.0, 0.0], gamma: [1.0, 1.0, 1.0], gain: [1.02, 1.01, 1.01] }
+  highlight_rolloff: { knee: 0.76, strength: 0.35 }
+  tone_curve: { strength: 0.28, pivot: 0.46 }        # §4a: moderate, gentle S, no crush
+  split_toning:
+    shadow:    [-0.004, 0.0, 0.006]
+    highlight: [0.006, 0.004, -0.004]
+    strength: 0.25
+    balance: 0.5
+  black_point: { lift: 0.0 }                          # true blacks for product
+  vibrance: { vibrance: 0.18, saturation: 1.04, skin_protect: 0.7 }
+compression: { grain: "off", mezzanine: yuv420p10le, sharpen: cap, notes: "§6 — halation/grain off; high skin_protect" }

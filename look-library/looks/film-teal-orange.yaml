@@ -1,0 +1,28 @@
+# film-teal-orange — blockbuster teal/orange on the authored look01 stock pairing.
+# Base = Vision3 250D -> Kodak 2383 (Darkroom spectral bake; §5 — matches the first authored look).
+# Trim values BLEND postfx 09 (0.85 "blockbuster") and hyperframes teal-orange-blockbuster
+# (0.62 restrained) at strength 0.72; sat 1.10 not 1.2 (§6.5 contrast-over-chroma).
+# tone_curve 0.32 NOT the §4a standalone 0.5 — the 2383 print base already supplies S-curve
+# contrast; 0.5 on top would double it (documented delta, build_cubes.py header).
+id: film-teal-orange
+genre: film
+description: Blockbuster teal shadows / orange skin on Vision3 250D -> 2383 (= look01 base)
+tags: [teal, orange, cinematic, vision3, blockbuster]
+intensity: 0.85
+film_base: spectral_luts/vision3_250d_2383.cube
+cube: { file: cubes/film-teal-orange_33.cube, size: 33 }
+drx:  { file: drx/film-teal-orange.drx, status: authored }
+params:
+  white_balance: { temp: 0.05, tint: 0.0 }           # print is already warm; postfx 0.08 reduced
+  exposure: { stops: 0.0 }
+  lift_gamma_gain: { lift: [0.0, 0.0, 0.004], gamma: [0.995, 1.0, 1.0], gain: [1.03, 1.0, 0.99] }
+  highlight_rolloff: { knee: 0.72, strength: 0.4 }
+  tone_curve: { strength: 0.32, pivot: 0.44 }
+  split_toning:
+    shadow:    [-0.035, 0.02, 0.06]                   # midpoint postfx<->hyperframes vectors
+    highlight: [0.07, 0.028, -0.03]
+    strength: 0.72
+    balance: 0.5
+  black_point: { lift: 0.006 }
+  vibrance: { vibrance: 0.14, saturation: 1.10, skin_protect: 0.6 }
+compression: { grain: low-capped, mezzanine: yuv420p10le, sharpen: light, notes: "QA on darkest-skinned subject (§6.6)" }
