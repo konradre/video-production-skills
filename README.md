@@ -41,7 +41,7 @@ on top of the base install, and the key or variable it reads from `.env`. Set up
 entry skill (`video-production`), pre-production (`ad-spot-preprod`, `film-preprod`), the prompt
 (`video-prompt-dialects`), the cut (`video-edit-edl`) and the client round (`client-rounds`) need nothing
 more, and the status line reads the Higgsfield and ElevenLabs balances once those are set up. Three rows want a
-GPU of your own; if you have none, [If you have no GPU](#if-you-have-no-gpu) is the whole answer in one place.
+GPU of your own, and how much VRAM it has decides which. [If you have no GPU, or a small one](#if-you-have-no-gpu-or-a-small-one) is the whole answer in one place.
 
 | step · skill | what it does | install or sign up for | key or variable |
 |---|---|---|---|
@@ -158,7 +158,7 @@ always worse.
 |---|---|---|
 | ffmpeg | the encode, the loudness read, the format checks, silence detection | everything up to the master; a hosted upscale returns a finished file |
 | Node 22+ | designed elements and explainers — they render through headless Chromium | every generated-footage lane, and the mastering tool on Node 18 |
-| a GPU | local generation (MiniMax H3 on your own card), the scene BUILDER (`scene_blockout.py`), the local upscale | the hosted lanes, all of them, and every finishing step — plus `scene_proxy.py`, which needs no GPU and still reads any `scene.json` you have. [What to ignore and what to delete](#if-you-have-no-gpu) |
+| a GPU with enough VRAM | local generation needs ~24 GB (ours peaked at 23.9); the local finish — Topaz and Dehancer — measured 92% of an 11 GB card, so below ~11 GB it goes too | the hosted lanes, all of them, and every finishing step — plus `scene_proxy.py`, which needs no GPU and still reads any `scene.json` you have. [Which tier is yours](#if-you-have-no-gpu-or-a-small-one) |
 | faster-whisper | word times on your own machine | the billed transcription service, or hand-placed captions |
 | Resolve Studio + Dehancer | halation, bloom, grain and gate weave as a graded pass | the colour itself, through a LUT in ffmpeg |
 | Windows | Topaz and Resolve, which are Windows-only here | the Linux lanes; a hosted upscale replaces Topaz |
@@ -169,15 +169,30 @@ always worse.
 The rule the kit holds to: **nothing you are asked to watch needs a build step.** A master plays in any
 player; a designed element's source is one HTML file a browser opens.
 
-### If you have no GPU
+### If you have no GPU, or a small one
 
-The whole answer, so you do not have to intersect the tables above.
+"Do I have a GPU" is the wrong question — every local step has its own VRAM floor, and ours are measured,
+not estimated. Find your row first.
+
+| your card | what we measured on it | what it means |
+|---|---|---|
+| **24 GB** (RTX 3090) | local MiniMax H3 peaked at **23.9 GB of 24** | everything local runs, but generation holds the whole card — nothing else can share it |
+| **~11 GB** (GTX 1080 Ti) | Resolve Studio 18.5 + Dehancer Pro 7.4 graded at **92% VRAM**; the Topaz Rhea ×4 pass also held **92%** | the local *finish* fits and local *generation* does not. Both jobs sit near the edge, so 11 GB is the floor, not the comfortable case |
+| **under ~11 GB** (8 GB, 6 GB) | never tested — *"we have not tried a smaller card"* | those two jobs used about 10.1 GB, so they do not fit. Treat this as the no-local-GPU row below |
+| **integrated graphics, or any non-NVIDIA card** | — | out by construction rather than by speed: Dehancer needs Resolve's **CUDA** processing mode, and the local generation wheels need CUDA 13 on an RTX 20-series card or newer |
+
+**At ~11 GB**, ignore only [MiniMax H3 on your own GPU](#minimax-h3-on-your-own-gpu) and buy your seeds
+hosted. Keep `tools/topaz-upscale/` and the Resolve chain — they are the two things that *do* fit. Expect
+them to be slow rather than impossible: a Dehancer frame took 5.5 s at 3416×1920, and a full pass ran about
+135 minutes.
+
+**Everything below applies to the last two rows** — no card, one under about 11 GB, or a non-NVIDIA one.
 
 Ignore three sections: [ComfyUI](#comfyui-only-for-work-on-your-own-gpu),
 [MiniMax H3 on your own GPU](#minimax-h3-on-your-own-gpu), and
 [Topaz](#topaz-only-for-upscaling-on-your-own-gpu).
 
-Five scripts cannot run. Nothing else calls them, so nothing else breaks:
+Five scripts cannot run. Nothing else calls them, so nothing else breaks — but read the note under the list:
 
 ```
 skills/video-refs-continuity/scripts/comfy_up.sh
@@ -187,7 +202,11 @@ skills/video-finish-qc/scripts/upscale_local.sh
 tools/topaz-upscale/topaz_upscale.py
 ```
 
-`tools/topaz-upscale/` is safe to delete. Leave every `COMFY_*`, `TOPAZ_*` and `TVAI_*` variable unset in `.env`.
+`tools/topaz-upscale/` is safe to delete **in these rows only** — at ~11 GB it is one of the few local things that still works. Leave every `COMFY_*`, `TOPAZ_*` and `TVAI_*` variable unset in `.env`.
+
+One caveat on `scene_blockout.py`: it ran in ~15–25 s per frame on a 24 GB card, but that is the card it happened
+to run on, **not a measured requirement** — its two checkpoints are small and nobody has tried it on a lesser card.
+If you have some GPU, it is worth one attempt before you assume it is out.
 
 You keep all fifteen skills and every generation route, because all four are hosted: Seedance 2.5 on
 Higgsfield by subscription or on monid pay-as-you-go, fal for people-free shots, kie for stills. You keep the
