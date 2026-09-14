@@ -257,9 +257,10 @@ For Codex, that folder is `~/.agents/skills`:
 ./install.sh ~/.agents/skills
 ```
 
-That links both, and both are needed: 24 files inside the skills call `~/.claude/skills/<skill>/…` by
+That links both, and both are needed: commands inside the skills call `~/.claude/skills/<skill>/…` by
 absolute path, so that link stays load-bearing whatever agent you run. Codex then invokes a skill with
 `$<skill-name>`, and reads `AGENTS.md` at the repository root on its own — it does not read this file.
+Claude Code reads `CLAUDE.md`, which is a one-line import of the same `AGENTS.md`.
 
 Vendor keys never live in the repo or in a skill. Copy `.env.example` to `.env`, which git ignores, and
 fill in the keys for the parts you use. The file names every key and variable the kit reads and what each

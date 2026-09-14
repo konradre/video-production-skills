@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a step, venue, instrument, or rule the kit does not have
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The kit's rules come from measurements. A proposal that carries one is much easier to accept.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What does not work today
+      description: The production situation you hit, not the solution you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: Which phase it belongs to, and which skill would own it.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >
+        A measurement, a vendor document, or a receipt. Name the model, venue, version and date it was
+        taken on — a number holds only for those.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Pre-production
+        - References and continuity
+        - The prompt
+        - Generation and cost gating
+        - Take review
+        - The cut
+        - Sound
+        - Designed elements and explainers
+        - The finish and QC
+        - Client rounds
+        - Tools (Topaz, Resolve)
+        - The look library
+        - Install, docs, or agent files
+    validations:
+      required: true

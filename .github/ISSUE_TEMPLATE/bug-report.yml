@@ -1,0 +1,59 @@
+name: Bug report
+description: A script, skill, or tool behaves differently from what it documents
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not paste API keys, `.env` contents, or client material.
+        For a security problem, use Security → Report a vulnerability instead.
+  - type: input
+    id: what
+    attributes:
+      label: What ran
+      description: The exact command, or the skill and the step inside it.
+      placeholder: python3 ~/.claude/skills/video-gen-cost-gate/scripts/... --root <project>
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+      description: Include the output. Redact keys, paths you would rather not share, and client names.
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code
+        - Codex
+        - No agent — ran the script directly
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS, and whether you are inside WSL2. Add GPU and VRAM if the step uses one.
+      placeholder: Ubuntu 24.04 under WSL2 on Windows 11; RTX 3090 24 GB
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Python, ffmpeg, and the version of any vendor tool involved (Resolve, Topaz, Node).
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I ran the command with `--help` and it did not explain the behaviour.
+          required: false
+        - label: This is not an edit request for a file under `skills/`, which is generated.
+          required: true
