@@ -40,7 +40,8 @@ The table follows a production in the order it runs. Each row names a step and i
 on top of the base install, and the key or variable it reads from `.env`. Set up the rows you will use. The
 entry skill (`video-production`), pre-production (`ad-spot-preprod`, `film-preprod`), the prompt
 (`video-prompt-dialects`), the cut (`video-edit-edl`) and the client round (`client-rounds`) need nothing
-more, and the status line reads the Higgsfield and ElevenLabs balances once those are set up.
+more, and the status line reads the Higgsfield and ElevenLabs balances once those are set up. Three rows want a
+GPU of your own; if you have none, [If you have no GPU](#if-you-have-no-gpu) is the whole answer in one place.
 
 | step · skill | what it does | install or sign up for | key or variable |
 |---|---|---|---|
@@ -157,7 +158,7 @@ always worse.
 |---|---|---|
 | ffmpeg | the encode, the loudness read, the format checks, silence detection | everything up to the master; a hosted upscale returns a finished file |
 | Node 22+ | designed elements and explainers — they render through headless Chromium | every generated-footage lane, and the mastering tool on Node 18 |
-| a GPU | local generation, the scene proxy, a local upscale | the hosted lanes, all of them, and every finishing step |
+| a GPU | local generation (MiniMax H3 on your own card), the scene BUILDER (`scene_blockout.py`), the local upscale | the hosted lanes, all of them, and every finishing step — plus `scene_proxy.py`, which needs no GPU and still reads any `scene.json` you have. [What to ignore and what to delete](#if-you-have-no-gpu) |
 | faster-whisper | word times on your own machine | the billed transcription service, or hand-placed captions |
 | Resolve Studio + Dehancer | halation, bloom, grain and gate weave as a graded pass | the colour itself, through a LUT in ffmpeg |
 | Windows | Topaz and Resolve, which are Windows-only here | the Linux lanes; a hosted upscale replaces Topaz |
@@ -167,6 +168,41 @@ always worse.
 
 The rule the kit holds to: **nothing you are asked to watch needs a build step.** A master plays in any
 player; a designed element's source is one HTML file a browser opens.
+
+### If you have no GPU
+
+The whole answer, so you do not have to intersect the tables above.
+
+Ignore three sections: [ComfyUI](#comfyui-only-for-work-on-your-own-gpu),
+[MiniMax H3 on your own GPU](#minimax-h3-on-your-own-gpu), and
+[Topaz](#topaz-only-for-upscaling-on-your-own-gpu).
+
+Five scripts cannot run. Nothing else calls them, so nothing else breaks:
+
+```
+skills/video-refs-continuity/scripts/comfy_up.sh
+skills/video-refs-continuity/scripts/comfy_ready.py
+skills/video-refs-continuity/scripts/scene_blockout.py
+skills/video-finish-qc/scripts/upscale_local.sh
+tools/topaz-upscale/topaz_upscale.py
+```
+
+`tools/topaz-upscale/` is safe to delete. Leave every `COMFY_*`, `TOPAZ_*` and `TVAI_*` variable unset in `.env`.
+
+You keep all fifteen skills and every generation route, because all four are hosted: Seedance 2.5 on
+Higgsfield by subscription or on monid pay-as-you-go, fal for people-free shots, kie for stills. You keep the
+whole finish chain, with the hosted upscale doing the job Topaz would have done. And you keep `look-library/`,
+because applying a look is an ffmpeg `lut3d` filter — Resolve is only needed to author or rebake one.
+
+One METHOD changes, not just a tool. Without `scene_blockout.py` you cannot compute a room from a keeper
+frame, so the geometry for a new angle is read off that frame at 2–4× zoom and copied into the prompt
+verbatim, and the GO ask says "no scene proxy for this shot"
+(`skills/video-refs-continuity/SKILL.md` § Failure behavior). The reader, `scene_proxy.py`, needs no GPU and
+still works on any `scene.json` you already have.
+
+`tools/resolve-pass/` is a different axis, not this one. It needs Windows, DaVinci Resolve Studio and a
+Dehancer licence whether or not you have a card. Without it a look still applies as a LUT; what you lose is
+halation, bloom, grain and gate weave as a graded pass.
 
 ## Install
 
