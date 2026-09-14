@@ -131,7 +131,15 @@ def main():
     if a.mode == 'flf' and not a.end_image:
         sys.exit('--mode flf needs --end-image')
     if len(refs) > 30:
-        sys.exit(f'seedance takes at most 30 reference images; got {len(refs)}')
+        # 30 is vendor PROSE in the endpoint schema's `role` description, NOT `maxItems` — the content
+        # array carries no length bound at all, nor does any variant (re-read 2026-09-14). This is a
+        # fail-closed guard on an UNMEASURED claim, and fail-closed is the right direction: an over-cap
+        # body the gateway or the provider rejects costs $0.00, while one that SUCCEEDS bills in full.
+        # So the real ceiling is free to probe on failure and one generation on success — deliberately,
+        # never by accident. Provenance: VENUES.md § monid.
+        sys.exit(f'{len(refs)} reference images — refusing above 30, which is the VENDOR\'S STATED cap '
+                 f'(prose in the endpoint schema, never measured here — VENUES.md § monid). '
+                 f'Raise it from a receipt, not from this message.')
 
     # The ratio rule is a schema fact, not a preference: only t2v/r2v accept one.
     ratio = a.ratio if a.mode in RATIO_MODES else 'adaptive'
