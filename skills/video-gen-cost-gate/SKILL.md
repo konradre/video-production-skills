@@ -143,7 +143,9 @@ python3 scripts/hf_submit.py --root <project> --scene S02-G4 --prompt prompts/r2
     --mode omni_reference --duration 8 --refs ROOM,W1,PRODUCT-sheet --start-image S02-G4-start --seeds 3 [--go]
 python3 scripts/gen_stills.py --root <project> --only S02-G4-start [--model gpt25|gpt25s|nano|gpt2] [--fresh-scene] [--go]
 python3 scripts/gen_video_fal.py --root <project> --prompt-file … --engine seedance|h3 --mode r2v --refs … [--go]
-python3 scripts/monid_upload.py --root <project> references/ROOM.png --name ROOM --go   # sfs, $0.00
+python3 scripts/monid_upload.py --root <project> --batch 'references/*.png' --go   # sfs, $0.00, idempotent
+python3 scripts/monid_upload.py --root <project> --verify        # ONE recursive /ls for the whole set
+python3 scripts/monid_upload.py --root <project> --refresh --go  # re-issue lapsed urls, moves no bytes
 python3 scripts/monid_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \
     --mode t2v|i2v|flf|r2v --duration 7 --refs ROOM,W1 --resolution 480p --ratio 9:16 [--go]
 ```
@@ -158,6 +160,14 @@ raw UUID or a raw URL is refused because the gate must see a name. kie URLs expi
 about 24 h ("Image fetch failed" = expired, billed 0 → re-upload). A prompt over 5000 chars is warned
 (6629 worked; 7840 was trimmed); on monid 6000 is the endpoint's own cap and `monid_submit.py` refuses
 above it rather than letting the venue trim.
+
+**A monid reference has a lifecycle the other venues do not, and the gate enforces it.** The FILE persists
+forever but its signed url lapses with its `ttl`, and the model fetches that url at generation time — while
+the job bills at **acceptance**. So a lapsed url would pass a name check and cost the batch. `--batch` hosts
+a whole set idempotently (skipping anything whose sha256 still matches, re-uploading anything whose local
+file CHANGED), `--verify` answers "do all 30 still exist?" in one free recursive `/ls`, `--refresh` re-issues
+a lapsed url by a free `/cat` that moves no bytes, and the refs gate FAILS a reference whose url has expired —
+checked locally from the recorded `expiresAt` or the url's own `?e=<unix>`, at zero API calls.
 
 `monid_submit.py` refuses three things outright, because each one bills in full while looking correct:
 **`--duration auto`** (it HOLDS a full 30 s price up front and releases the remainder on settle, so the

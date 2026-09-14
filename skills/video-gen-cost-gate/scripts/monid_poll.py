@@ -20,9 +20,21 @@ WIRE FACTS, measured 2026-09-14 (VENUES.md § monid) — each one is a trap that
      A parser written for the fal shape returns None here and the take is silently lost.
   4. The result URL expires in ~24 h, so the download happens at collection, not later.
   5. Cost is a RECEIPT, never arithmetic: `cost.value` and `billedUnits` come back on the run record
-     and are stored verbatim. The estimate is kept beside them so drift is visible.
+     and are stored verbatim. The estimate is kept beside them so drift is visible. `billing` is absent
+     until the run settles, so `cost.value` is the field to read.
+  6. The terminal set is FIVE statuses, not two — see TERMINAL below. This is monid's documented
+     lifecycle, and a poller that waits only for COMPLETED/FAILED hangs on the other three.
 """
 import argparse, json, os, subprocess, sys, time, urllib.request
+
+
+# The FULL terminal set, from monid's own API reference (docs/api/run § Polling for Results):
+# COMPLETED · FAILED · BLOCKED · STOPPED · TIMED_OUT. Breaking on only COMPLETED/FAILED leaves a
+# BLOCKED or TIMED_OUT run spinning until this script's own timeout — the poll never returns and the
+# take is never collected. BLOCKED is a control gate refusing the run BEFORE execution (200 + `reason`
+# + `controls`), so it is free; TIMED_OUT exceeded its time budget; STOPPED was stopped by request.
+TERMINAL = ('COMPLETED', 'FAILED', 'BLOCKED', 'STOPPED', 'TIMED_OUT',
+            'CANCELLED', 'CANCELED', 'ERROR')     # the last three are not in the docs; harmless to accept
 
 
 def log(*a):
@@ -93,7 +105,7 @@ def main():
                 continue
             o = get_run(j['run_id'])
             st = str(o.get('status', '')).upper()
-            if st not in ('COMPLETED', 'FAILED', 'CANCELLED', 'CANCELED', 'ERROR'):
+            if st not in TERMINAL:
                 log('…', j['name'], st or json.dumps(o)[:120])
                 continue
             http = ((o.get('providerResponse') or {}).get('httpStatus'))
@@ -102,9 +114,18 @@ def main():
             if st != 'COMPLETED' or (isinstance(http, int) and not 200 <= http < 300):
                 err = json.dumps((o.get('providerResponse') or {}).get('error') or o.get('error') or {})[:300]
                 free = (cost in (0, 0.0, None))
+                extra = ''
+                if st == 'BLOCKED':
+                    # a control gate refused it BEFORE execution — the reason is actionable, unlike a
+                    # provider error, and the run never reached the model
+                    extra = f" reason={o.get('reason')!r} controls={json.dumps(o.get('controls') or {})[:160]}"
+                elif st in ('STOPPED', 'TIMED_OUT'):
+                    extra = f" reason={o.get('reason')!r}"
                 log('FAILED', j['name'], f'status={st} provider_http={http}',
-                    f'cost=${cost} ({"FREE — provider errors are not charged" if free else "BILLED"})', err)
-                done[j['name']] = {'run': o, 'error': f'{st}/{http}', 'cost_usd': cost, 'billed': not free}
+                    f'cost=${cost} ({"FREE — provider errors are not charged" if free else "BILLED"})',
+                    err + extra)
+                done[j['name']] = {'run': o, 'error': f'{st}/{http}', 'cost_usd': cost, 'billed': not free,
+                                   'reason': o.get('reason'), 'controls': o.get('controls')}
                 continue
             url = video_url_of(o)
             if not url:

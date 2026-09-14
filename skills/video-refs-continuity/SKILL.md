@@ -171,7 +171,10 @@ for `hf`, `refs-urls.json` for `kie`, `monid-urls.json` for `monid`. A reference
 free `/cat` rather than re-uploaded, an expired link there costs nothing, unlike kie's ~24 h expiry. The same call also
 carries a privacy consequence the other targets do not: an sfs URL is fetchable by anyone who holds it until its `ttl`
 lapses, and `/rm` frees the quota without recalling a copy already served — so a client's own asset gets a short `ttl`,
-not the default.
+not the default. **The gate checks that url's EXPIRY, not just its presence** — a lapsed signed url would pass a name
+check and then cost the batch, because the model fetches it at generation time while the job bills at acceptance. Expiry is
+read locally from the recorded `expiresAt` or the url's own `?e=<unix>` (zero API calls); an expired url FAILS, one lapsing
+inside a generation's p95 WARNs, and the fix is free: `monid_upload.py --refresh <NAME> --go`.
 
 Rules live in `<project>/prompts/refs-required.json`
 ([template](references/refs-required.example.json)): each element the prompt matches needs its reference

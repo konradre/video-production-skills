@@ -157,7 +157,9 @@ def main():
             sys.exit(f'{name[:40]}… is a raw URL — the gate needs a NAME; host it with '
                      f'monid_upload.py --root {root} <file> --name <NAME> (sfs, $0.00)')
         u = urls.get(name)
-        if not u:
+        if name == '_meta':
+            u = None
+        if not isinstance(u, str):
             sys.exit(f'no hosted URL for {name} ({p}) — monid_upload.py --root {root} <file> --name {name}')
         return u
 

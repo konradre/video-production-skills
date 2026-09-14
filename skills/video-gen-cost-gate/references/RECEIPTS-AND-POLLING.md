@@ -25,7 +25,10 @@ Billing happens when the venue ACCEPTS the job, not when the result is fetched. 
    high across ten runs. A refusal returns `billable='0'`.
 8. Never resubmit a billed job. Results persist; re-fetch by job id (`higgsfield generate get <id>`,
    `monid runs get -r <run id>`).
-9. On monid the handle is the `runId`, and an async fire writes it to **stdout only** — `-o` writes
+9. **monid has FIVE terminal statuses** — `COMPLETED` · `FAILED` · `BLOCKED` · `STOPPED` · `TIMED_OUT` — and the
+   vendor's own CLI guidance is to *"run without `--wait` and poll separately"*. `status` and
+   `providerResponse.httpStatus` are INDEPENDENT: `COMPLETED` + `404` is a normal, unbilled no-match.
+10. On monid the handle is the `runId`, and an async fire writes it to **stdout only** — `-o` writes
    nothing. Persist it from the submit envelope before anything else can fail. A reply carrying **no
    `runId`** is a body the gateway rejected: no run was created, so nothing was billed.
 
@@ -42,6 +45,8 @@ Billing happens when the venue ACCEPTS the job, not when the result is fetched. 
 | `Timeout after 10m` (Higgsfield `--wait`) | wait too short | `--wait-timeout 20m`, or poll without `--wait` |
 | monid `COMPLETED` + `providerResponse.httpStatus` 404/500 | the RUN finished, the generation did not — and a provider error is **NOT charged** | read `cost.value` (0) before recording any spend; fix the body and resubmit inside the original GO |
 | monid reply with no `runId` | the gateway refused the body before a run existed | nothing billed and no handle to recover; correct the body and resubmit |
+| monid `status: BLOCKED` | a control gate refused the run BEFORE execution (`200` + `reason` + `controls`) | free and never reached the model; read `reason`, fix the body, resubmit inside the original GO |
+| monid `status: TIMED_OUT` / `STOPPED` | the run exceeded its time budget, or was stopped by request | terminal — a poller that waits only for `COMPLETED`/`FAILED` hangs here until its own timeout |
 | monid `--wait` returning a timeout at 300 s | the default wait is shorter than the job (p50 245 s, p95 603 s) | never `--wait`; fire, persist the `runId`, poll detached — the run is still billing |
 | Topaz/Starlight submission hangs (no job, no charge) | route hazard | one retry, then the local Rhea route |
 | `Session expired` | OAuth token | the operator re-logs in |

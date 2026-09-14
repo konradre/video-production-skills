@@ -10,7 +10,10 @@ Layout under --root (default: the current directory):
   receipts/refs-gate.jsonl       the ledger: PASS records, registrations, imports, acceptances, keeper-crop derivations
   receipts/<NAME>-upload-id.txt  a reference uploaded for target `hf`
   refs-urls.json                 references uploaded for target `kie` ({NAME: url})
-  monid-urls.json                references hosted on sfs for target `monid` ({NAME: url}; monid_upload.py)
+  monid-urls.json                references hosted on sfs for target `monid` ({NAME: url} + `_meta`;
+                                 monid_upload.py). For this target the gate ALSO checks the signed url's
+                                 expiry — a lapsed url FAILS, because the model fetches it at generation
+                                 time and the job bills at acceptance. The fix is a free re-issue.
 
 Rules: each rule = an element (a regex over the prompt body, negated clauses removed) + the reference ROLES it needs;
 a role is met by any listed reference NAME that is in --refs AND uploaded for --target, or inherited from the START
@@ -91,6 +94,47 @@ class Gate:
         # kie uploads to its own store, where a lapsed URL means a real re-upload. One ledger each.
         p = os.path.join(self.root, 'monid-urls.json' if target == 'monid' else 'refs-urls.json')
         return os.path.exists(p) and name in json.load(open(p, encoding='utf-8'))
+
+    def monid_freshness(self, name, label):
+        """A monid reference rides as a SIGNED URL that lapses with its ttl. The name being present in
+        the ledger proves nothing about the url still resolving, and the model fetches it at generation
+        time — so a lapsed url would pass a name check and fail (or worse, silently drop a reference)
+        after the job is already billed at acceptance. Expiry is read LOCALLY: from the recorded
+        expiresAt, else from the url's own `?e=<unix>`. Zero API calls. The fix is free
+        (`monid_upload.py --refresh <NAME>`), so this fails closed."""
+        p = os.path.join(self.root, 'monid-urls.json')
+        if not os.path.exists(p):
+            return [], 0
+        try:
+            d = json.load(open(p, encoding='utf-8'))
+        except Exception:
+            return [(f'{label} url', 'WARN', 'monid-urls.json does not parse')], 0
+        url = d.get(name)
+        if not isinstance(url, str):
+            return [], 0
+        exp = ((d.get('_meta') or {}).get(name) or {}).get('expiresAt')
+        left = None
+        if exp:
+            try:
+                t = time.strptime(exp.replace('Z', '+0000'), '%Y-%m-%dT%H:%M:%S.%f%z')
+                left = time.mktime(t) - time.timezone - time.time()
+            except Exception:
+                left = None
+        if left is None:
+            m = re.search(r'[?&]e=(\d+)', url)
+            if m:
+                left = int(m.group(1)) - time.time()
+        if left is None:
+            return [(f'{label} url', 'WARN', 'no expiry recorded — run monid_upload.py --verify')], 0
+        if left <= 0:
+            return [(f'{label} url', 'FAIL',
+                     'the signed sfs url has EXPIRED — the model fetches it at generation time, and the '
+                     f'job bills at acceptance. Free fix: monid_upload.py --root <project> --refresh {name} --go')], 1
+        if left < 1800:
+            return [(f'{label} url', 'WARN',
+                     f'url lapses in {left/60:.0f} min and a generation p95 is ~10 min — '
+                     f'refresh it before the GO (free)')], 0
+        return [(f'{label} url', 'ok', f'signed url good for {left/3600:.1f} h')], 0
 
     def latest_record(self, asset):
         rec = None
@@ -197,9 +241,13 @@ class Gate:
                                  f"derive the plate from the previous shot's LAST keeper frame, --import the client's approved image, or declare --fresh-scene")); fail += 1
             if rec is not None:
                 crows, cfail = self.content(start_image, '  start image'); rows += crows; fail += cfail
+        if target == 'monid' and start_image:
+            frows, ffail = self.monid_freshness(start_image, '  start image'); rows += frows; fail += ffail
         for r in refs:
             if not self.uploaded(r, target):
                 rows.append(('ref ' + r, 'FAIL', f'not uploaded for target {target}')); fail += 1
+            elif target == 'monid':
+                frows, ffail = self.monid_freshness(r, 'ref ' + r); rows += frows; fail += ffail
             if r == start_image:
                 continue
             crows, cfail = self.content(r, 'ref ' + r); rows += crows; fail += cfail
@@ -312,6 +360,26 @@ def selftest():
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm', 'BROKEN-ref']); cases.append(('an undecodable registered file FAILS', not ok and any('does not decode' in r[2] for r in rows)))
         Image.new('RGB', (512, 768), (10, 200, 10)).save(os.path.join(d, 'refs', 'VISITOR-ref.png'))
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm']); cases.append(('a file changed after acceptance FAILS', not ok and any('CHANGED' in r[2] for r in rows)))
+        # --- target monid: the signed url's expiry, read locally from the ledger and the url itself ---
+        now = int(time.time())
+        mpath = os.path.join(d, 'monid-urls.json')
+        Image.new('RGB', (512, 768), (120, 90, 60)).save(os.path.join(d, 'refs', 'VISITOR-ref.png'))
+        rec = g.latest_record('VISITOR-ref'); rec['sha256'] = sha256(os.path.join(d, 'refs', 'VISITOR-ref.png')); g.append(rec)
+        live = f'https://sfs.monid.ai/BBB?e={now + 7 * 3600}'
+        json.dump({'VISITOR-ref': f'https://sfs.monid.ai/AAA?e={now + 7 * 3600}', 'LOOK-warm': live,
+                   '_meta': {}}, open(mpath, 'w'))
+        ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], target='monid')
+        cases.append(('monid: a LIVE signed url passes', ok and any(r[1] == 'ok' and 'good for' in r[2] for r in rows)))
+        json.dump({'VISITOR-ref': f'https://sfs.monid.ai/AAA?e={now - 60}', 'LOOK-warm': live,
+                   '_meta': {}}, open(mpath, 'w'))
+        ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], target='monid')
+        cases.append(('monid: an EXPIRED signed url FAILS before the GO',
+                      not ok and any(r[1] == 'FAIL' and 'EXPIRED' in r[2] for r in rows)))
+        json.dump({'VISITOR-ref': f'https://sfs.monid.ai/AAA?e={now + 300}', 'LOOK-warm': live,
+                   '_meta': {}}, open(mpath, 'w'))
+        ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], target='monid')
+        cases.append(('monid: a url lapsing inside the gen p95 WARNs but still passes',
+                      ok and any(r[1] == 'WARN' and 'lapses in' in r[2] for r in rows)))
     for name, ok in cases: print(f"  {'ok  ' if ok else 'FAIL'} {name}")
     ok = all(v for _, v in cases); print(f"refs_gate selftest {'PASS' if ok else 'FAIL'}"); return 0 if ok else 1
 
