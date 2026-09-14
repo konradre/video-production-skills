@@ -100,6 +100,17 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
 - **Wire limits**: 480p / 720p (/1080p on Higgsfield); duration 4–30 s (integer on Higgsfield, or `auto`
   on fal); prompt ≤ 6000 chars (≈ 2.5–3.2 k worked; > 5 k warned; 7840 was trimmed); `ratio` adaptive by
   default; public https or asset ids on the wire (Higgsfield uploads by UUID); result URLs expire ~24 h.
+- **The monid wire shape is NOT the @-flag shape — the DIALECT above is unchanged, the CALL is not.**
+  One `content[]` array carries everything: a `{type:"text"}` item holding the whole prompt, then one
+  `{type:"image_url", image_url:{url}, role}` per picture with `role` ∈ `first_frame` · `last_frame`
+  (only alongside a first frame) · `reference_image` (≤30), plus `video_url` / `audio_url` items (≤10
+  each, 2–30 s, ≤30 s total) under `reference_video` / `reference_audio`. **Ordinals are numbered per
+  TYPE in ARRAY ORDER, and a first_frame is still an image** — so a start frame occupies `@Image1` and
+  every reference shifts by one; `video-gen-cost-gate/scripts/monid_submit.py` prints the resolved map
+  before the GO, because a prompt citing the wrong ordinal generates cleanly and bills in full. `ratio`
+  is accepted ONLY for t2v and r2v: first/last-frame, video edit and extend inherit their source's
+  aspect and REQUIRE `adaptive`. Pictures ride as public https URLs, which monid's own `sfs` store
+  issues for $0.00 (`monid_upload.py`) — so nothing here is blocked on "it needs a public URL".
 - **Moderation is on the prompt WORDS**: "penis", "dick", "thrusting" → `nsfw` on the whole batch
   (refunded); a woman looking a man up and down → nsfw on 2/3; a bare-torso waist frame or a headless
   start image → refused unbilled; ALL-CAPS script words trip the refs gate's subject scan. fal additionally

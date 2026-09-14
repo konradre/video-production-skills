@@ -4,11 +4,14 @@
 it), the background jobs (named, or "none"), and the open items. Nothing here spends; every read is free.
 
   status_line.py --root <project> [--deliverable deliver/<file>.mp4] [--drive /mnt/c] [--min-free-gb 6]
-                 [--higgsfield] [--elevenlabs] [--open "the client's verdict on S02"] [--job "rhea A2F (log: …)"]
---higgsfield runs `higgsfield account status` (the CLI's free read: balance, plan, recent transactions) when the CLI is on the PATH; --elevenlabs reads the plan's
+                 [--higgsfield] [--monid] [--elevenlabs] [--open "the client's verdict on S02"] [--job "rhea A2F (log: …)"]
+--higgsfield runs `higgsfield account status` (the CLI's free read: balance, plan, recent transactions) when the CLI is on the PATH; --monid runs `monid balance`, the
+pay-as-you-go wallet in dollars (also free); --elevenlabs reads the plan's
 character count with ELEVENLABS_API_KEY from the environment. Vendors with no balance endpoint are reported as unreadable.
+A balance is REPORTED, never ranked on: venue choice is by marginal cost, and a low wallet is a funding question
+(`video-gen-cost-gate/references/VENUES.md` § Venue ranking).
 """
-import argparse, json, os, shutil, subprocess, time, urllib.request
+import argparse, json, os, re, shutil, subprocess, time, urllib.request
 
 
 def sh(cmd, timeout=20):
@@ -19,13 +22,20 @@ def sh(cmd, timeout=20):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--deliverable'); ap.add_argument('--drive', default='.'); ap.add_argument('--min-free-gb', type=float, default=6)
-    ap.add_argument('--higgsfield', action='store_true'); ap.add_argument('--elevenlabs', action='store_true'); ap.add_argument('--open', action='append', default=[]); ap.add_argument('--job', action='append', default=[])
+    ap.add_argument('--higgsfield', action='store_true'); ap.add_argument('--monid', action='store_true'); ap.add_argument('--elevenlabs', action='store_true'); ap.add_argument('--open', action='append', default=[]); ap.add_argument('--job', action='append', default=[])
     a = ap.parse_args(); os.chdir(a.root); now = time.strftime('%Y-%m-%d %H:%M'); lines = [f'STATUS {now}']
     if a.deliverable:
         ok = os.path.exists(a.deliverable); lines.append(f"deliverable: {a.deliverable}" + (f" ({os.path.getsize(a.deliverable) / 2 ** 20:.1f} MiB)" if ok else ' — MISSING'))
     du = shutil.disk_usage(a.drive); free = du.free / 1e9; lines.append(f"drive {a.drive}: {free:.0f} GB free" + (' — ⚠ under the floor, stop heavy work' if free < a.min_free_gb else ''))
     bal = []
     if a.higgsfield: bal.append('Higgsfield: ' + (sh(['higgsfield', 'account', 'status']).splitlines()[0] if shutil.which('higgsfield') else 'unreadable (CLI not on PATH)'))
+    if a.monid:
+        if not shutil.which('monid'): bal.append('monid: unreadable (CLI not on PATH)')
+        else:
+            # `monid balance` prints a decorated banner; the wallet is the line carrying a figure.
+            raw = re.sub(r'\x1b\[[0-9;]*m', '', sh(['monid', 'balance']))
+            hit = [ln.strip() for ln in raw.splitlines() if '$' in ln]
+            bal.append('monid: ' + (hit[0] if hit else f'unreadable ({raw.splitlines()[-1][:40] if raw else "no output"})'))
     if a.elevenlabs:
         key = os.environ.get('ELEVENLABS_API_KEY')
         if not key: bal.append('ElevenLabs: unreadable (no ELEVENLABS_API_KEY in the environment)')

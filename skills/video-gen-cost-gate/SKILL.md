@@ -38,8 +38,20 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   refs, start image + image refs + video refs together, 480p at 2.5 cr/s). fal's Seedance refuses any
   photoreal person in a reference (`content_policy_violation`, billed 0) — fal only for people-free
   shots. MiniMax H3 is 768p minimum and a different look.
+- **People-free Seedance with no plan to feed → monid `bytedance /v1/video/seedance-2.5`, the
+  pay-as-you-go route.** Same model, same 480p house shape as the Higgsfield route, bought by the
+  second instead of by the month: **$10.7/1M tokens ⇒ $0.1039/s at 4 s → $0.1029/s at 30 s**, measured.
+  Rank by MARGINAL cost and prefer pay-as-you-go over plan lock-in at equal cost — a plan's true rate is
+  its price ÷ the credits actually burned, and **a venue is NEVER ranked by its current balance** (a low
+  wallet is a funding question; `references/VENUES.md` § Venue ranking). References ride free on monid's
+  own `sfs` store (`scripts/monid_upload.py`, $0.00), so "it needs a public URL" never routes work off
+  it. **The partition is the same one fal already forces, for a different reason:** real human faces are
+  rejected UPSTREAM (BytePlus ModelArk) and monid exposes none of the licensed-asset escapes, so a
+  photoreal person in a reference stays on Higgsfield.
 - A continuation of a keeper → `--mode video_extension` on the keeper's own job id (same price as a
-  fresh gen).
+  fresh gen). On monid the edit and extend modes are **phrasing, not flags** — say so explicitly in the
+  prompt or the model reads it as a plain r2v, generates a NEW video, succeeds, and bills in full with
+  no error to catch (`video-prompt-dialects` DIALECTS.md § Seedance 2.5).
 - Stills → **GPT Image 2.5 is the default image model for every still, plate and reference, and kie is the
   FIRST venue for image gens (house rule, 2026-09-10)**: kie `gpt-image-2-5-flare-image-to-image` ($0.05 at
   2K; validated 09-10 — one still matched the scene proxy's end table with no invented element), Higgsfield
@@ -58,6 +70,11 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   UNKNOWN — never the largest value you happen to have used: a multi-call extension workaround was once designed
   around an 8 s "ceiling" taken from a production's own receipts, for a model whose estimator names the real cap in one
   free call (`higgsfield generate cost <model> --duration 40` → the error states the maximum; never with `--mode`).
+  On **monid** the free read is `monid inspect -p <provider> -e <endpoint>`, whose `input` schema carries every
+  cap verbatim — run it before EVERY run, because the schemas change. Its `notes` also carry the vendor's
+  billing formula, and **a formula is a vendor CLAIM until a receipt confirms it**: ByteDance's published
+  `W × H × fps × seconds ÷ 1024` was short by exactly one frame, and only a measured run found it
+  (`references/VENUES.md` § monid).
   The cap is read before a shot list splits any action (`video-production/references/PREPRODUCTION-CORE.md` § 2).
 
 ### Mode by what the shot must hold
@@ -126,16 +143,30 @@ python3 scripts/hf_submit.py --root <project> --scene S02-G4 --prompt prompts/r2
     --mode omni_reference --duration 8 --refs ROOM,W1,PRODUCT-sheet --start-image S02-G4-start --seeds 3 [--go]
 python3 scripts/gen_stills.py --root <project> --only S02-G4-start [--model gpt25|gpt25s|nano|gpt2] [--fresh-scene] [--go]
 python3 scripts/gen_video_fal.py --root <project> --prompt-file … --engine seedance|h3 --mode r2v --refs … [--go]
+python3 scripts/monid_upload.py --root <project> references/ROOM.png --name ROOM --go   # sfs, $0.00
+python3 scripts/monid_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \
+    --mode t2v|i2v|flf|r2v --duration 7 --refs ROOM,W1 --resolution 480p --ratio 9:16 [--go]
 ```
 
 Dry run by default; `--go` spends. Each path runs the refs gate first and refuses on FAIL, prints the
 cost, parses the venue's reply shape-safely (Higgsfield `generate create --json` returns a bare LIST of
 job ids), writes the raw reply to `receipts/raw/`, appends a ledger record per seed BEFORE polling,
 and detaches the poller. Reference names resolve through `receipts/<NAME>-upload-id.txt`
-(`scripts/hf_upload.py`) or `refs-urls.json` (`scripts/kie_upload.py`, which MERGES — an overwrite once
-dropped eleven live URLs); a raw UUID is refused because the gate must see a name. kie URLs expire in
+(`scripts/hf_upload.py`), `refs-urls.json` (`scripts/kie_upload.py`, which MERGES — an overwrite once
+dropped eleven live URLs) or `monid-urls.json` (`scripts/monid_upload.py`, which merges the same way); a
+raw UUID or a raw URL is refused because the gate must see a name. kie URLs expire in
 about 24 h ("Image fetch failed" = expired, billed 0 → re-upload). A prompt over 5000 chars is warned
-(6629 worked; 7840 was trimmed).
+(6629 worked; 7840 was trimmed); on monid 6000 is the endpoint's own cap and `monid_submit.py` refuses
+above it rather than letting the venue trim.
+
+`monid_submit.py` refuses three things outright, because each one bills in full while looking correct:
+**`--duration auto`** (it HOLDS a full 30 s price up front and releases the remainder on settle, so the
+GO would be given against a number nobody asked for — always an integer 4–30); **a `ratio` on a mode
+that cannot take one** (only t2v and r2v accept a ratio; first/last-frame, edit and extend inherit their
+source's aspect and REQUIRE `adaptive`); and **a raw URL in place of a reference name**. It prints the
+resolved `@Image1…@ImageN` map before the GO, because ordinals are numbered **per type in array order**
+and a start image is itself an image — so a first frame takes `@Image1` and every ref shifts by one, and
+a prompt citing the wrong ordinal generates cleanly at full price.
 
 **Done when:** `receipts/hf-jobs-<scene>.json` (or the fal/kie receipt) holds every job id and the
 ledger has one record per seed, before any result is read.
@@ -153,6 +184,13 @@ never `tail -f | grep`. Mechanics in [`references/RECEIPTS-AND-POLLING.md`](refe
   **inside the original GO**. A 503 on one seed is resubmitted under a NEW scene key, never the same
   (it would clobber the batch receipts). A billed job is never resubmitted — its result persists;
   re-fetch it.
+- **monid is fire-and-poll, never `--wait`** (p50 **245 s**, p95 **603 s** against a 300 s default — the
+  wait returns a timeout on a run that is still billing), and on an async fire `-o` writes nothing: the
+  submit envelope is stdout only, so the `runId` is persisted from it before anything else happens.
+  `COMPLETED` carries a second question there that no other venue has — **a provider error arrives as
+  `COMPLETED` with `providerResponse.httpStatus` 404/500 and is NOT charged**, so `monid_poll.py` reads
+  the http status and the run's own `cost.value` before calling a take failed or a failure billed. A
+  reply with **no `runId` at all** is a body the gateway rejected: no run exists and nothing was billed.
 - Two 504s in a row is an outage: stop paying to find out; switch venue on the next GO.
 - The billing header on fal is late, not absent: re-fetch the result URL until it appears; never record
   a missing header as zero. Seedance bills actual output seconds; H3 bills the requested integer.

@@ -10,6 +10,7 @@ Layout under --root (default: the current directory):
   receipts/refs-gate.jsonl       the ledger: PASS records, registrations, imports, acceptances, keeper-crop derivations
   receipts/<NAME>-upload-id.txt  a reference uploaded for target `hf`
   refs-urls.json                 references uploaded for target `kie` ({NAME: url})
+  monid-urls.json                references hosted on sfs for target `monid` ({NAME: url}; monid_upload.py)
 
 Rules: each rule = an element (a regex over the prompt body, negated clauses removed) + the reference ROLES it needs;
 a role is met by any listed reference NAME that is in --refs AND uploaded for --target, or inherited from the START
@@ -24,7 +25,7 @@ LOOK: when the rules list look_plates, light or grade language in the prose with
 keeps a prose-only light on purpose). COMPETING: a cited reference no matched rule depends on is a WARN — a reference
 the prompt does not need competes with the ones it does.
 
-  refs_gate.py --prompt <file> --refs A,B,C [--target hf|kie] [--start-image NAME] [--births R,R]
+  refs_gate.py --prompt <file> --refs A,B,C [--target hf|kie|monid] [--start-image NAME] [--births R,R]
                [--prose X,Y] [--fresh-scene] [--record NAME]            → table + REFS-GATE PASS|FAIL, exit 0|1
   refs_gate.py --register NAME --file <path>                            → bind a reference name to its file (sha256, size)
   refs_gate.py --import NAME --file <path> --provenance "<who, when, how>" → a CLIENT-SUPPLIED asset, a lineage root of its own
@@ -86,7 +87,9 @@ class Gate:
     def uploaded(self, name, target):
         if target == 'hf':
             return os.path.exists(os.path.join(self.root, 'receipts', f'{name}-upload-id.txt'))
-        p = os.path.join(self.root, 'refs-urls.json')
+        # monid hosts its references on sfs (free, and a lapsed URL is re-issued rather than re-uploaded);
+        # kie uploads to its own store, where a lapsed URL means a real re-upload. One ledger each.
+        p = os.path.join(self.root, 'monid-urls.json' if target == 'monid' else 'refs-urls.json')
         return os.path.exists(p) and name in json.load(open(p, encoding='utf-8'))
 
     def latest_record(self, asset):
@@ -320,7 +323,7 @@ def main():
     ap.add_argument('--ledger', help='ledger jsonl (default <root>/receipts/refs-gate.jsonl)')
     ap.add_argument('--prompt', help='prompt file to gate')
     ap.add_argument('--refs', default='', help='comma-separated reference NAMES in @Image order')
-    ap.add_argument('--target', default='hf', choices=['hf', 'kie'])
+    ap.add_argument('--target', default='hf', choices=['hf', 'kie', 'monid'])
     ap.add_argument('--start-image')
     ap.add_argument('--births', default='', help='roles born in this gen')
     ap.add_argument('--prose', default='', help='roles/subjects consciously left prose-only (LOOK = a prose-only light)')

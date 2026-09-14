@@ -160,10 +160,18 @@ checked again.
 
 ```
 python3 scripts/refs_gate.py --root <project> --prompt prompts/<shot>.txt --refs A,B,C \
-    --target hf|kie [--start-image NAME] [--births ROLE,..] [--prose ROLE,..] [--record NAME]
+    --target hf|kie|monid [--start-image NAME] [--births ROLE,..] [--prose ROLE,..] [--record NAME]
 python3 scripts/refs_gate.py --root <project> --register NAME --file references/<file>.png
 python3 scripts/refs_gate.py --root <project> --import CLIENT-PHOTO --file assets/<file>.jpg --provenance "<client, date, channel>"
 ```
+
+Each target has its own upload ledger, and the gate reads the one the call will use: `receipts/<NAME>-upload-id.txt`
+for `hf`, `refs-urls.json` for `kie`, `monid-urls.json` for `monid`. A reference bound for monid is hosted on monid's own
+`sfs` store by `video-gen-cost-gate/scripts/monid_upload.py` at **$0.00** — and because a lapsed sfs URL is re-issued by a
+free `/cat` rather than re-uploaded, an expired link there costs nothing, unlike kie's ~24 h expiry. The same call also
+carries a privacy consequence the other targets do not: an sfs URL is fetchable by anyone who holds it until its `ttl`
+lapses, and `/rm` frees the quota without recalling a copy already served — so a client's own asset gets a short `ttl`,
+not the default.
 
 Rules live in `<project>/prompts/refs-required.json`
 ([template](references/refs-required.example.json)): each element the prompt matches needs its reference

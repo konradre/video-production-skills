@@ -23,7 +23,11 @@ Billing happens when the venue ACCEPTS the job, not when the result is fetched. 
 7. Cost is a receipt, not arithmetic: fal's `X-Fal-Billable-Units` arrives on a re-fetch seconds to
    hours later — re-fetch up to six times; never record a missing header as zero. Arithmetic ran ~10 %
    high across ten runs. A refusal returns `billable='0'`.
-8. Never resubmit a billed job. Results persist; re-fetch by job id (`higgsfield generate get <id>`).
+8. Never resubmit a billed job. Results persist; re-fetch by job id (`higgsfield generate get <id>`,
+   `monid runs get -r <run id>`).
+9. On monid the handle is the `runId`, and an async fire writes it to **stdout only** — `-o` writes
+   nothing. Persist it from the submit envelope before anything else can fail. A reply carrying **no
+   `runId`** is a body the gateway rejected: no run was created, so nothing was billed.
 
 ## Refusals, refunds, outages
 
@@ -36,6 +40,9 @@ Billing happens when the venue ACCEPTS the job, not when the result is fetched. 
 | two 504s in a row (any venue) | outage | stop paying to find out; keep a recovery watcher only for already-billed results; switch venue on the next GO |
 | fal result lookup 504 for hours | vendor down | switch vendor; never resubmit |
 | `Timeout after 10m` (Higgsfield `--wait`) | wait too short | `--wait-timeout 20m`, or poll without `--wait` |
+| monid `COMPLETED` + `providerResponse.httpStatus` 404/500 | the RUN finished, the generation did not — and a provider error is **NOT charged** | read `cost.value` (0) before recording any spend; fix the body and resubmit inside the original GO |
+| monid reply with no `runId` | the gateway refused the body before a run existed | nothing billed and no handle to recover; correct the body and resubmit |
+| monid `--wait` returning a timeout at 300 s | the default wait is shorter than the job (p50 245 s, p95 603 s) | never `--wait`; fire, persist the `runId`, poll detached — the run is still billing |
 | Topaz/Starlight submission hangs (no job, no charge) | route hazard | one retry, then the local Rhea route |
 | `Session expired` | OAuth token | the operator re-logs in |
 | "Image fetch failed" (kie) | reference URL expired (~24 h) | re-upload (free), merge into `refs-urls.json` |

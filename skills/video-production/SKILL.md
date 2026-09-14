@@ -57,7 +57,7 @@ which the project differs from the defaults has its value on disk.
 
 ```bash
 date
-python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --deliverable deliver/<latest>.mp4 --drive <drive> --higgsfield --elevenlabs --open "…"
+python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --deliverable deliver/<latest>.mp4 --drive <drive> --higgsfield --monid --elevenlabs --open "…"
 ```
 
 Read the LATEST `STATE AT PAUSE — READ THIS FIRST ON RESUME` block of the project's RESUME document,

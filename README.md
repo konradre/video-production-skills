@@ -12,7 +12,7 @@ explainers drawn in code. The measurements behind the finishing rules are in the
 | `skills/ad-spot-preprod` · `skills/film-preprod` | pre-production for an ad campaign, or for a film and a music video |
 | `skills/video-refs-continuity` | the derived reference set, the start image, the continuity ledger and a refs gate that runs in code before any generation call |
 | `skills/video-prompt-dialects` | the prompt compiled per venue dialect (Seedance 2.5 / 2.0, MiniMax H3, a web front end, two image models), with a linter |
-| `skills/video-gen-cost-gate` | the venue table, the cost line and the operator's GO, the gated submit path, receipts at acceptance, detached polling |
+| `skills/video-gen-cost-gate` | the venue table, the cost line and the operator's GO, the gated submit path, receipts at acceptance, detached polling. Two hosted routes buy the same Seedance 2.5 model — one by subscription, one pay-as-you-go — and the table ranks them by marginal cost |
 | `skills/video-take-review` | the per-seed read: continuity first, then the acceptance matrix, voids and usable windows, instruments with self-tests |
 | `skills/video-edit-edl` | the edit as a derived EDL: the beat list from the script, a builder that computes every time, a script-fidelity gate |
 | `skills/spot-audio-assembly` | voice-over, dubs, off-screen voices, sfx and music cues, room tone, captions, the loudness pass and its verification |
@@ -47,6 +47,7 @@ more, and the status line reads the Higgsfield and ElevenLabs balances once thos
 | references · `video-refs-continuity` | makes the stills: the reference set and the start image | a [kie.ai](https://kie.ai/api-key) key, the default still route; Higgsfield credits are the second | `KIE_API_KEY` |
 | references · `video-refs-continuity` | the scene proxy, a room rebuilt as labelled boxes on your own GPU | ComfyUI with one node pack and two checkpoints, listed under [ComfyUI](#comfyui-only-for-work-on-your-own-gpu) | `COMFY_HOST`, plus `COMFY_DIR`, `COMFY_VENV`, `COMFY_ARGS`, `COMFY_LOG` and `COMFY_SSH` for `comfy_up.sh` |
 | generation · `video-gen-cost-gate` | buys Seedance 2.5 and MiniMax H3 seeds, each behind a cost line and your go | a [Higgsfield](https://higgsfield.ai) account with credits and its CLI: `npm install -g @higgsfield/cli`, then `higgsfield auth login` and `higgsfield workspace set <workspace-id>`. A [fal.ai](https://fal.ai/dashboard/keys) key opens a second route, which refuses photoreal people in references | `FAL_KEY`; Higgsfield logs in through its CLI |
+| generation · `video-gen-cost-gate` | buys the same Seedance 2.5 seeds pay-as-you-go — by the second rather than by the month — and hosts the reference images they cite, free | a [monid](https://monid.ai) account and its CLI: `npm install -g @monid-ai/cli`, then `monid keys add` to store the key and `monid balance` to confirm it. Credit is pay-as-you-go, so there is no plan to exhaust and no credits to expire. People-free shots only: real human faces are refused upstream by the model host | none — monid keeps the key in its own CLI store, not in `.env` |
 | generation · `video-gen-cost-gate` | MiniMax H3 seeds on your own GPU, free per take | an NVIDIA card (we ran a 24 GB one), ComfyUI and the weights in [MiniMax H3 on your own GPU](#minimax-h3-on-your-own-gpu) | the `COMFY_*` variables |
 | the read · `video-take-review` | a take's cut list, contact sheet and frame instruments | nothing more; [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (`pip install faster-whisper`) adds a transcript to the take's record | none |
 | the sound · `spot-audio-assembly` | voice-over, dubs, voice clones and generated sfx | an [ElevenLabs](https://elevenlabs.io/app/settings/api-keys) key | `ELEVENLABS_API_KEY` |
@@ -162,6 +163,7 @@ always worse.
 | Windows | Topaz and Resolve, which are Windows-only here | the Linux lanes; a hosted upscale replaces Topaz |
 | an ElevenLabs key | generated voice-over and generated sfx | the take's own sound, a library sound, and every caption, loudness and mix step |
 | a music vendor | generated cues | a cue the operator brings or a library bed — the cut, duck and licence rules are the same either way |
+| the monid CLI | the pay-as-you-go generation route and its free reference hosting | the subscription route for the same model, and any other venue in the table |
 
 The rule the kit holds to: **nothing you are asked to watch needs a build step.** A master plays in any
 player; a designed element's source is one HTML file a browser opens.
