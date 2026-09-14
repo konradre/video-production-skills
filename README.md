@@ -179,7 +179,12 @@ not estimated. Find your row first.
 | **24 GB** (RTX 3090) | local MiniMax H3 peaked at **23.9 GB of 24** | everything local runs, but generation holds the whole card — nothing else can share it |
 | **~11 GB** (GTX 1080 Ti) | Resolve Studio 18.5 + Dehancer Pro 7.4 graded at **92% VRAM**; the Topaz Rhea ×4 pass also held **92%** | the local *finish* fits and local *generation* does not. Both jobs sit near the edge, so 11 GB is the floor, not the comfortable case |
 | **under ~11 GB** (8 GB, 6 GB) | never tested — *"we have not tried a smaller card"* | those two jobs used about 10.1 GB, so they do not fit. Treat this as the no-local-GPU row below |
-| **integrated graphics, or any non-NVIDIA card** | — | out by construction rather than by speed: Dehancer needs Resolve's **CUDA** processing mode, and the local generation wheels need CUDA 13 on an RTX 20-series card or newer |
+| **an AMD card or APU** (e.g. Radeon 780M) | — | local generation is out by construction — the wheels need CUDA 13 on an RTX 20-series card or newer. Dehancer is **not** out: it ships a separate **OpenCL** build for AMD, so the graded pass turns on VRAM, not on vendor. On an APU that VRAM is carved out of system RAM, so 4 GB of it also costs you 4 GB of the RAM everything else wants |
+| **Intel integrated** (Iris, HD) | — | Dehancer does not support these at all, and local generation needs CUDA. Every hosted lane is unaffected |
+
+Resolve's own floor is lower than ours — 2 GB VRAM and 16 GB system RAM — so it may well install on a modest card and
+still be unable to carry the graded pass we measured, which held 92% of 11 GB. Treat "it launches" and "it can finish
+a job" as separate questions.
 
 **At ~11 GB**, ignore only [MiniMax H3 on your own GPU](#minimax-h3-on-your-own-gpu) and buy your seeds
 hosted. Keep `tools/topaz-upscale/` and the Resolve chain — they are the two things that *do* fit. Expect
