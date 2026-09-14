@@ -1,6 +1,6 @@
 # video-production-skills
 
-Fifteen Claude Code skills, two host-side tools and a look library for producing video: short-form
+Fifteen agent skills, two host-side tools and a look library for producing video: short-form
 ad campaigns, short films and music videos made from generated footage, and narrated motion-graphics
 explainers drawn in code. The measurements behind the finishing rules are in the references.
 
@@ -32,9 +32,11 @@ work inside a project take its folder as `--root <project>`.
 
 ## What you need
 
-The base install is Claude Code, Python 3.10 or newer with numpy, Pillow, scipy and PyYAML
-(`pip install numpy pillow scipy pyyaml`), and [ffmpeg](https://ffmpeg.org/download.html).
+The base install is an agent that reads `SKILL.md` — Claude Code and Codex both do — Python 3.10 or newer
+with numpy, Pillow, scipy and PyYAML (`pip install numpy pillow scipy pyyaml`), and
+[ffmpeg](https://ffmpeg.org/download.html).
 On Windows, run the kit inside WSL2. The skills give the agent bash commands, and WSL2 is where we built the kit.
+`AGENTS.md` is the short orientation an agent reads before its first action; this file is the long form.
 
 The table follows a production in the order it runs. Each row names a step and its skill, what that step adds
 on top of the base install, and the key or variable it reads from `.env`. Set up the rows you will use. The
@@ -186,6 +188,15 @@ Resolve's own floor is lower than ours — 2 GB VRAM and 16 GB system RAM — so
 still be unable to carry the graded pass we measured, which held 92% of 11 GB. Treat "it launches" and "it can finish
 a job" as separate questions.
 
+**On an APU those two floors compete for one pool.** The iGPU takes its VRAM from the same system RAM Resolve wants
+16 GB of, so a 16 GB machine satisfies neither floor comfortably once the carve-out lands. Leave the BIOS UMA buffer
+at its default: it sets a *minimum* reserve rather than a cap, and raising it only takes RAM away from everything else.
+
+**Which Resolve licence you hold decides export speed more than the card does.** On the free edition, H.264 and H.265
+encoding is CPU-only — the GPU's hardware encoder is not selectable on the Deliver page — so exports are slow on any
+machine, and slowest where that CPU is also feeding an iGPU. Studio uses the hardware encoder. The documented
+workaround on free is to export an intermediate (DNxHR) and transcode that with ffmpeg, which does reach the encoder.
+
 **At ~11 GB**, ignore only [MiniMax H3 on your own GPU](#minimax-h3-on-your-own-gpu) and buy your seeds
 hosted. Keep `tools/topaz-upscale/` and the Resolve chain — they are the two things that *do* fit. Expect
 them to be slow rather than impossible: a Dehancer frame took 5.5 s at 3416×1920, and a full pass ran about
@@ -239,6 +250,16 @@ The installer symlinks `skills/*` into `~/.claude/skills/`. The skills find the 
 library through those links, so the default layout needs no configuration. Every command inside the
 skills calls `~/.claude/skills/<skill>/…`, so keep those links whichever agent runs the kit; if your agent
 loads skills from another folder, `./install.sh <that folder>` links them there as well.
+
+For Codex, that folder is `~/.agents/skills`:
+
+```bash
+./install.sh ~/.agents/skills
+```
+
+That links both, and both are needed: 24 files inside the skills call `~/.claude/skills/<skill>/…` by
+absolute path, so that link stays load-bearing whatever agent you run. Codex then invokes a skill with
+`$<skill-name>`, and reads `AGENTS.md` at the repository root on its own — it does not read this file.
 
 Vendor keys never live in the repo or in a skill. Copy `.env.example` to `.env`, which git ignores, and
 fill in the keys for the parts you use. The file names every key and variable the kit reads and what each
