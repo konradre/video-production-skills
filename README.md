@@ -30,6 +30,10 @@ with the contracts and measurements, and a `scripts/` directory of small Python 
 Every Python and shell script prints its usage on `--help` and changes nothing, and the scripts that
 work inside a project take its folder as `--root <project>`.
 
+`skills/` is generated from a separate source tree and exported here, so an edit made to it in this
+repository is overwritten by the next export. Read it, run it, copy from it; to change a skill, open an
+issue rather than a patch.
+
 ## What you need
 
 The base install is an agent that reads `SKILL.md` — Claude Code and Codex both do — Python 3.10 or newer

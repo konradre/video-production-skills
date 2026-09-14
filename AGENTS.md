@@ -115,8 +115,8 @@ conditions that outrank the budget. `CHAIN.md` is the contract.
 - **Never hand-edit anything under `skills/` in this repository.** It is exported from a separate source
   tree through an overlay, so an edit here is silently overwritten by the next export. Open an issue
   describing the change instead.
-- `README.md`, `METHOD.md`, `CHAIN.md`, `AGENTS.md`, `CLAUDE.md`, `install.sh`, `SECURITY.md` and
-  `.env.example` are this repository's own files and are edited here.
+- `README.md`, `METHOD.md`, `CHAIN.md`, `AGENTS.md`, `CLAUDE.md`, `install.sh` and `.env.example` are
+  this repository's own files and are edited here.
 - No credential goes into any file this repository tracks. `.env` is ignored by git.
 
 ## Where to look next
@@ -129,4 +129,3 @@ conditions that outrank the budget. `CHAIN.md` is the contract.
 | the two Windows tools and their variables | `tools/README.md` |
 | the grading method and the look recipes | `look-library/GUIDE.md` |
 | every key and variable, with what reads it | `.env.example` |
-| reporting a vulnerability | `SECURITY.md` |
