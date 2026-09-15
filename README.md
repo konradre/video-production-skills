@@ -9,20 +9,20 @@ explainers drawn in code. The measurements behind the finishing rules are in the
 | directory | what |
 |---|---|
 | `skills/video-production` | the entry skill. Fixes the genre, rehydrates a paused project, routes the next step to the phase skill that owns it |
-| `skills/ad-spot-preprod` · `skills/film-preprod` | pre-production for an ad campaign, or for a film and a music video |
+| `skills/ad-spot-preprod` · `skills/film-preprod` | pre-production for an ad campaign, polished or creator-style, or for a film and a music video |
 | `skills/video-refs-continuity` | the derived reference set, the start image, the continuity ledger and a refs gate that runs in code before any generation call |
-| `skills/video-prompt-dialects` | the prompt compiled per venue dialect (Seedance 2.5 / 2.0, MiniMax H3, a web front end, two image models), with a linter |
+| `skills/video-prompt-dialects` | the prompt compiled per venue dialect (Seedance 2.5 / 2.0, MiniMax H3, a web front end, two image models), with a linter, and the phone-native dialect a creator-style spot is prompted in |
 | `skills/video-gen-cost-gate` | the venue table, the cost line and the operator's GO, the gated submit path, receipts at acceptance, detached polling. Two hosted routes buy the same Seedance 2.5 model — one by subscription, one pay-as-you-go — and the table ranks them by marginal cost |
 | `skills/video-take-review` | the per-seed read: continuity first, then the acceptance matrix, voids and usable windows, instruments with self-tests |
 | `skills/video-edit-edl` | the edit as a derived EDL: the beat list from the script, a builder that computes every time, a script-fidelity gate |
 | `skills/spot-audio-assembly` | voice-over, dubs, off-screen voices, sfx and music cues, room tone, captions, the loudness pass and its verification |
 | `skills/designed-elements` | end cards, turntables, piece walls and drifts as deterministic HyperFrames compositions |
 | `skills/explainer-video` | a narrated motion-graphics explainer drawn in code: sourced facts, a script whose spoken anchors time every scene, the voice and its word times, HyperFrames scenes and captions, a frame instrument and an audit of every on-screen string |
-| `skills/video-finish` · `skills/video-finish-qc` | the per-clip finishing order (upscale, grade, grain, watermark, downscale, encode) and the spot pipeline that runs it from the EDL, plus the QC of the delivered file |
+| `skills/video-finish` · `skills/video-finish-qc` | the per-clip finishing order (upscale, grade, grain, watermark, downscale, encode) and the spot pipeline that runs it from the EDL, plus the QC of the delivered file. A second finish, the phone-native tier, for a spot that has to read as phone-shot |
 | `skills/client-rounds` | client notes located before anything moves, classified, executed by a ladder, delivered with a numbered ask |
 | `skills/mastering-audio` | a standalone loudness master for a finished mix |
 | `tools/` | the local Topaz upscale wrapper and the unattended Resolve + Dehancer hero pass |
-| `look-library/` | five looks, each as a baked `.cube` and an authored Dehancer `.drx`, their YAML recipes and baker, the dial-ins, and a guide to the whole grading method |
+| `look-library/` | five looks, each as a baked `.cube` and an authored Dehancer `.drx`, plus the cube-only colour tier of the phone-native finish, their YAML recipes and baker, the dial-ins, and a guide to the whole grading method |
 | `CHAIN.md` | the handoff contract every skill runs under: a budget of three automatic hops, a visited set, stop conditions |
 
 Each skill is a `SKILL.md` with the steps and their completion criteria, a `references/` directory
@@ -63,6 +63,7 @@ GPU of your own, and how much VRAM it has decides which. [If you have no GPU, or
 | the sound · `spot-audio-assembly` | burned-in captions | the caption fonts, which the kit does not ship; see [Caption fonts](#caption-fonts) | none |
 | designed elements · `designed-elements`, `explainer-video` | end cards, turntables and piece walls, and narrated explainers drawn in code | [Node.js](https://nodejs.org/en/download) 22 or newer and `unzip` on the machine that renders, and your display font as a TTF. `npx` fetches HyperFrames, which draws in headless Chromium. Headless Chromium hangs under WSL2, so from WSL2 `render_hyper.sh --host` renders on another Linux machine over ssh and rsync. An explainer's voice and word times come from the sound rows | none |
 | the finish · `video-finish`, `video-finish-qc` | a look's colour | nothing more; ffmpeg's `lut3d` filter applies the cubes | `LOOK_LIBRARY_CUBES`, optional |
+| the finish · `video-finish`, `video-finish-qc` | the phone-native tier: the texture probe, the temporal layer and the phone-class encode | nothing more; ffmpeg 4.4 or newer, which has the `colortemperature` filter, and numpy for the probe | none |
 | the finish · `video-finish-qc` | the hosted upscale, a billed 4× pass for wides where faces sit small and shots with text to read, and for every take if you skip Topaz | the fal key (Topaz Starlight) or Higgsfield credits (Rhea), behind a cost line and your go | `FAL_KEY` |
 | the finish · `video-finish-qc` | the local upscale, a free 4× Rhea pass over approved takes framed chest-up or closer, before the grade | Topaz Video and a GPU with room for it, only if you upscale on your own card; see [Topaz](#topaz-only-for-upscaling-on-your-own-gpu) | `TOPAZ_FFMPEG`, `TVAI_MODEL_DIR` and `TVAI_MODEL_DATA_DIR`, all optional |
 | the finish · `video-finish-qc` | a look's halation, bloom and grain, graded clip by clip in the hero pass | Windows with an NVIDIA GPU, [DaVinci Resolve Studio](https://www.blackmagicdesign.com/products/davinciresolve) (we verified 18.5), a [Dehancer Pro](https://www.dehancer.com/shop/davinci_resolve/pro) 7.x licence, and the in-app bridge from [davinci-resolve-mcp](https://github.com/samuelgursky/davinci-resolve-mcp) | `RESOLVE_PY`, `DAVINCI_RESOLVE_MCP_DIR` and the rest in `tools/README.md` |
@@ -166,7 +167,7 @@ always worse.
 | Node 22+ | designed elements and explainers — they render through headless Chromium | every generated-footage lane, and the mastering tool on Node 18 |
 | a GPU with enough VRAM | local generation needs ~24 GB (ours peaked at 23.9); the local finish — Topaz and Dehancer — measured 92% of an 11 GB card, so below ~11 GB it goes too | the hosted lanes, all of them, and every finishing step — plus `scene_proxy.py`, which needs no GPU and still reads any `scene.json` you have. [Which tier is yours](#if-you-have-no-gpu-or-a-small-one) |
 | faster-whisper | word times on your own machine | the billed transcription service, or hand-placed captions |
-| Resolve Studio + Dehancer | halation, bloom, grain and gate weave as a graded pass | the colour itself, through a LUT in ffmpeg |
+| Resolve Studio + Dehancer | halation, bloom, grain and gate weave as a graded pass | the colour itself, through a LUT in ffmpeg, and the whole phone-native finish, which never opens Resolve |
 | Windows | Topaz and Resolve, which are Windows-only here | the Linux lanes; a hosted upscale replaces Topaz |
 | an ElevenLabs key | generated voice-over and generated sfx | the take's own sound, a library sound, and every caption, loudness and mix step |
 | a music vendor | generated cues | a cue the operator brings or a library bed — the cut, duck and licence rules are the same either way |
@@ -231,7 +232,8 @@ If you have some GPU, it is worth one attempt before you assume it is out.
 You keep all fifteen skills and every generation route, because all four are hosted: Seedance 2.5 on
 Higgsfield by subscription or on monid pay-as-you-go, fal for people-free shots, kie for stills. You keep the
 whole finish chain, with the hosted upscale doing the job Topaz would have done. And you keep `look-library/`,
-because applying a look is an ffmpeg `lut3d` filter — Resolve is only needed to author or rebake one.
+because applying a look is an ffmpeg `lut3d` filter — Resolve is only needed to author or rebake one. The
+phone-native finish is ffmpeg from end to end.
 
 One METHOD changes, not just a tool. Without `scene_blockout.py` you cannot compute a room from a keeper
 frame, so the geometry for a new angle is read off that frame at 2–4× zoom and copied into the prompt
@@ -294,10 +296,56 @@ client's text is the single source of truth and additions are proposed as cost l
 the first acceptance test, before the gag. Masters are 1080p only. Decisions go to the operator as
 numbered questions with the cost and the file path inline.
 
+## The phone-native finish
+
+A creator-style spot, the kind that has to pass as something a person filmed on their phone, does not get
+the film finish. It gets a tier of its own, `ugc-phone`, and that tier inverts two of the rules above on
+purpose.
+
+What makes a clip read as phone-shot is not its colour. A `.cube` carries colour only, and a phone's colour
+is close to neutral, so the library's `ugc-phone` cube is a grade close to identity, with no film stock and
+no split-tone, and there is no Dehancer pass at all. Halation, bloom and film grain read as film, and a phone
+has none of them. The phone-ness is temporal, and most of it lives in the encode.
+`skills/video-finish/scripts/phone_native.py` runs at delivery resolution, after the cube and the downscale.
+It adds a slow exposure drift, a white balance that moves in steps the way a phone's auto white balance does,
+an exposure jump at each cut, one to three pixels of handheld shake, and either fine noise like a sensor's or
+a light denoise. Then it encodes the way a phone does: H.264 4:2:0, a closed GOP, BT.709 tags, at a bitrate
+between 2.5 and 12 Mbps. None of it needs Resolve, Dehancer or a GPU. ffmpeg and numpy cover the whole tier.
+
+The probe decides the dose, not the eye. `skills/video-finish-qc/scripts/phone_texture_probe.py` reads three
+numbers off native centre crops of a clip at five points along it: the share of 8×8 blocks the encoder
+flattened to zero variance, the noise floor of the flattest fifth of the blocks, and the median block spread.
+Run it on the project's own real phone clips first, by scene class, then on the candidate, and move the dose
+until the candidate sits inside the real clips' range. The numbers compare matched content. They are not a
+threshold, and a number from one project says nothing about another.
+
+The calibration run overturned the premise we started from. We expected to add noise. Two real phone clips,
+as they arrived from a client through a platform re-encode at about 2.5 Mbps, read a noise floor between 0.1
+and 0.7, with anywhere from none to a third of their blocks dead-flat depending on which frames the probe
+sampled. Three raw 720p takes from a hosted generator read a floor of 1.8 to 2.0 and no dead-flat blocks at
+all. The generated take carried more fine texture than the phone clips, not less. Adding noise moved it
+further out of the band. A light denoise and a 2.5 Mbps encode moved it in, and the encode was the larger of
+the two levers. So the layer carries a denoise arm beside the noise arm, and the probe decides the direction
+per pair. On another generator, another raster or another set of real clips the direction can reverse; we
+have measured one generator so far. The full table is in `skills/video-finish/references/EVIDENCE.md`.
+
+The prompt side lives in `skills/video-prompt-dialects/references/PHONE-NATIVE.md`. The dialect attributes
+the camera ("shot on a front camera, handheld, at arm's length") and never names the device, because a
+video model tends to draw the noun you hand it. `camera_clause.py --phone`, in the same skill, prints the
+clause. That rule reads more certain than its evidence. We have watched generators draw a negated noun, one
+burning in captions it was told to leave off and another drawing a grid it was told to omit, while the
+device name case comes from other practitioners' skills and we have not yet checked it against a control on
+the same seed. The creative grammar for the sub-genre, hooks, structures, beats by duration, the variant
+matrix and the four artifacts a spot ships with, is in `skills/ad-spot-preprod/references/UGC-GRAMMAR.md`.
+The disclosure rules for creator-style ads on the large platforms and under the FTC endorsement guides are
+in that skill's `references/RISKS.md`, written from the primary sources; three claims that circulate in the
+write-ups did not survive that reading.
+
 ## What is not here
 
-Where a skill needs an example of a file shape, the example is a placeholder. The looks ship
-complete, cubes and `.drx` grades both; the `.drx` files were authored on Dehancer Pro OFX 7.4 and
+Where a skill needs an example of a file shape, the example is a placeholder. The five looks ship
+complete, cubes and `.drx` grades both; the phone tier's cube ships alone, because that tier uses no
+Dehancer pass. The `.drx` files were authored on Dehancer Pro OFX 7.4 and
 need a licensed Dehancer Pro 7.x with its film profiles downloaded, because a major version installs
 as a separate plugin. The spectral base cubes the film looks were baked from are fetched, not
 vendored; you only need them to rebake after editing a recipe. Third-party notices are in `NOTICE.md`.
