@@ -8,7 +8,8 @@ provenance: everything labelled "measured" or "shipped" comes from two productio
 # Film looks, LUTs and Dehancer in DaVinci Resolve — the method
 
 > What ships beside this guide: the five looks as baked `.cube` files (`cubes/`) and authored Dehancer
-> `.drx` grades (`drx/`, Dehancer Pro OFX 7.4), their recipes (`looks/*.yaml`, `RECIPES.md`), the cube
+> `.drx` grades (`drx/`, Dehancer Pro OFX 7.4), the phone tier's cube with no `.drx` beside them, their
+> recipes (`looks/*.yaml`, `RECIPES.md`), the cube
 > baker, the validator and the preview chooser. The spectral base cubes are fetched with
 > `fetch_spectral_bases.sh` only when a recipe is edited and rebaked.
 
@@ -56,7 +57,7 @@ preset" (Quick Guide pp. 53–54). Inside a film emulation, halation runs before
 grain is independent of the stock and sized by frame (JanLohse's `spectral_film_lut`); the `.drx` holds
 that order for you.
 
-### 3a. The five looks the library defines, and what each did on real footage
+### 3a. The five looks and the phone tier the library defines, and what each did on real footage
 
 | look | genre | colour-tier base (cube) | Dehancer node (drx) | verdict from use |
 |---|---|---|---|---|
@@ -99,7 +100,8 @@ params:
 compression: { grain: low-capped, mezzanine: yuv420p10le, sharpen: light }
 ```
 
-The shipped values for all five looks, with the consensus range they were tuned against:
+The shipped values for the five looks that carry a `.drx`, with the consensus range they were tuned against
+(the phone tier's values, close to identity, are in its § 3a row and in `looks/ugc-phone.yaml`):
 
 | parameter | `ads-clean` | `ads-warm` | `film-teal-orange` | `film-portra` | `film-cinestill` | consensus ads / film |
 |---|---|---|---|---|---|---|
