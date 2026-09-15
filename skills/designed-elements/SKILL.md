@@ -32,7 +32,9 @@ Anything that must be exact is designed, never generated: packaging and product 
 "WARNIGY"), the wordmark and the card, the product's pieces as sprites, a display with names, a wall or
 a drift that must straddle a cut at a known frame. Anything that must be alive is generated. The two
 meet only where the operator has accepted a composite on a plate — **never a 2D overlay on generated
-motion**.
+motion**. Every on-screen WORD has a named source — the client's text, a line heard in the footage, or the CTA — and an
+internal label, a placeholder or a concept name never prints in a frame (a shipped frame once read the concept's working
+title, 2026-09-15).
 
 **Done when:** every element in the shot list is labelled designed or generated, and each designed one
 names its kit entry (card · turntable · wall · drift · burst · title) and its length.
@@ -51,6 +53,10 @@ with a silhouette matte; a hard border or a straight edge is fixed AT THE SOURCE
 composition obeys (`data-*`, `window.__timelines`, a seeded PRNG, local assets, a new length = a new
 project): [`references/HYPERFRAMES-CONTRACT.md`](references/HYPERFRAMES-CONTRACT.md); the kit and where
 each element lands in the EDL: [`references/KIT.md`](references/KIT.md).
+
+A NEW device or typeface is the operator's pick from rendered options before the kit is dialled in for the campaign — a
+motion test of the device on the project's own frames, and the message line set in three to five typefaces
+(`ad-spot-preprod` § 6, the creative checkpoint); a written standard does not stand in for the pick.
 
 **Done when:** the project renders its full length from local assets with a seed, and its sync constant
 (the burst's `T0`, the wall's opaque frame, the ding times) is written in the composition.

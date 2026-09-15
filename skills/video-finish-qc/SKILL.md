@@ -109,9 +109,15 @@ Duration vs runtime · **finite** loudness within 1 LU and TP under the ceiling 
 a SOUND check) · the delivered cut list vs the EDL joins with every extra detection named · take-cut leaks
 (rogue frames; a cut the take composed and the operator kept is declared on the event as `accepted_cuts` and
 prints as INFO — a gate that fails a chosen keeper on every render teaches every reader to skip its verdict) ·
-every event's window sampled at three points for NEAR-BLACK frames (all three under 16/255 = FAIL unless the event declares `accepted_black`; the row that catches a source type the grade turned black) · the end card by NCC of the last frame · VO placement by envelope NCC. Then the eye and the
+every event's window sampled at three points for NEAR-BLACK frames (all three under 16/255 = FAIL unless the event declares `accepted_black`; the row that catches a source type the grade turned black) · the end card by NCC of the last frame · VO placement by envelope NCC · the longest still run against the EDL's `qc.max_still_s` (a
+designed hold is declared on its event) · the true peak against the platform ceiling the EDL names (`loudnorm.TP_ceiling`) ·
+the source geometry of every hero take as INFO (a display shape unlike the storage shape is normalised before any crop —
+`video-production/scripts/probe_sources.py`). Then the eye and the
 ear on the delivered file: the grade at zoom at several timecodes, the mouth check on the wides, the audio
-at every cut and hit, the captions against the VO. Every instrument carries its known-answer case.
+at every cut and hit, the captions against the VO, a delivered frame beside the source's display frame at 1:1 (a circle stays a
+circle). Every instrument carries its known-answer case. With no operator reachable (a headless run) the eye and the ear are
+PROVISIONAL: the instruments stand in, and a look/listen queue of timecodes rides the handoff — nothing is final until the
+operator has done it.
 Designed content (explainer scenes, kinetic titles, cards) adds two judgement rows: `designed_frame_metrics.py` on the
 delivered file and `literal_audit.py` on the composition's source.
 The table and what each failure means: [`references/QC.md`](references/QC.md).
@@ -156,7 +162,7 @@ file by path with its size.
 | `hero_distinct.py files…` | frame-hash distinctness of same-size heroes |
 | `finish_spot.py --root --edl [--stage] [--tag] [--min-free-gb 40]` | gate → cut → master (a static mix; the card when the EDL has one) → deliver (one measured gain, the limiting printed, the length capped) from the EDL |
 | `finish_clip.py --root --hero --take --in --out --name` | a standalone clip / excerpt deliverable |
-| `qc_deliverable.py --root --edl --deliv [--black-luma 16]` | the one-pass QC of the delivered file; declared `accepted_cuts` print as INFO, never as leaks; near-black per event; `--selftest` |
+| `qc_deliverable.py --root --edl --deliv [--black-luma 16] [--tp-ceiling] [--max-still-s]` | the one-pass QC of the delivered file; declared `accepted_cuts` and `accepted_still` print as INFO, never as failures; near-black per event; the still threshold and the TP ceiling come from the EDL (`qc.max_still_s`, `loudnorm.TP_ceiling`) unless overridden; the source-geometry INFO row; `--selftest` |
 | `look_sheet.py --out --cubes --looks ads-clean,ads-warm [--blend look:0.85] [--current "<vf>"] --frame <video@s|image> …` | the frame sheet the operator picks the look from, before the first delivery; `--selftest` |
 | `final_renders.sh --root spots…` | finish → QC → `deliver/final/` for every approved spot |
 

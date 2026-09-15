@@ -97,6 +97,11 @@ python3 ~/.claude/skills/video-production/scripts/script_diff.py --script prompt
   the capper draws from the CURRENT accepted spots.
 - `script_diff.py` (core § 5) runs before the first prompt, both ways; in an ad campaign `--elements` also fails a
   piece-bearing beat without its element id — the one that changes later. [`references/SHOTLIST-CONTRACT.md`](references/SHOTLIST-CONTRACT.md).
+- **Existing footage** (the client supplies the picture): the same core with the generation stages declared not applicable,
+  with the reason — the sources probed for their DISPLAY shape and transcribed whole first, the beats from the client's text
+  or the brief's message lines, the shot list as a keeper list with a microphone-position column, the scaffold as
+  `--spot-type ugc` with the gens table, the refs gate and the fill marked N/A in the header:
+  [`references/INTAKE.md`](references/INTAKE.md) § Existing footage.
 
 **Done when:** `SCRIPT-DIFF PASS` on the beats AND on the shot list (`--shots`), the generator's cap is in the
 header with its source, every section is filled, and every partition row quotes the script lines it serves.
@@ -122,6 +127,14 @@ Rounds by dependency (what runs in parallel, what waits for a pick), the spot to
 re-roll per scene, stills and VO as their own lines — as **numbered questions with the cost inline**,
 one GO per round. The client-facing shot list ships as a designed PDF when asked. Then the hand-off:
 `video-refs-continuity` builds the references the first scene needs; `video-gen-cost-gate` submits.
+
+**A designed device gets a CREATIVE CHECKPOINT before the full build.** When the spot's idea rests on something designed —
+type over footage, an animated opener, a card system — the first round is a short motion test of that device (a few
+seconds, one raster, the real footage and the real words) plus the typeface as an operator PICK from rendered options (the
+message line set in three to five candidates on the project's own frames), before polish, before the second raster, before
+any cut-down. A written standard ("brand-appropriate, licensed") does not replace the pick: on one job the operator's first
+look at the device in motion was the fourth full build, and every version to that point was rejected on the typeface and
+the device together (2026-09-15). A campaign whose kit is already accepted skips this.
 
 **Done when:** the cost lines are answered, the first round's references are listed by name, and the
 plan is saved in the project with its path in the ask.

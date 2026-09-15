@@ -69,3 +69,27 @@ reopen it** (a channel-mix change, a SKU change, a test result) — so a later p
 settled ground nor misses a real trigger. Costs quoted in a decision are dated; a stale cost is
 re-costed before it is cited again. A handoff to another agent or session carries everything gleaned AND the
 authorization.
+
+## Existing footage — when the client supplies the picture
+
+The core runs unchanged (`video-production/references/PREPRODUCTION-CORE.md`); the generation stages are declared not
+applicable, with the reason, in the shot list's header and the pause block — never silently skipped, never adapted by
+hand mid-phase. What each stage becomes:
+
+| stage | with generated footage | with the client's footage |
+|---|---|---|
+| the sources | the generator's native raster, known | every clip probed for its DISPLAY shape first (`video-production/scripts/probe_sources.py`: SAR, rotation, bit depth, audio) and normalised before any crop; a word-timed transcript of every clip, whole; a timecoded keeper sheet per clip (`video-take-review` § 1) |
+| the SSOT | the client's script | the client's script when there is one; otherwise the brief's message lines and CTA, saved verbatim, and the on-screen words diffed against THEM — the footage's own speech is heard, never captioned as the message |
+| the beats | one per script line | one per message line or per footage moment the operator picked, in the order the operator gave; markers measured on the clips |
+| the generator's cap | read from the vendor before the shot list | not applicable — the cap is each clip's own length and its internal cuts |
+| the partitions | one generation per continuity partition | the keepers: `take + in + out + what it shows`, with a **microphone-position column** for the sound each carries (`spot-audio-assembly` § 3) |
+| the scaffold | `--spot-type product` | `--spot-type ugc` (no product, card or wipe rules); the gens table, the refs gate and the fill marked N/A in the header with the reason |
+| the references and the refs gate | before every generation | not applicable; a generated OPEN or insert (a still chain, a bridging shot) brings them back for that call only (`video-refs-continuity`) |
+| the grade | the genre's cube on generated takes | the same cube on the client's footage, picked from the look sheet (§ 3) |
+| the creative checkpoint | the first keeper | the motion test of the designed device and the typeface pick (§ 6) — before the second raster and any cut-down |
+| the sound | VO, sfx, cues through the cost line | the recorded sound by microphone position, cleaned by the ladder in `spot-audio-assembly` § 4; a short bed looped before a longer cue is priced |
+| the finish and QC | unchanged | unchanged, plus the source-geometry row and the still-run threshold the project sets |
+
+Two shapes of this job exist: a brief with no script (the operator's direction is the SSOT, saved verbatim as dated notes)
+and a script over supplied footage (the script is the SSOT and the footage is the coverage). Both keep the order: sources
+probed → transcripts → beats from the SSOT → keepers → the checkpoint → the build.

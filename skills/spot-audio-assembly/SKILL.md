@@ -70,7 +70,12 @@ billed delta is in the receipt.
 ## 3. Source the sound — the syllable map before the cut
 
 The ladder: the take's own sound (cut at the frame, placed as an sfx — `video-edit-edl`), then a library
-sound with its licence line read, then generated sound (billed → cost line). A reel pick is confirmed as
+sound with its licence line read, then generated sound (billed → cost line). RECORDED sound — documentary
+speech, an interview, an event's floor — carries a **microphone-position column** on every window (on the
+subject · near the subject · far, on the floor): a window used under OTHER picture is subject-near, or it is
+shown with its own frames, and a sound with a visible cause (a bystander's call, a ringman's yelp) is shown
+with its picture or not used — a floor recording laid under other shots "sounds weird without context", and
+the operator sent the build back (2026-09-15). A reel pick is confirmed as
 a **syllable map before cutting** — which onsets, in which order, the bitten-off one excluded:
 
 ```bash
@@ -82,8 +87,10 @@ python3 ~/.claude/skills/spot-audio-assembly/scripts/sfx_onsets.py audio/sfx/<re
   burst (`card + 0.02`).
 - Music: the **AceDataCloud Suno API is the default route** — async, two takes a call, behind the cost
   line and a GO; the operator's own candidates and a library bed are FALLBACKS that need the operator's
-  permission first. A cue is CUT to the marker it ends on, the file name carries the length, a cue
-  shorter than its span just ends; the earlier accepted cue wins; ducks under speech with ramps;
+  permission first. A cue is CUT to the marker it ends on, the file name carries the length; a cue
+  SHORTER than its span is looped on its own beat grid by whole bars, the take's ending kept
+  (`scripts/music_loop.py`), before a longer cue is priced — a cue neither looped nor long enough just ends
+  mid-shot and `edl_check` fails it; the earlier accepted cue wins; ducks under speech with ramps;
   Opus-in-`.m4a` is transcoded to 48 kHz WAV before anything reads it. Designed-sound extras (chimes)
   are opt-in, default off.
 
@@ -120,6 +127,12 @@ operator sent back (an auction spot, 2026-09-15):
   written beside it); the pick goes into the EDL by ordinal.
 - **A tick train under speech is swapped, not patched.** A spectral patch clears one click; eight ticks across half a
   second of speech survive every local repair. Replace the moment — audio AND picture — with another take of the same beat.
+- **Speech over a vehicle, a crowd or wind: a speech-enhancement model first, a music/voice separator second, spectral
+  denoise third.** Measured on one 5.6 s line as speech-window over pause-window SNR in 300–4 kHz: the original 2.8 dB,
+  demucs vocals 5.9, vocals + `afftdn` 8.3, DeepFilterNet3 14.3 with the words intact (whisper p 0.90); ffmpeg
+  `dialoguenhance` broke the words. Clean the WHOLE take segment, never the excerpt, so the background does not return at
+  the next cut inside it; then re-measure the cleaned excerpt — it reads quieter, and the stem's gain clamp must admit it.
+  The order says where to start; the operator's reel still decides what ships.
 
 **Done when:** every flagged window has been listened to, each artifact has a mute + room tone in the
 EDL, the scan is clean on the takes the cut uses, and no processed voice is in the stem without a reel pick behind it.
@@ -143,7 +156,13 @@ python3 ~/.claude/skills/spot-audio-assembly/scripts/build_captions.py --root <p
   legitimately carries sound under it). [`references/VO-PIPELINE.md`](references/VO-PIPELINE.md) § provenance.
 - Word times: local whisper is free; Scribe is billed per minute (cost line). **`--only` when one take
   is swapped** — a full re-run clobbers hand patches on the other lines; a swapped file on a lip-synced
-  line also re-measures its `at` (`video-edit-edl`).
+  line also re-measures its `at` (`video-edit-edl`). **Transcribe the WHOLE source, then window** — a short
+  excerpt transcribed alone lost the agreement between two model sizes that the full source restored.
+  **Fast speech — chant, rap, an auctioneer, an overlapping crowd — is beyond ASR onsets**: seven runs (three
+  models, three windows, 0.8× speed, a band-limited envelope) put one word's onset anywhere in a 0.74 s
+  spread. A cue that must sit ON such a word takes its time from the operator (tapping along, or a tolerance
+  stated up front), or from an envelope onset the operator confirmed by ear — never from ASR word times
+  alone, and a ±2-frame standard is not offered on it.
 - Captions: the narrator's lines only, **never punctuation**, a card ends a frame before the next card's
   lead, nothing over the end card. The display text is the SCRIPT's (`vo[line].text`) and the timing the
   transcript's — the word counts must agree. The style is the campaign's `caption_style`: the house default
@@ -169,8 +188,15 @@ ffmpeg -v info -i deliver/<file>.mp4 -af ebur128=peak=true -f null - 2>&1 | tail
 - Placement by **envelope** correlation (10 ms RMS, 300–4 kHz): a waveform correlation reads 0.08 under
   loudnorm + AAC where the envelope reads 0.65–0.91; every line < 15 ms or it is OFF. The instrument
   self-tests first or prints nothing.
-- Loudness and true peak against the EDL's targets; AAC overshoots ≈ 1 dB, so the TP target sits under
-  the platform's ceiling; measured per channel, never on a mono sum.
+- Loudness and true peak against the EDL's targets: the delivered file is judged against the PLATFORM ceiling
+  (`loudnorm.TP_ceiling`, −1 dBTP unless the platform says otherwise), never against the master's TP plus a
+  fixed allowance — the AAC overshoot on limited peaks measured 0.4–1.0 dB and grows with how hard the limiter
+  works (a quieter premix that pushed it harder overshot by 0.5 dB where earlier versions overshot 0.2), so the
+  master's TP sits under the ceiling by at least that and the gap is re-measured after any premix change;
+  measured per channel, never on a mono sum.
+- **No operator in the loop (a headless run) makes every pick and listen PROVISIONAL**: the alternatives stay on
+  disk by ordinal and path, the instruments stand in for the ear, and a listen queue — timecodes and what to
+  listen for — rides the handoff; nothing is final until the operator has done the queue.
 - The VO ↔ sfx clash and the head tones are listened for at every hit, the signature and every cut.
 
 The mix graph the finisher implements (a static sum — no loudness processing in the master), the loudness
@@ -210,6 +236,7 @@ and the listen at each hit found no clash.
 | `audio_head_scan.py --root (--edl \| --files)` | stable tones/drones in each take's head, labelled |
 | `roomtone_synth.py --ref --ss --t --dur --out` | stationary room tone coloured by a clean slice |
 | `voice_ab_reel.py --out <reel.wav> name=<file> … [--gap 0.3]` | the A/B reel of voice treatments — each variant once, a gap between, the index printed and written beside the reel; `--selftest` |
+| `music_loop.py --take --bars --a-target [--bpm --first-beat] [--xfade] [--out]` | a short bed looped on its own beat grid by whole bars, the take's ending kept and its hit moved by exactly the jump; a new file, never an overwrite; `--selftest` |
 | `qc_vo_placement.py --root --edl --deliv` | envelope-NCC placement of every line on the delivered file |
 
 ## Cross-references

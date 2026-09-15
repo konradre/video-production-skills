@@ -31,6 +31,10 @@ checked against that file, not the current one. A note about a break or a join n
 generations: it is never carried into the review of ONE generation, where a cut the model composed is a
 capability and consistency across it is the read (`video-take-review` § 3).
 
+A note about a SOUND at a timecode is located the same way a frame is: transcribe the DELIVERED file around the timecode
+and quote back what is heard before anything changes. Spoken filler with no picture reads as a voice-over line; a fix
+inferred from word times trimmed the wrong thing once (2026-09-15).
+
 ## Classify in the client's own words
 
 | class | the client says | what it means for the build |
@@ -58,3 +62,7 @@ object is STILL and VISIBLE.
 
 Quip assignment is a **fit pass** scored against each spot's gag before VO is generated (a table goes
 stale); the sign-off copy loop caps at five candidates, then tighter variants of the operator's own line.
+
+**Every note set names what to KEEP.** A fix note constrains one defect; a set of them with nothing protecting what
+the previous version got right flattens the piece — the brand system, each spot's hook and the concept's device all
+went in one round that landed its five fixes (2026-09-15). Beside each fix, the guard: what stays.

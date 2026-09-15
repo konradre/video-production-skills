@@ -41,9 +41,13 @@ in the ledger with its quote ([`references/ROUND-LEDGER.md`](references/ROUND-LE
 script asks for reads as a frozen body until the script is read. Then for each note: the frame time in the DELIVERED
 file, the version that introduced it in the EDL history, and what the SCRIPT says — the client may be pointing back at
 the script's original idea. A note that
-names a version is checked against that file (`video-take-review` `frame_match.py` for a posted frame).
+names a version is checked against that file (`video-take-review` `frame_match.py` for a posted frame). A note about a
+SOUND at a timecode is located by transcribing the DELIVERED file at that timecode (± 3 s) and quoting back what is heard
+before anything changes — "a bit of VO at the very start" was the subject's own spoken filler between two runs, and the
+first fix, made from word times, trimmed a number instead (2026-09-15).
 
-**Done when:** every note carries a frame time, an EDL version and a script line beside it.
+**Done when:** every note carries a frame time, an EDL version and a script line beside it — and a sound note the
+transcript of the delivered audio at its timecode.
 
 ## 3. Curate the numbered list — no action
 
@@ -67,7 +71,9 @@ cost line, with the approved cut frozen. A rebuild takes its STRUCTURE from the 
 continuity partition — never from the rejected cut's scene boundaries (`video-production/references/PREPRODUCTION-CORE.md` § 1): scene detection on a
 rejected file reconstructs the previous producer's split, mistakes included. Every version is a **new EDL file and a new deliverable name**
 (`video-edit-edl`); shipped files are never edited; "lock these in" placements are kept; alternates
-are their own EDLs. A GATE item changes the pre-production rules (`ad-spot-preprod`), not just this spot.
+are their own EDLs. A GATE item changes the pre-production rules (`ad-spot-preprod`), not just this spot. The note set
+names what to KEEP: beside each fix, a guard for what the previous version got right (the brand system, each spot's hook,
+the concept's device) — five fixes that each constrained one defect all landed, and the piece lost its design (2026-09-15).
 
 **Done when:** the new version exists under its own name, the previous version is byte-identical, and
 every item's outcome (file, EDL, credits) is on its ledger row.

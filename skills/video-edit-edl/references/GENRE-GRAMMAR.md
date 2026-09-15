@@ -24,6 +24,14 @@ operator corrects, never a taste of their own.
   keepers; a punch-in (`zoom`) to keep the wrong thing out of frame; a placed sfx for a lost sound.
   Four re-cuts in 1 h 45 cost zero credits.
 - **Captions**: narrator only, campaign style, no punctuation.
+- **Type over footage** (a spot whose words are designed type on real or generated footage — no narrator, a documentary
+  spot): footage and the hook are on screen together from frame 1, because a card-only open spends the hook window on a
+  card (a brief that asks for a card open overrides); frame use is stated as a footage SHARE per beat, measured from the
+  layout, never as a layout — "a band with type above and below" seeded a strip at 0.56 scale with decorative fill around
+  it; no beat is type-only except the card; a subject's head is checked per shot AND per raster, since the square crop of a
+  vertical shot (or the reverse) cuts a head the other raster kept; every on-screen word has a named source — the client's
+  text, a line heard in the footage, or the CTA — and an internal label or a concept name never prints; a hold on one frame
+  is bounded by the EDL's `qc.max_still_s` and read back by `qc_deliverable.py` (a designed hold declares `accepted_still`).
 - **Alternates** are their own EDLs and deliverables; finals are named versions per spot in
   `deliver/final/` with the current card.
 

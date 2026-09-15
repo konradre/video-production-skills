@@ -20,6 +20,13 @@ needed more — never to accommodate a run that overran.
 maintenance step, or a skill invoked as a subroutine of another is not a hop the agent takes
 unattended, and counting it inflates the budget.
 
+**An operator-authorised phase scope is a budget override.** A go that names the phases it covers —
+"this go covers pre-production through the finish for spot X" — sets the budget to that chain's length
+for that phase, and the handoff record quotes it. A finished spot from existing footage is at least four
+automatic hops (the entry → designed elements → the EDL → the sound → the finish), which the default
+would cut mid-chain. The visited set and the stop conditions still apply; without the named scope the
+default holds.
+
 **In practice a stop condition fires first.** The budget is a backstop for chains nobody designed,
 not the expected terminator.
 

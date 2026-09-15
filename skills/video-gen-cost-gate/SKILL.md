@@ -25,7 +25,8 @@ the job — billing happens at acceptance, not at fetch), **clip** (a landed see
 a file path; the pick is theirs).
 
 **What varies.** The venues, prices, modes, caps and the stills model are the established chain's, dated in
-[`references/VENUES.md`](references/VENUES.md); the balance sets the batch size. The GO, the receipt, the one gated path
+[`references/VENUES.md`](references/VENUES.md); the balance sets the batch size (a venue with no balance endpoint records it
+as *unreadable* — never 0, never a guess — and the GO's cap is that batch's limit). The GO, the receipt, the one gated path
 and the clip handover do not move — `video-production/references/WHAT-VARIES.md` § Generator, venue and native raster.
 
 ## 1. Pick the venue from the table

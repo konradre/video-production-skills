@@ -40,7 +40,10 @@ bash    scripts/contact_sheet.sh takes/S02-G4-s1.mp4 4 4
 `qc_seed.py` gives the cut list (per-frame diff), the **continuity sheet** — the plate | the first frame
 of every cut | the last frame — a 1 fps tile, the native-audio RMS peak (the hit's time) and a whisper
 transcript. Read the sheet at 2–4×: every background element in every cut (one object checked is not
-all of them).
+all of them). The transcript is of the WHOLE take, windowed afterwards to the excerpt in question — a short excerpt
+transcribed alone loses the agreement between models that the full take keeps (`spot-audio-assembly` § 5). Client footage
+is a take too: the same sheet, cut list and transcript per clip, and its display shape from
+`video-production/scripts/probe_sources.py` before any crop.
 
 **Done when:** every seed has a sheet, a cut list, a transcript and a peak time in `review/`, and the
 previous keeper's last frame (or the plate) sits beside them.

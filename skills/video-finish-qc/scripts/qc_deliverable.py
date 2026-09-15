@@ -3,7 +3,8 @@
   duration     vs the EDL runtime (< 50 ms)
   loudness     integrated LUFS · LRA · true peak — and the loudness must be FINITE: an audio-STREAM check is not a SOUND check
                (a conforming AAC track at -inf passes a stream probe and ships silent); the true peak must sit under the platform
-               ceiling (--tp-ceiling, -1 dBTP) — the EDL's TP is the encode-side target that AAC overshoots by up to ~1 dB
+               ceiling (--tp-ceiling; default = the EDL's loudnorm.TP_ceiling, else -1 dBTP) — the EDL's TP is the master's
+               limiter ceiling under it, and the AAC overshoot on limited peaks measured 0.4–1.0 dB, growing with the limiting
   cuts         the delivered scene-cut list vs the EDL joins: extras are a take's own cut, motion, or a LEAK — named
   leaks        every hero event's [in,out] against ITS TAKE's own scene cuts (a window crossing one = rogue frames) — except
                the cuts the event DECLARES in accepted_cuts (composed inside one generation and kept), printed as INFO
@@ -12,8 +13,12 @@
   FORMAT rows  frame = the EDL canvas (1080 on the short side) · H.264 High yuv420p · BT.709 primaries + transfer + MATRIX
                (shipped finals carried an untagged matrix until 2026-09-10) · CFR at the EDL fps (r == avg) · faststart
                (moov before mdat) · AAC 48 kHz stereo
-  black/frozen blackdetect ≥ 0.1 s anywhere but a trailing fade; freezedetect ≥ 0.5 s inside the footage span (the card is
-               meant to hold)
+  black/frozen blackdetect ≥ 0.1 s anywhere but a trailing fade; freezedetect ≥ qc.max_still_s (--max-still-s; 0.5 s by
+               default) inside the footage span, the longest run printed — the card holds by design, and a designed hold
+               inside the footage is declared on its event as accepted_still: "<why>" and prints as INFO
+  geometry     INFO: every hero take probed for SAR and rotation — a source whose display shape differs from its storage
+               shape is listed (normalise before any crop: video-production/scripts/probe_sources.py); the eye check is a
+               delivered frame beside the source's display frame at 1:1
   near-black   EVERY event's window sampled at three points (10 / 50 / 90 %): a window whose samples all read under
                --black-luma (16/255) FAILS unless the event declares `accepted_black: true` — a 10-bit source once rendered
                black through a grade while every other row passed (2026-09-15)
@@ -22,7 +27,7 @@ Every row carries a KIND: `format` rows are mechanically fixable — the agent f
 at the right frame); `judgement` rows change the content (duration, loudness, cuts, black frames) and go to the operator.
 Exit 1 on any FAIL; the summary names the failures by kind.
 
-  qc_deliverable.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--placement <qc_vo_placement.py>] [--no-card]
+  qc_deliverable.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--placement <qc_vo_placement.py>] [--no-card] [--tp-ceiling] [--max-still-s]
   qc_deliverable.py --selftest        # the near-black instrument against a synthetic clip: a black event FAILS, a declared one passes
 """
 import argparse, json, os, re, subprocess, sys
@@ -72,7 +77,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--edl'); ap.add_argument('--deliv')
     ap.add_argument('--placement', default=f'{SK}/spot-audio-assembly/scripts/qc_vo_placement.py'); ap.add_argument('--no-card', action='store_true')
-    ap.add_argument('--tp-ceiling', type=float, default=-1.0, help='the delivered true-peak bar (the platform ceiling); the EDL TP is the encode target under it')
+    ap.add_argument('--tp-ceiling', type=float, default=None, help='the delivered true-peak bar (the platform ceiling); default = the EDL loudnorm.TP_ceiling, else -1.0 — the EDL TP is the master target under it')
+    ap.add_argument('--max-still-s', type=float, default=None, help='the longest still run allowed inside the footage span; default = the EDL qc.max_still_s, else 0.5')
     ap.add_argument('--black-luma', type=float, default=16.0, help='an event whose three sampled frames all read under this mean luma (0–255) fails unless it declares accepted_black')
     ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
@@ -107,8 +113,9 @@ def main():
     li = float(I[-1]) if I and I[-1] != '-inf' else float('-inf'); tp = float(TP[-1]) if TP and TP[-1] != '-inf' else float('-inf')
     ln = e.get('audio', {}).get('loudnorm', {'I': -14, 'TP': -1})
     verdict(np.isfinite(li) and abs(li - ln['I']) <= 1.0, 'loudness', f"I {li} LUFS (target {ln['I']}) · LRA {LRA[-1] if LRA else '?'}" + ('' if np.isfinite(li) else ' — SILENT TRACK'))
-    over = tp - ln['TP']   # the EDL's TP is the encode-side target; AAC overshoots it by up to ~1 dB, so the delivered bar is the platform ceiling
-    verdict(np.isfinite(tp) and tp <= a.tp_ceiling + 0.05, 'true peak', f"{tp} dBTP vs the platform ceiling {a.tp_ceiling} (EDL target {ln['TP']}, {over:+.1f} dB over it" + ('' if over <= 1.0 else ' — more than the AAC overshoot: check the limiter order') + ')')
+    tpc = a.tp_ceiling if a.tp_ceiling is not None else float(ln.get('TP_ceiling', -1.0))   # the platform's bar for the DELIVERED file
+    over = tp - ln['TP']   # the EDL's TP is the master's limiter ceiling; AAC overshoots the limited peaks by 0.4–1.0 dB, so the delivered bar is the platform ceiling
+    verdict(np.isfinite(tp) and tp <= tpc + 0.05, 'true peak', f"{tp} dBTP vs the platform ceiling {tpc} ({'EDL loudnorm.TP_ceiling' if a.tp_ceiling is None and 'TP_ceiling' in ln else '--tp-ceiling' if a.tp_ceiling is not None else 'the default'}; EDL master target {ln['TP']}, {over:+.1f} dB over it" + ('' if over <= 1.0 else ' — more than the AAC overshoot: check the limiter order') + ')')
     cuts = [round(float(x), 3) for x in re.findall(r'pts_time:([\d.]+)', sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', "select='gt(scene,0.25)',showinfo", '-f', 'null', '-']).stderr)]
     joins = [round(x['tl'][0], 3) for x in e['events'][1:]]
     tol = max(0.05, 1.5 / efps)   # a scene-detector time against a declared take time: 1.5 frames
@@ -132,6 +139,14 @@ def main():
         if bad: leaks.append(f"{x['id']} {x['take']} in {x['in']:.3f} out {x['out']:.3f} crosses the take's cut at {bad}")
     if kept: print(f"INFO accepted cuts inside hero windows (declared on the event, not leaks): {kept}")
     verdict(not leaks, 'take-cut leaks', f"{len(leaks)} leak(s) over {sum(1 for x in e['events'] if 'src' in x)} hero events" + ''.join('\n      ' + l for l in leaks))
+    # ---- source geometry (INFO: the QC cannot know the crop, but it can say which sources are not what their storage says) ----
+    geo = []
+    for t in sorted({x['take'] for x in e['events'] if 'src' in x and os.path.exists(x.get('take', ''))}):
+        pr = sh(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=sample_aspect_ratio:stream_tags=rotate:stream_side_data=rotation', '-of', 'default=nw=1', t]).stdout
+        sm = re.search(r'sample_aspect_ratio=(\S+)', pr); sar = sm.group(1) if sm else '1:1'
+        rm = re.search(r'(?:rotation|TAG:rotate)=(-?[\d.]+)', pr); rot = (float(rm.group(1)) % 360) if rm else 0.0
+        if sar not in ('1:1', 'N/A', '0:1') or rot: geo.append(f"{os.path.basename(t)} SAR {sar}" + (f" rotation {rot:g}" if rot else ''))
+    print(f"INFO source geometry: {len(geo)} hero take(s) whose display shape differs from their storage shape" + (f" — normalise before any crop (video-production/scripts/probe_sources.py); check a delivered frame beside the source's display frame at 1:1: {geo}" if geo else ''))
     card = [x for x in e['events'] if x.get('role') == 'endcard']
     # ---- black and frozen frames (judgement: a content defect the operator sees) ----
     foot_end = float(card[0]['tl'][0]) if card else dur
@@ -139,11 +154,21 @@ def main():
     blacks = [(float(s0), float(e0)) for s0, e0 in re.findall(r'black_start:([\d.]+) black_end:([\d.]+)', bl)]
     bad_black = [b for b in blacks if b[1] < dur - 0.3]   # a trailing fade to black is a choice; a black run anywhere else is a hole
     verdict(not bad_black, 'black frames', f"{len(blacks)} black run(s) ≥ 0.1 s: {[(round(x, 2), round(y, 2)) for x, y in blacks]}" + (' — trailing fade only' if blacks and not bad_black else ''))
-    fz = sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', f"trim=0:{foot_end:.3f},freezedetect=n=-60dB:d=0.5", '-f', 'null', '-']).stderr
-    frozen = re.findall(r'freeze_start: ([\d.]+)', fz)
+    mst = a.max_still_s if a.max_still_s is not None else float(e.get('qc', {}).get('max_still_s', 0.5))   # the project's threshold, from the EDL
+    fz = sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', f"trim=0:{foot_end:.3f},freezedetect=n=-60dB:d={mst:g}", '-f', 'null', '-']).stderr
+    runs = []
+    for m in re.finditer(r'freeze_(start|duration): ([\d.]+)', fz):   # start … duration pairs; a run still open at the trim end gets the remainder
+        if m.group(1) == 'start': runs.append([float(m.group(2)), None])
+        elif runs and runs[-1][1] is None: runs[-1][1] = float(m.group(2))
+    runs = [(s0, d0 if d0 is not None else max(0.0, foot_end - s0)) for s0, d0 in runs]
+    holds = [(float(x['tl'][0]), float(x['tl'][1]), x['id']) for x in e['events'] if x.get('accepted_still')]
+    declared_runs = [r for r in runs if any(h0 - 0.05 <= r[0] <= h1 for h0, h1, _ in holds)]
+    frozen = [r for r in runs if r not in declared_runs]; longest = max((d for _, d in runs), default=0.0)
+    if declared_runs: print(f"INFO still runs inside declared holds (accepted_still on the event): {[(round(s0, 2), round(d0, 2)) for s0, d0 in declared_runs]}")
     nb = near_black_events(D, e['events'], a.black_luma)
     verdict(not nb, 'near-black events', f"{len(nb)} event window(s) read black at all three samples (< {a.black_luma:g}/255): {nb}" + (' — a source type the grade turns black? declare accepted_black only for a shot meant to be black' if nb else ''))
-    verdict(not frozen, 'frozen frames', f"{len(frozen)} frozen run(s) ≥ 0.5 s inside the footage span 0–{foot_end:.2f} s at {[round(float(x), 2) for x in frozen]} (the end card is allowed to hold)")
+    src = '--max-still-s' if a.max_still_s is not None else ('the EDL qc.max_still_s' if 'max_still_s' in e.get('qc', {}) else 'the default')
+    verdict(not frozen, 'frozen frames', f"{len(frozen)} still run(s) ≥ {mst:g} s inside the footage span 0–{foot_end:.2f} s at {[(round(s0, 2), round(d0, 2)) for s0, d0 in frozen]}; longest run {longest:.2f} s (threshold {mst:g} s from {src}; the end card is allowed to hold)")
     if card and not a.no_card:
         A, B = last_frame_thumb(D), last_frame_thumb(card[0]['take'])
         if A is None or B is None: verdict(False, 'end card', 'could not read a last frame')

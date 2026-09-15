@@ -39,9 +39,12 @@ inherits a gain ride it cannot undo. A listener hears it as a second element was
    `TP_measured + g`; everything above the TP target is limited. The loudest LIMITING-FREE target is
    `I_measured − TP_measured + TP_target`: a mix measuring I −21.1 / TP −5.25 against a −1 dBTP target is
    limiting-free up to −16.9 LUFS, and every louder target buys its loudness with limiting.
-5. **AAC overshoots ≈ +1 dB**: the EDL's TP target sits ≈ 1 dB under the platform's ceiling (−2.4 for a
-   −1 dBTP delivery); the delivered bar is the platform ceiling, verified on
-   the DELIVERED file every time.
+5. **AAC overshoots the limited peaks by 0.4–1.0 dB, and the overshoot GROWS with how hard the limiter works**: the
+   EDL's TP target sits under the platform's ceiling by at least that (−2.4 for a −1 dBTP delivery; a −1.5 target that
+   delivered −0.9 on a quieter premix, where the earlier versions had overshot 0.2, is the measurement behind the range).
+   The delivered bar is the platform ceiling — `loudnorm.TP_ceiling` in the EDL when it is not −1 dBTP — verified on the
+   DELIVERED file every time, never inferred from the WAV target plus a fixed allowance; re-measure after any premix
+   change.
 6. Captions are overlaid after the downscale in the same pass; `-t <runtime>` caps the length (without it AAC
    priming and padding set the container duration); `-movflags +faststart`.
 

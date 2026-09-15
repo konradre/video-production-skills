@@ -65,6 +65,11 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
   over the card.
 - `loudnorm` — `{I, TP, LRA}`: `I` is the target the deliver leg reaches with ONE measured static gain, `TP` the
   limiter ceiling; the client reference's own level when there is one. Verified on the DELIVERED file every time.
+- `loudnorm.TP_ceiling` (optional) — the platform's true-peak bar for the DELIVERED file when it is not −1 dBTP; the QC
+  reads it as its default. `TP` stays the master's limiter ceiling under it: the AAC overshoot on limited peaks measured
+  0.4–1.0 dB and grows with how hard the limiter works, so the gap is re-measured after any premix change.
+- `qc.max_still_s` (optional, default 0.5) — the longest run of unchanged frames the footage span may hold before
+  `qc_deliverable.py` fails it; a designed hold longer than that is declared on its event as `accepted_still: "<why>"`.
 
 ## markers — absolute timeline seconds, written by the builder
 

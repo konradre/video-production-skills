@@ -52,8 +52,12 @@ WAV.
   and why, then wait. A vendor outage or a refused cue is a reason to ask, never a reason to switch quietly.
 - The reseller licence question for a paying-client deliverable is the operator's call, raised once.
 - **A cue is cut to the marker it ends on** (the before cue to the HIT) from the head of the candidate;
-  the file name carries the length; a cue file shorter than its span just ENDS mid-shot — `edl_check`
-  fails it.
+  the file name carries the length. **A cue shorter than its span is looped on its own beat grid by whole bars, the
+  take's ending kept, before a longer cue is priced** — `scripts/music_loop.py` plays the take to a beat A, jumps back a
+  bar multiple to a beat B on the same bar phase, crossfades the join (40 ms, equal power) and plays through the take's
+  own ending, whose hit then lands exactly the jump later; the operator listens across the join before it enters a build
+  (a 38.8 s take under a 57.9 s spot, zero spend, 2026-09-15). A cue neither looped nor long enough just ENDS mid-shot —
+  `edl_check` fails it.
 - **The earlier accepted cue wins** — a cue the operator approved is the campaign's cue for that beat.
 - A cue slams in ON the reveal marker (`fade_in: 0`); the bed under the turntable and card runs to the
   end; the hit shot and the line after it carry only native sound.

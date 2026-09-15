@@ -58,8 +58,15 @@ sit in the bodies — `video-finish` § 5b's verify-every-render and `video-prom
 documentary spot whose description-level routing never opened either (2026-09-15). The declarations go into the pause block
 ("skills consulted / declared not applicable").
 
+And **every source is probed for its DISPLAY shape** before any crop, layout or raster math — `scripts/probe_sources.py`
+prints storage, SAR, rotation and the display shape per file and exits 2 when any needs normalising (`scale=iw*sar:ih,
+setsar=1` and the rotation, before the first crop); the display shape, not the storage shape, goes into the shot list's
+header. Width × height alone read 11 of 17 vertical client clips as landscape, and every render stretched them 3.16× wide
+(2026-09-15).
+
 **Done when:** the root, the genre and the pre-production skill are named in the first status line, every axis on
-which the project differs from the defaults has its value on disk, and the sweep's declarations are written down.
+which the project differs from the defaults has its value on disk — the sources' display shapes among them — and the sweep's
+declarations are written down.
 
 ## 2. Rehydrate
 
@@ -164,6 +171,7 @@ agent keeps one, says NEXT.
 | `status_line.py --root [--deliverable --drive --keep-tags --higgsfield --monid --elevenlabs --open --job]` | the status template with free reads only; unreadable balances said, never 0; the project's size and its superseded derived set; the render floor |
 | `project_size.py --root [--keep-tags spot=tag,…] [--plan <file>] [--selftest]` | substrate vs derived by directory role; the superseded set by category with sizes; a plan file the operator names deletions from — it never deletes |
 | `corpus_sweep.py --skills <dir> --axes k=v,… [--selftest]` | every skill's body summary (What varies + section headers) against the project's axes — the reading aid behind the intake declarations |
+| `probe_sources.py <file>… [--json] [--selftest]` | storage, SAR, DAR, rotation, the DISPLAY shape, fps, codec, bit depth, duration and audio per source; exit 2 when any source must be normalised before a crop |
 | `pause_block.py --resume --deliverable --next [--builder --keepers --refs --substrate --skills --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak` |
 | `detach.py --log <abs log> -- <command> …` | starts a long job in a session of its own (Linux and macOS), so it outlives the shell and the tool call; prints the pid that leads the job's process group |
 
