@@ -292,6 +292,9 @@ be continued by a gen: write the face into the last frame, or continue from the 
 
 - `video-finish` — the finishing chain; it starts only after a seed is APPROVED (no upscale before
   approval).
+- [`references/ZOOM-OUT-CHAIN.md`](references/ZOOM-OUT-CHAIN.md) — a generated aerial or wide open grown OUTWARD from one real
+  frame: import the landing frame, generate closest-first with the previous output as reference 1, land on the frame that IS
+  the first live frame (four stills, one afternoon, no re-rolls, 2026-09-15).
 - [`references/ASSET-HYGIENE.md`](references/ASSET-HYGIENE.md) — citations vs assets both ways, two-SSOT
   sync, superseded assets, defect notes keyed to the file, counts derived never retyped, derived artefacts
   fingerprinted.

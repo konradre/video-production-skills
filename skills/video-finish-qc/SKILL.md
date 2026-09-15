@@ -86,8 +86,18 @@ only 8-bit 4:2:0 file. A new version is a new tag and a new EDL (`video-edit-edl
 `FINISH-END` or the stage failed. A standalone clip or an excerpt: `finish_clip.py` (a fresh name per
 render). Free disk is part of every status — a ProRes pair per version fills a drive.
 
-**Done when:** the deliverable exists under its tag, the log carries `FINISH-END all`, and `df` was read
-before and after.
+The look is the library's cube for the genre — `--look ads-clean` on an ad, a film look on a film — on generated takes and
+on existing footage alike; before the FIRST delivered version the operator picks it from `scripts/look_sheet.py` (a few of
+the project's own frames × the candidate cubes, the builder's current chain as a column when one exists). A hand-written
+level chain is a deviation that needs a reason: two such chains stood for ten hours on a documentary spot before the
+operator asked (2026-09-15). A new SOURCE TYPE — another codec, bit depth or pixel format: a png-codec still, a 10-bit
+ProRes render — gets a one-event render check before a full build; a 10-bit source once rendered black through the grade
+and every other QC row passed. And the finisher reads the HOST drive first: under `--min-free-gb` (40 GB, or three times
+the spot's mezzanine pair) it refuses to start, because a guest's `df` is not the host's free space and a mezzanine pair per
+version fills a drive (`references/PIPELINE.md` § Disk).
+
+**Done when:** the deliverable exists under its tag, the log carries `FINISH-END all`, the look came from the sheet, and
+the host drive's free space was read before and after.
 
 ## 4. QC the delivered file — per metric, with its label
 
@@ -99,7 +109,7 @@ Duration vs runtime · **finite** loudness within 1 LU and TP under the ceiling 
 a SOUND check) · the delivered cut list vs the EDL joins with every extra detection named · take-cut leaks
 (rogue frames; a cut the take composed and the operator kept is declared on the event as `accepted_cuts` and
 prints as INFO — a gate that fails a chosen keeper on every render teaches every reader to skip its verdict) ·
-the end card by NCC of the last frame · VO placement by envelope NCC. Then the eye and the
+every event's window sampled at three points for NEAR-BLACK frames (all three under 16/255 = FAIL unless the event declares `accepted_black`; the row that catches a source type the grade turned black) · the end card by NCC of the last frame · VO placement by envelope NCC. Then the eye and the
 ear on the delivered file: the grade at zoom at several timecodes, the mouth check on the wides, the audio
 at every cut and hit, the captions against the VO. Every instrument carries its known-answer case.
 Designed content (explainer scenes, kinetic titles, cards) adds two judgement rows: `designed_frame_metrics.py` on the
@@ -144,9 +154,10 @@ file by path with its size.
 | `upscale_fal_topaz.py --root --clips [--factor] [--confirmed] [--resume]` | hosted Starlight with pre-flight, receipts, resume |
 | `hero_pass.sh --root --look files…` | the Resolve + Dehancer pass over the bridge, one clip per call |
 | `hero_distinct.py files…` | frame-hash distinctness of same-size heroes |
-| `finish_spot.py --root --edl [--stage] [--tag]` | gate → cut → master (a static mix; the card when the EDL has one) → deliver (one measured gain, the limiting printed, the length capped) from the EDL |
+| `finish_spot.py --root --edl [--stage] [--tag] [--min-free-gb 40]` | gate → cut → master (a static mix; the card when the EDL has one) → deliver (one measured gain, the limiting printed, the length capped) from the EDL |
 | `finish_clip.py --root --hero --take --in --out --name` | a standalone clip / excerpt deliverable |
-| `qc_deliverable.py --root --edl --deliv` | the one-pass QC of the delivered file; declared `accepted_cuts` print as INFO, never as leaks |
+| `qc_deliverable.py --root --edl --deliv [--black-luma 16]` | the one-pass QC of the delivered file; declared `accepted_cuts` print as INFO, never as leaks; near-black per event; `--selftest` |
+| `look_sheet.py --out --cubes --looks ads-clean,ads-warm [--blend look:0.85] [--current "<vf>"] --frame <video@s|image> …` | the frame sheet the operator picks the look from, before the first delivery; `--selftest` |
 | `final_renders.sh --root spots…` | finish → QC → `deliver/final/` for every approved spot |
 
 ## Cross-references

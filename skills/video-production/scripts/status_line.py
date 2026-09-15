@@ -21,12 +21,20 @@ def sh(cmd, timeout=20):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--root', default='.'); ap.add_argument('--deliverable'); ap.add_argument('--drive', default='.'); ap.add_argument('--min-free-gb', type=float, default=6)
+    ap.add_argument('--root', default='.'); ap.add_argument('--deliverable'); ap.add_argument('--drive', default='.'); ap.add_argument('--min-free-gb', type=float, default=40, help='the render floor: under it no finish starts (finish_spot.py --min-free-gb)')
+    ap.add_argument('--keep-tags', default='', help='spot=tag,… the current versions; everything else derived is SUPERSEDED (project_size.py)')
     ap.add_argument('--higgsfield', action='store_true'); ap.add_argument('--monid', action='store_true'); ap.add_argument('--elevenlabs', action='store_true'); ap.add_argument('--open', action='append', default=[]); ap.add_argument('--job', action='append', default=[])
     a = ap.parse_args(); os.chdir(a.root); now = time.strftime('%Y-%m-%d %H:%M'); lines = [f'STATUS {now}']
     if a.deliverable:
         ok = os.path.exists(a.deliverable); lines.append(f"deliverable: {a.deliverable}" + (f" ({os.path.getsize(a.deliverable) / 2 ** 20:.1f} MiB)" if ok else ' — MISSING'))
-    du = shutil.disk_usage(a.drive); free = du.free / 1e9; lines.append(f"drive {a.drive}: {free:.0f} GB free" + (' — ⚠ under the floor, stop heavy work' if free < a.min_free_gb else ''))
+    du = shutil.disk_usage(a.drive); free = du.free / 1e9; lines.append(f"drive {a.drive}: {free:.0f} GB free" + (f' — ⚠ under the render floor ({a.min_free_gb:g} GB): no finish starts; free space or name superseded files' if free < a.min_free_gb else '') + ' (the HOST drive; a VM image never shrinks)')
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('project_size', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'project_size.py')); ps = importlib.util.module_from_spec(spec); spec.loader.exec_module(ps)
+        keep = {kv.split('=')[0]: kv.split('=')[1] for kv in a.keep_tags.split(',') if '=' in kv}
+        rows = ps.classify('.', keep, ps.SUBSTRATE, ps.DERIVED); tot = {k: sum(sz for _, sz in v) / 1e9 for k, v in rows.items()}
+        lines.append(f"project: {sum(tot.values()):.1f} GB — substrate {tot['substrate']:.1f} · derived current {tot['derived-current']:.1f} · SUPERSEDED {tot['derived-superseded']:.1f} GB ({len(rows['derived-superseded'])} files; list them with project_size.py --plan and name what goes)")
+    except Exception as ex: lines.append(f'project: size unreadable ({type(ex).__name__})')
     bal = []
     if a.higgsfield: bal.append('Higgsfield: ' + (sh(['higgsfield', 'account', 'status']).splitlines()[0] if shutil.which('higgsfield') else 'unreadable (CLI not on PATH)'))
     if a.monid:

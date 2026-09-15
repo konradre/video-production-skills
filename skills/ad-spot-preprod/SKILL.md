@@ -65,7 +65,13 @@ structure (the variable line's halves bracket the audio signature; the locked li
 A spot with no product, card or wipe on screen (a UGC testimonial) carries only the rules its script invokes —
 the scaffold's `--spot-type ugc` drops the rest. [`references/GLOBAL-SPEC.md`](references/GLOBAL-SPEC.md).
 
-**Done when:** the global spec section is written once for the campaign and every later spot cites it.
+The grade is named here, once, and it starts from the look library's cube for the genre (`ads-clean` for an ad) — also when
+the footage is the client's own: the operator picks it from a frame sheet of the project's frames
+(`video-finish-qc/scripts/look_sheet.py`) before the first delivered version. A hand-written level chain is a deviation that
+needs a reason; two of them stood for ten hours on a documentary spot before the operator asked (2026-09-15).
+
+**Done when:** the global spec section is written once for the campaign, names the look the operator picked from the sheet,
+and every later spot cites it.
 
 ## 4. Build the asset bible, the kit and the beats — then the shot list
 

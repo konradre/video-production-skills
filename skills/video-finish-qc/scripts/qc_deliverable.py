@@ -14,12 +14,16 @@
                (moov before mdat) · AAC 48 kHz stereo
   black/frozen blackdetect ≥ 0.1 s anywhere but a trailing fade; freezedetect ≥ 0.5 s inside the footage span (the card is
                meant to hold)
+  near-black   EVERY event's window sampled at three points (10 / 50 / 90 %): a window whose samples all read under
+               --black-luma (16/255) FAILS unless the event declares `accepted_black: true` — a 10-bit source once rendered
+               black through a grade while every other row passed (2026-09-15)
 Every row carries a KIND: `format` rows are mechanically fixable — the agent fixes them alone (a re-mux with
 `-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1`, a faststart re-mux, a re-encode
 at the right frame); `judgement` rows change the content (duration, loudness, cuts, black frames) and go to the operator.
 Exit 1 on any FAIL; the summary names the failures by kind.
 
   qc_deliverable.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--placement <qc_vo_placement.py>] [--no-card]
+  qc_deliverable.py --selftest        # the near-black instrument against a synthetic clip: a black event FAILS, a declared one passes
 """
 import argparse, json, os, re, subprocess, sys
 import numpy as np
@@ -30,6 +34,35 @@ SK = os.path.expanduser('~/.claude/skills')
 def sh(c): return subprocess.run(c, capture_output=True, text=True)
 
 
+def mean_luma(p, t):
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-ss', f'{t:.3f}', '-i', p, '-frames:v', '1', '-vf', 'scale=32:32,format=gray', '-f', 'rawvideo', '-'], capture_output=True).stdout
+    return float(np.frombuffer(raw[-1024:], np.uint8).mean()) if len(raw) >= 1024 else None
+
+
+def near_black_events(D, events, thr=16.0):
+    """Every event's window sampled at 10 / 50 / 90 %: returns [(id, [lumas])] for windows whose samples ALL read under thr and
+    that do not declare accepted_black. Three probes per event keep it cheap; a real black hole never passes three."""
+    bad = []
+    for x in events:
+        t0 = float(x['tl'][0]); t1 = float(x['tl'][1]) if len(x.get('tl', [])) > 1 else t0 + float(x.get('out', 0)) - float(x.get('in', 0))
+        if t1 - t0 <= 0: continue
+        ls = [mean_luma(D, t0 + (t1 - t0) * f) for f in (0.1, 0.5, 0.9)]; ls = [l for l in ls if l is not None]
+        if ls and max(ls) < thr and not x.get('accepted_black'): bad.append((x.get('id', '?'), [round(l, 1) for l in ls]))
+    return bad
+
+
+def selftest():
+    import tempfile
+    d = tempfile.mkdtemp(); clip = os.path.join(d, 'clip.mp4')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=gray:s=64x64:d=2:r=24', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=2:r=24',
+                    '-filter_complex', '[0:v][1:v]concat=n=2:v=1:a=0[v]', '-map', '[v]', '-pix_fmt', 'yuv420p', clip], check=True)
+    ev = [{'id': 'a', 'tl': [0.0, 2.0]}, {'id': 'b', 'tl': [2.0, 4.0]}]
+    bad = near_black_events(clip, ev); ok1 = [b[0] for b in bad] == ['b']
+    ev[1]['accepted_black'] = True; ok2 = near_black_events(clip, ev) == []
+    print(f"SELFTEST {'PASS' if ok1 and ok2 else 'FAIL'}: black event flagged={ok1} (found {bad}), declared event passes={ok2}")
+    sys.exit(0 if ok1 and ok2 else 1)
+
+
 def last_frame_thumb(p):
     raw = subprocess.run(['ffmpeg', '-v', 'error', '-sseof', '-0.2', '-i', p, '-frames:v', '1', '-vf', 'scale=96:170,format=gray', '-f', 'rawvideo', '-'], capture_output=True).stdout
     return np.frombuffer(raw[-96 * 170:], np.uint8).astype(np.float32) if len(raw) >= 96 * 170 else None
@@ -37,10 +70,15 @@ def last_frame_thumb(p):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--root', default='.'); ap.add_argument('--edl', required=True); ap.add_argument('--deliv', required=True)
+    ap.add_argument('--root', default='.'); ap.add_argument('--edl'); ap.add_argument('--deliv')
     ap.add_argument('--placement', default=f'{SK}/spot-audio-assembly/scripts/qc_vo_placement.py'); ap.add_argument('--no-card', action='store_true')
     ap.add_argument('--tp-ceiling', type=float, default=-1.0, help='the delivered true-peak bar (the platform ceiling); the EDL TP is the encode target under it')
-    a = ap.parse_args(); os.chdir(a.root); e = json.load(open(a.edl, encoding='utf-8')); D = a.deliv; fails = []
+    ap.add_argument('--black-luma', type=float, default=16.0, help='an event whose three sampled frames all read under this mean luma (0–255) fails unless it declares accepted_black')
+    ap.add_argument('--selftest', action='store_true')
+    a = ap.parse_args()
+    if a.selftest: selftest()
+    if not a.edl or not a.deliv: ap.error('--edl and --deliv are required (or --selftest)')
+    os.chdir(a.root); e = json.load(open(a.edl, encoding='utf-8')); D = a.deliv; fails = []
     if not os.path.exists(D): sys.exit(f'QC-DELIVERABLE FAIL (missing) — no file at {D}')
 
     def verdict(ok, label, detail, kind='judgement'): (None if ok else fails.append((label, kind))); print(f"{'PASS' if ok else 'FAIL'} [{kind}] {label}: {detail}")
@@ -103,6 +141,8 @@ def main():
     verdict(not bad_black, 'black frames', f"{len(blacks)} black run(s) ≥ 0.1 s: {[(round(x, 2), round(y, 2)) for x, y in blacks]}" + (' — trailing fade only' if blacks and not bad_black else ''))
     fz = sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', f"trim=0:{foot_end:.3f},freezedetect=n=-60dB:d=0.5", '-f', 'null', '-']).stderr
     frozen = re.findall(r'freeze_start: ([\d.]+)', fz)
+    nb = near_black_events(D, e['events'], a.black_luma)
+    verdict(not nb, 'near-black events', f"{len(nb)} event window(s) read black at all three samples (< {a.black_luma:g}/255): {nb}" + (' — a source type the grade turns black? declare accepted_black only for a shot meant to be black' if nb else ''))
     verdict(not frozen, 'frozen frames', f"{len(frozen)} frozen run(s) ≥ 0.5 s inside the footage span 0–{foot_end:.2f} s at {[round(float(x), 2) for x in frozen]} (the end card is allowed to hold)")
     if card and not a.no_card:
         A, B = last_frame_thumb(D), last_frame_thumb(card[0]['take'])

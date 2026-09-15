@@ -50,15 +50,27 @@ budget ([`references/WHAT-VARIES.md`](references/WHAT-VARIES.md)). Every value t
 written into the project's own files: the EDL's `canvas`, `fps`, `runtime_s` and `audio.loudnorm`, the `caption_style`,
 the shot list's header, the pause block. A number in a skill is a default until the project confirms it.
 
-**Done when:** the root, the genre and the pre-production skill are named in the first status line, and every axis on
-which the project differs from the defaults has its value on disk.
+Then **the corpus sweep** — the one reading a description cannot replace: `scripts/corpus_sweep.py --skills ~/.claude/skills
+--axes footage=existing,deliverable=ad,…` prints every skill's BODY summary (its What-varies paragraph and its section
+headers) against the project's axes, and the agent declares, skill by skill, which sections apply and which do not, with
+the reason. Descriptions are trigger lists tuned to the established chain; the rules that transfer to another footage kind
+sit in the bodies — `video-finish` § 5b's verify-every-render and `video-prompt-dialects`' still dialect both applied to a
+documentary spot whose description-level routing never opened either (2026-09-15). The declarations go into the pause block
+("skills consulted / declared not applicable").
+
+**Done when:** the root, the genre and the pre-production skill are named in the first status line, every axis on
+which the project differs from the defaults has its value on disk, and the sweep's declarations are written down.
 
 ## 2. Rehydrate
 
 ```bash
 date
-python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --deliverable deliver/<latest>.mp4 --drive <drive> --higgsfield --monid --elevenlabs --open "…"
+python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --deliverable deliver/<latest>.mp4 --drive <drive> --keep-tags "<spot>=<tag>,…" --higgsfield --monid --elevenlabs --open "…"
 ```
+
+`--drive` is the HOST drive the project lives on (on a VM, never the guest's root: its disk image only grows), and the line
+now carries the project's size and the size of its SUPERSEDED derived set (`scripts/project_size.py`: mezzanines, masters and
+deliverables older than the kept tags, `.bak` copies, scratch). Under the render floor the line says so.
 
 Read the LATEST `STATE AT PAUSE — READ THIS FIRST ON RESUME` block of the project's RESUME document,
 then **the full files it names** — grep locates, it does not read. Resume from the **latest
@@ -123,8 +135,18 @@ jobs, the resume commands, NEXT), the continuity ledger, the SOP items and the r
 keeps them, and the agent's persistent memory with its NEXT pointer where the agent keeps one. Automatic
 compaction stays off, so nothing compacts before the ritual is done; the operator compacts.
 
-**Done when:** the pause block is appended with a clock timestamp, every background job is stopped or
-named, and the memory pointer, where the agent keeps one, says NEXT.
+Two more things belong to every pause, and to every phase boundary. **The cleanup prompt:** the status line's superseded
+set is listed by category with sizes (`project_size.py --plan`), and the operator names what goes — one delete per category,
+never a sweep; 62 GB of superseded mezzanines accumulated in one day on a documentary spot and the host drive ran out under a
+build. **The substrate list** (`pause_block.py --substrate`): what the spots are made FROM — client assets, generated stills
+and clips, music, cleaned takes, plans, tools — so the next context, or the cleanup, never mistakes a derived file for a
+source. The retrospective the project keeps follows [`references/RETROSPECTIVE.md`](references/RETROSPECTIVE.md): a
+reimplementation ledger, a failure-layer tag per finding, a proof line per proposal, rounds-to-converge per note class, a
+fold-status column, recipe blocks on the positive findings.
+
+**Done when:** the pause block is appended with a clock timestamp with its substrate list and its skills-consulted line, the
+superseded set has been put to the operator, every background job is stopped or named, and the memory pointer, where the
+agent keeps one, says NEXT.
 
 ## Failure behavior
 
@@ -139,15 +161,17 @@ named, and the memory pointer, where the agent keeps one, says NEXT.
 
 | script | does |
 |---|---|
-| `status_line.py --root [--deliverable --drive --higgsfield --elevenlabs --open --job]` | the status template with free reads only; unreadable balances said, never 0 |
-| `pause_block.py --resume --deliverable --next [--builder --keepers --refs --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak` |
+| `status_line.py --root [--deliverable --drive --keep-tags --higgsfield --monid --elevenlabs --open --job]` | the status template with free reads only; unreadable balances said, never 0; the project's size and its superseded derived set; the render floor |
+| `project_size.py --root [--keep-tags spot=tag,…] [--plan <file>] [--selftest]` | substrate vs derived by directory role; the superseded set by category with sizes; a plan file the operator names deletions from — it never deletes |
+| `corpus_sweep.py --skills <dir> --axes k=v,… [--selftest]` | every skill's body summary (What varies + section headers) against the project's axes — the reading aid behind the intake declarations |
+| `pause_block.py --resume --deliverable --next [--builder --keepers --refs --substrate --skills --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak` |
 | `detach.py --log <abs log> -- <command> …` | starts a long job in a session of its own (Linux and macOS), so it outlives the shell and the tool call; prints the pid that leads the job's process group |
 
 ## Cross-references
 
 - [`references/CONTEXT-MAP.md`](references/CONTEXT-MAP.md) · [`references/RESUME-CONTRACT.md`](references/RESUME-CONTRACT.md) ·
   [`references/STANDING-RULES.md`](references/STANDING-RULES.md) · [`references/WHAT-VARIES.md`](references/WHAT-VARIES.md) ·
-  [`references/CHAIN.md`](references/CHAIN.md).
+  [`references/CHAIN.md`](references/CHAIN.md) · [`references/RETROSPECTIVE.md`](references/RETROSPECTIVE.md).
 - The phase skills: `ad-spot-preprod` · `film-preprod` · `video-refs-continuity` · `video-prompt-dialects` ·
   `video-gen-cost-gate` · `video-take-review` · `video-edit-edl` · `spot-audio-assembly` · `designed-elements` ·
   `video-finish-qc` (on `video-finish`) · `client-rounds` · `explainer-video` (the explainer genre, end to end).

@@ -60,6 +60,9 @@ designed event  → source designed, its own look, no src; the card = role endca
 native bed      → only when the keeper EARNED its sound; native_audio_from/to mute what it did not
 punch-in        → zoom + anchor keeps the wrong thing out of frame without a regen
 montage         → COPY delivered spots' events, window them on the disclaimer's word times
+prefix          → events inserted at t=0 (a generated open) shift EVERY absolute time the plan holds — type cards,
+                  the logo, cue edges — so those times are derived from events, never typed; a bed that is now too short
+                  is re-looped by whole bars so its ending still lands on the card (`video-refs-continuity` § zoom-out chain)
 ```
 
 The genre decides the shape the beats take — ad spot (hook ≤ 2 s → reveal on a marker → product →

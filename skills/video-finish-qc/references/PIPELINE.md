@@ -58,7 +58,13 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
   resubmitted; `COMPLETED` is not success until the file is on disk and probed; the billing header is late
   (re-fetched after 20 s) and the receipt keeps both reads.
 - **Disk**: a ProRes pair per version fills a drive (a drive at 4.7 GB free took the whole environment down); the free space of the
-  target is part of every status line; check before moving anything (a project tree reaches 200 GB quickly).
+  target is part of every status line; check before moving anything (a project tree reaches 200 GB quickly). Three rules
+  from the second outage (2026-09-15, 62 GB of superseded mezzanines in one day, the host drive full under a build):
+  the free space that matters is the HOST drive's — a VM's disk image never shrinks, so `df` inside the guest is not free
+  space; scratch and intermediates live on the host drive, where a deleted file frees space at once; a mezzanine is never
+  `.bak`-copied (a copy doubles the footprint — `.bak` is for small project files). `finish_spot.py` refuses to start under
+  its floor (`--min-free-gb`, 40 GB or 3x the spot's mezzanine pair), and at every phase boundary
+  `video-production/scripts/project_size.py` lists the superseded derived set by category for the operator to name.
 
 ## The deliverable contract
 

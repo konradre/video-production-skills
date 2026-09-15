@@ -18,6 +18,9 @@ role:"endcard" event (a beat list may forbid a card) cuts its footage at the run
 Sources per event: designed → its own render at native raster; generated → <in-dir>/<id>.mov | <id>__*.mov | <id>.mp4,
 or the event's own `src` (a hero under a fresh name), sought by handle_head (a FULL-TAKE hero needs handle_head = in).
 Prints FINISH-END <stage> as the sentinel; a log without it is a failure whatever the file sizes say.
+Before any stage the HOST drive's free space is read; under the floor (--min-free-gb 40, or 3x the spot's estimated mezzanine
+pair) the finish refuses to start — a mezzanine pair per version fills a drive, and on a VM the guest's free space is not the
+host's.
 """
 import argparse, glob, json, os, subprocess, sys
 
@@ -41,10 +44,21 @@ def main():
     ap.add_argument('--canvas', default='2160x3840'); ap.add_argument('--fps', type=int, default=24); ap.add_argument('--handle', type=float, default=None, help='default head handle for upscaled sources (default 4 frames)')
     ap.add_argument('--beat-gate', default=f'{SK}/video-edit-edl/scripts/beat_sheet.py'); ap.add_argument('--stem-builder', default=f'{SK}/spot-audio-assembly/scripts/build_vo_stem.py')
     ap.add_argument('--captions-builder', default=f'{SK}/spot-audio-assembly/scripts/build_captions.py'); ap.add_argument('--no-gate', action='store_true')
+    ap.add_argument('--min-free-gb', type=float, default=40.0, help='the HOST drive floor under which no stage starts (or 3x the spot\'s mezzanine footprint, whichever is larger); --min-free-gb 0 disables')
     argv = sys.argv[1:]
     for i, x in enumerate(argv[:-1]):   # --tag -final: a value that starts with '-' must be joined for argparse
         if x == '--tag' and argv[i + 1].startswith('-'): argv[i:i + 2] = [f'--tag={argv[i + 1]}']
     a = ap.parse_args(argv); os.chdir(a.root)
+    if a.min_free_gb > 0:   # the drive that matters is the one the mezzanines land on — on a VM that is the HOST drive, whose image never shrinks
+        import shutil as _sh
+        _free = _sh.disk_usage('.').free / 1e9
+        try:
+            _e = json.load(open(a.edl, encoding='utf-8')); _W, _H = (int(v) for v in a.canvas.lower().split('x'))
+            _est = float(_e.get('runtime_s', 30)) * _W * _H * a.fps * 3.8 / 8 / 1e9 * 2   # two ProRes HQ mezzanines (~3.8 bit/px)
+        except Exception: _est = 0.0
+        _floor = max(a.min_free_gb, 3 * _est)
+        if _free < _floor: sys.exit(f'FINISH REFUSED: {_free:.0f} GB free on the drive holding the project, floor {_floor:.0f} GB (3x an estimated {_est:.1f} GB mezzanine pair, min {a.min_free_gb:g}). Free space or name superseded mezzanines for deletion (video-production/scripts/project_size.py); --min-free-gb 0 overrides.')
+        print(f'disk: {_free:.0f} GB free, floor {_floor:.0f} GB', flush=True)
     W, H = (int(v) for v in a.canvas.lower().split('x')); FPS = a.fps; HANDLE = a.handle if a.handle is not None else 4 / FPS
     edl = json.load(open(a.edl, encoding='utf-8')); RUN = float(edl['runtime_s']); AU = edl['audio']; SPOT = edl.get('spot', 'SPOT'); DBASE = edl.get('deliver_base', SPOT)
     FOOT = f'edit/mezz/{SPOT}-footage-graded{a.tag}.mov'; MASTER = f'edit/mezz/{SPOT}-master-{W}x{H}{a.tag}.mov'; DELIV = f'deliver/{DBASE}{a.tag or "-v1"}.mp4'

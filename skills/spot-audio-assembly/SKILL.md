@@ -107,8 +107,22 @@ window is muted (`native_audio_from/to` in the EDL) and the hole is filled with 
 from a clean slice of a sibling take — never a pasted slice (it carries the take's artifacts), never
 digital silence (the drop from room fuzz to nothing is audible).
 
+A recorded VOICE — documentary chant, an interview, a testimonial — gets three more rules, each the price of a build the
+operator sent back (an auction spot, 2026-09-15):
+
+- **A dip or a mute is placed by the level envelope, never by a transcript gap.** On fast speech the ASR drops words, so a
+  "silent" gap in the transcript can be the speaker at full level; a −18 dB dip placed on one cut the caller's own calling.
+  Read the RMS envelope of the window first; mute only where it shows no speech.
+- **Processed voice enters a build only after the operator's A/B reel.** Light broadband denoise (`afftdn` at about 9 dB)
+  is the default and needs no reel; a model separation (DeepFilterNet, demucs) is for a NAMED intrusion — a truck under one
+  line — and even then the reel decides: the operator hears "too much messing with his voice" on every model pass a build
+  ships unheard. `scripts/voice_ab_reel.py` builds the reel (each treatment once, a gap between, the index printed and
+  written beside it); the pick goes into the EDL by ordinal.
+- **A tick train under speech is swapped, not patched.** A spectral patch clears one click; eight ticks across half a
+  second of speech survive every local repair. Replace the moment — audio AND picture — with another take of the same beat.
+
 **Done when:** every flagged window has been listened to, each artifact has a mute + room tone in the
-EDL, and the scan is clean on the takes the cut uses.
+EDL, the scan is clean on the takes the cut uses, and no processed voice is in the stem without a reel pick behind it.
 
 ## 5. Build the stem and the captions
 
@@ -195,6 +209,7 @@ and the listen at each hit found no clash.
 | `sfx_onsets.py <file> [--cut a:b --out]` | the syllable map by ordinal; sample-exact cuts with fades |
 | `audio_head_scan.py --root (--edl \| --files)` | stable tones/drones in each take's head, labelled |
 | `roomtone_synth.py --ref --ss --t --dur --out` | stationary room tone coloured by a clean slice |
+| `voice_ab_reel.py --out <reel.wav> name=<file> … [--gap 0.3]` | the A/B reel of voice treatments — each variant once, a gap between, the index printed and written beside the reel; `--selftest` |
 | `qc_vo_placement.py --root --edl --deliv` | envelope-NCC placement of every line on the delivered file |
 
 ## Cross-references
