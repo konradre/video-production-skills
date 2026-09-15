@@ -10,7 +10,7 @@ it replays the session's tool calls against them and reports the GAPS: phases wh
   skills_invoked.py --transcript <jsonl|latest> [--since ISO] [--until ISO]           the invocation list
   skills_invoked.py --transcript … --phases <rules.json> --root <project> [--calls]   … plus the gap list per phase
   skills_invoked.py --transcript … [--phases … --root …] --line                       one line for the pause block
-  skills_invoked.py --install-gate --root <project> [--registry <file>] [--genre ads]  write the project's rules file
+  skills_invoked.py --install-gate --root <project> --genre <g> [--registry <file>]  write the project's rules file
   skills_invoked.py --selftest
 
 `--transcript latest` picks the most recently written transcript under ~/.claude/projects — the live session in
@@ -431,8 +431,18 @@ def install_gate(root, registry=None, genre=None, template=TEMPLATE):
     with open(template, encoding="utf-8") as f:
         doc = json.load(f)
     doc["project"] = os.path.basename(root)
+    known = doc.pop("genres", None)
+    overrides = doc.pop("genre_overrides", None) or {}
+    if known:
+        if not genre:
+            sys.exit(f"install_gate: --genre is required for this template; one of: {', '.join(known)}")
+        if genre not in known:
+            sys.exit(f"install_gate: unknown genre {genre!r}; one of: {', '.join(known)}")
     if genre:
         doc["genre"] = genre
+        for rule in doc.get("rules") or []:
+            if rule.get("id") in (overrides.get(genre) or {}):
+                rule["require_any"] = list(overrides[genre][rule["id"]])
     doc.pop("_about", None)
     if registry:
         reg_path = os.path.expanduser(registry)
@@ -528,6 +538,19 @@ def _selftest():
     with open(reg) as f:
         r = json.load(f)
     checks.append(("install-gate --registry registers the root -> projects/<name>.json", r.get(root) == os.path.join("projects", "proj.json") and os.path.exists(out2) and json.load(open(out2))["genre"] == "ads"))
+    tpl2 = os.path.join(tmp, "tpl2.json")
+    with open(tpl2, "w") as f:
+        json.dump({"project": "<project>", "genres": ["ads", "explainer"], "genre_overrides": {"explainer": {"finish": ["explainer-video", "video-finish-qc"]}},
+                   "rules": [{"id": "finish", "when": {"command": "ffmpeg"}, "require_any": ["video-finish-qc"]}, {"id": "any", "when": {"path": ".*"}, "require_any": ["video-production"]}]}, f)
+    out3 = install_gate(root, template=tpl2, genre="explainer")
+    got3 = json.load(open(out3))
+    checks.append(("install-gate --genre applies the genre's require_any overrides and drops the override tables", got3["rules"][0]["require_any"] == ["explainer-video", "video-finish-qc"] and got3["rules"][1]["require_any"] == ["video-production"] and "genre_overrides" not in got3 and "genres" not in got3 and got3["genre"] == "explainer"))
+    for bad_genre in (None, "opera"):
+        try:
+            install_gate(root, template=tpl2, genre=bad_genre); ok_exit = False
+        except SystemExit:
+            ok_exit = True
+        checks.append((f"install-gate refuses genre={bad_genre!r} when the template lists genres", ok_exit))
     bad = 0
     for label, ok in checks:
         bad += not ok

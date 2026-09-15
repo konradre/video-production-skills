@@ -58,11 +58,12 @@ sit in the bodies — `video-finish` § 5b's verify-every-render and `video-prom
 documentary spot whose description-level routing never opened either (2026-09-15). The declarations go into the pause block
 ("skills consulted / declared not applicable").
 
-Then **the skill gate**, written once per project: `scripts/skills_invoked.py --install-gate --root <project> [--genre ads]`
+Then **the skill gate**, written once per project: `scripts/skills_invoked.py --install-gate --root <project> --genre <ads|film|music video|explainer>`
 copies [`references/SKILL-GATE-TEMPLATE.json`](references/SKILL-GATE-TEMPLATE.json) — the phase → command/path → skill map
 of this corpus (a build or `ffmpeg` → `video-finish-qc`; a voice, a cue, captions → `spot-audio-assembly`; an EDL or a plan
 file → `video-edit-edl`; frame sheets → `video-take-review`; a card → `designed-elements`; client notes → `client-rounds`;
-references and stills → `video-refs-continuity` + `video-gen-cost-gate`; anything else → this skill) — to
+references and stills → `video-refs-continuity` + `video-gen-cost-gate`; anything else → this skill; the genre picks the lists: an
+explainer renders its own frames, so `explainer-video` satisfies the finish, designed, cut, frame-sheet and audio rules there) — to
 `<project>/.claude/skill-gate.json` (`--registry ~/.claude/skill-gate/projects.json` for a tree that must stay clean). From
 then on the `PreToolUse` hook `skill-gate.py` denies a phase action until its skill was invoked through the Skill tool since
 the last compaction; a denial names the skill. On one documentary-ad job 7 of 11 phase skills were never invoked although
@@ -194,7 +195,7 @@ agent keeps one, says NEXT.
 | `corpus_sweep.py --skills <dir> --axes k=v,… [--selftest]` | every skill's body summary (What varies + section headers) against the project's axes — the reading aid behind the intake declarations |
 | `probe_sources.py <file>… [--json] [--selftest]` | storage, SAR, DAR, rotation, the DISPLAY shape, fps, codec, bit depth, duration and audio per source; exit 2 when any source must be normalised before a crop |
 | `pause_block.py --resume --deliverable --next --transcript <jsonl\|latest> [--phases <rules> --root <project>] [--builder --keepers --refs --substrate --skills --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak`; the skills-consulted line comes from the transcript (`--skills-unmeasured` labels a typed one) |
-| `skills_invoked.py --transcript <jsonl\|latest> [--since --until] [--phases <rules> --root <project>] [--calls\|--line\|--json] [--selftest]` | the Skill invocations with timestamps, the compactions, and with the rules file the gap list — phases whose actions ran without their skill; `--install-gate --root <project> [--registry <file>] [--genre]` writes the project's rules file from `references/SKILL-GATE-TEMPLATE.json` |
+| `skills_invoked.py --transcript <jsonl\|latest> [--since --until] [--phases <rules> --root <project>] [--calls\|--line\|--json] [--selftest]` | the Skill invocations with timestamps, the compactions, and with the rules file the gap list — phases whose actions ran without their skill; `--install-gate --root <project> --genre <g> [--registry <file>]` writes the project's rules file from `references/SKILL-GATE-TEMPLATE.json`, the genre's `require_any` overrides applied |
 | `detach.py --log <abs log> -- <command> …` | starts a long job in a session of its own (Linux and macOS), so it outlives the shell and the tool call; prints the pid that leads the job's process group |
 
 ## Cross-references
