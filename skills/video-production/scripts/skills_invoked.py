@@ -230,8 +230,18 @@ def is_read_only(seg):
     return True
 
 
+QUOTED_LITERAL_RE = re.compile(r"""(?<!-c )(?<!-e )("(?:[^"\n]*\s)[^"\n]*"|'(?:[^'\n]*\s)[^'\n]*')""")
+
+
+def mask_quoted_literals(text):
+    """A quoted string with whitespace inside is DATA — a filename, a note, a prompt — never the action
+    ("Kitchen Table v1 no captions.mp4" fired an audio rule on a luminance probe). Single-token quotes
+    and the argument of -c/-e stay: there the quoted string is the action's own name."""
+    return QUOTED_LITERAL_RE.sub(lambda m: m.group(0)[0] + "<literal>" + m.group(0)[0], text)
+
+
 def action_text(cmd):
-    stripped = strip_data_heredocs(cmd)
+    stripped = mask_quoted_literals(strip_data_heredocs(cmd))
     try:
         segs = [s for s in segments(stripped) if s]
     except ValueError:
@@ -481,6 +491,8 @@ def _selftest():
     rules = os.path.join(tmp, "rules.json")
     with open(rules, "w") as f:
         json.dump({"project": "t", "rules": [
+            {"id": "probe", "when": {"tool": ["Bash"], "command": r"ffmpeg[^\n]*(-f null|signalstats|astats|-frames:v\s+[1-9]\b)"}, "allow": True},
+            {"id": "audio", "when": {"tool": ["Bash"], "command": r"\bcaptions?\b|loudnorm"}, "require_any": ["spot-audio-assembly"]},
             {"id": "finish", "when": {"tool": ["Bash", "Edit", "Write"], "command": r"ffmpeg|build\.py", "path": r"build\.py$"}, "require_any": ["video-finish-qc", "video-finish"]},
             {"id": "edl", "when": {"tool": ["Edit", "Write"], "path": r"EDL.*\.json$"}, "require_any": ["video-edit-edl"]},
             {"id": "any", "when": {"path": ".*", "command": ".*"}, "require_any": ["video-production"]},
@@ -501,6 +513,8 @@ def _selftest():
     with open(t, "w") as f:
         f.write(skill("video-production", "2026-09-16T00:00:00Z") + "\n")
         f.write(call("Bash", {"command": f"cd {root} && mkdir -p review"}, "2026-09-16T00:00:10Z") + "\n")          # allow any
+        f.write(call("Bash", {"command": f"cd {root} && python3 probe.py \"/x/Kitchen Table v1 no captions.mp4\""}, "2026-09-16T00:00:12Z") + "\n")   # allow any: quoted filename is data
+        f.write(call("Bash", {"command": f"cd {root} && ffmpeg -i a.mp4 -vf signalstats -f null -"}, "2026-09-16T00:00:14Z") + "\n")   # allow probe
         f.write(call("Bash", {"command": f"cd {root} && ffmpeg -i a o"}, "2026-09-16T00:00:20Z") + "\n")            # deny finish
         f.write(call("Bash", {"command": f"cat {root}/tools/build.py"}, "2026-09-16T00:00:25Z") + "\n")             # read
         f.write(skill("video-finish-qc", "2026-09-16T00:01:00Z") + "\n")
@@ -518,8 +532,8 @@ def _selftest():
     checks = [
         ("invocations in order, slash included, sidechain excluded", names == ["video-production", "video-finish-qc", "video-edit-edl"]),
         ("one compaction seen", len(rep["compactions"]) == 1),
-        ("decisions: allow any · deny finish · allow finish · deny finish (post-compaction) · deny edl · allow edl",
-         decisions == [("allow", "any"), ("deny", "finish"), ("allow", "finish"), ("deny", "finish"), ("deny", "edl"), ("allow", "edl")]),
+        ("decisions: allow any · quoted filename with captions = data · probe allowed · deny finish · allow finish · deny finish (post-compaction) · deny edl · allow edl",
+         decisions == [("allow", "any"), ("allow", "any"), ("allow", "probe"), ("deny", "finish"), ("allow", "finish"), ("deny", "finish"), ("deny", "edl"), ("allow", "edl")]),
         ("gap list: finish ×2, edl ×1", [(g["rule"], g["calls"]) for g in rep["gaps"]] == [("finish", 2), ("edl", 1)]),
         ("one-line form names the gaps and the post-compaction set", "gaps (phase actions without their skill): finish ×2" in one_line(rep) and "since the last compaction" in one_line(rep) and "video-edit-edl" in one_line(rep)),
         ("window filter", len(scan(t, since="2026-09-16T00:01:00Z", rules=rules, root=root)["invocations"]) == 2),

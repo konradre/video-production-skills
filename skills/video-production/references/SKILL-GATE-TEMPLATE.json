@@ -1,5 +1,5 @@
 {
- "_about": "Genre template for the PreToolUse skill gate (skill-gate.py): a phase ACTION in this project cannot run until the skill that governs it was invoked through the Skill tool after the last compaction. Written into <project>/.claude/skill-gate.json by `skills_invoked.py --install-gate --root <project> --genre <g>` at intake (video-production § 1); `genre_overrides[<g>]` replaces `require_any` per rule id for that genre — an explainer renders its own frames, so explainer-video satisfies its finish, designed, cut, frame-sheet, audio and pre-production rules; ads, film and music video use the base lists, or registered in ~/.claude/skill-gate/projects.json with --registry for a tree that must stay clean. Rules match in order, first match governs: `command` is tested against the Bash ACTION text (read-only commands and data heredoc bodies never match), `path` against every target relative to the root; `require_any` names the skills that satisfy it; `scope` = since-compaction (default) | session; `max_age_min` demands a fresh invocation after N minutes; `allow: true` carves an exception. Fix THIS file when the gate denies a legitimate call — never the gate.",
+ "_about": "Genre template for the PreToolUse skill gate (skill-gate.py): a phase ACTION in this project cannot run until the skill that governs it was invoked through the Skill tool after the last compaction. Written into <project>/.claude/skill-gate.json by `skills_invoked.py --install-gate --root <project> --genre <g>` at intake (video-production § 1); `genre_overrides[<g>]` replaces `require_any` per rule id for that genre — an explainer renders its own frames, so explainer-video satisfies its finish, designed, cut, frame-sheet, audio and pre-production rules; ads, film and music video use the base lists, or registered in ~/.claude/skill-gate/projects.json with --registry for a tree that must stay clean. Rules match in order, first match governs: `command` is tested against the Bash ACTION text (read-only commands and data heredoc bodies never match), `path` against every target relative to the root; `require_any` names the skills that satisfy it; `scope` = since-compaction (default) | session; `max_age_min` demands a fresh invocation after N minutes; `allow: true` carves an exception. Fix THIS file when the gate denies a legitimate call — never the gate. Rules with `allow: true` (the `probe` rule) carve measurement out of the phase rules; a quoted string with whitespace inside a command is masked as data before matching, so a filename never fires a rule.",
  "project": "<project>",
  "genre": "ads | film | music video | explainer",
  "genres": [
@@ -43,6 +43,17 @@
  "max_age_min": null,
  "scope": "since-compaction",
  "rules": [
+  {
+   "id": "probe",
+   "when": {
+    "tool": [
+     "Bash"
+    ],
+    "command": "ffmpeg[^\\n]*(-f null|signalstats|astats|ebur128|volumedetect|showinfo|blackdetect|freezedetect|cropdetect|idet|-frames:v\\s+[1-9]\\b)"
+   },
+   "allow": true,
+   "message": "measurement only: a null-output or filter-stats ffmpeg run, or a one-frame grab, is a probe, not a phase action"
+  },
   {
    "id": "client",
    "when": {
