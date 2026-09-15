@@ -1,0 +1,176 @@
+{
+ "_about": "Genre template for the PreToolUse skill gate (skill-gate.py): a phase ACTION in this project cannot run until the skill that governs it was invoked through the Skill tool after the last compaction. Written into <project>/.claude/skill-gate.json by `skills_invoked.py --install-gate --root <project>` at intake (video-production § 1), or registered in ~/.claude/skill-gate/projects.json with --registry for a tree that must stay clean. Rules match in order, first match governs: `command` is tested against the Bash ACTION text (read-only commands and data heredoc bodies never match), `path` against every target relative to the root; `require_any` names the skills that satisfy it; `scope` = since-compaction (default) | session; `max_age_min` demands a fresh invocation after N minutes; `allow: true` carves an exception. Fix THIS file when the gate denies a legitimate call — never the gate.",
+ "project": "<project>",
+ "genre": "ads | film | music video | explainer",
+ "max_age_min": null,
+ "scope": "since-compaction",
+ "rules": [
+  {
+   "id": "client",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit"
+    ],
+    "command": "CLIENT-NOTES|client[-_ ]?notes|client[-_ ]round",
+    "path": "CLIENT-NOTES|client[-_ ]?notes|(^|/)rounds?/"
+   },
+   "require_any": [
+    "client-rounds"
+   ],
+   "message": "client notes and the round ladder are governed by client-rounds"
+  },
+  {
+   "id": "audio",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit"
+    ],
+    "command": "gen_vo|elevenlabs|loudnorm|afftdn|demucs|deepfilter|deepFilter|music_loop|suno|\\bvo\\b|voice|\\bsfx\\b|\\bcaptions?\\b|build_captions|audio/(vo|music|clean|mixes|sfx)",
+    "path": "^audio/|(^|/)captions?/|(^|/)vo/"
+   },
+   "require_any": [
+    "spot-audio-assembly"
+   ],
+   "message": "voicing, music, sfx, captions and the mix are governed by spot-audio-assembly"
+  },
+  {
+   "id": "take-review",
+   "when": {
+    "tool": [
+     "Bash"
+    ],
+    "command": "qc_seed|frame[-_ ]?sheets?|contact_sheet|review/[^ ]*(keepers|takes|seeds|sheet)"
+   },
+   "require_any": [
+    "video-take-review"
+   ],
+   "message": "the per-seed read and the frame sheets are governed by video-take-review"
+  },
+  {
+   "id": "designed",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit"
+    ],
+    "command": "render_hyper|hyperframes|\\bhyper/|end[-_ ]?card|card\\.(html|json)|turntable",
+    "path": "^hyper/|(^|/)card|turntable"
+   },
+   "require_any": [
+    "designed-elements"
+   ],
+   "message": "cards, turntables and designed layers are governed by designed-elements"
+  },
+  {
+   "id": "refs",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit"
+    ],
+    "command": "refs_gate|gen_stills|kie\\.ai|kie_|startframes?/|start[-_ ]image|(^|[ /])refs/|continuity",
+    "path": "^refs/|^startframes/|continuity"
+   },
+   "require_any": [
+    "video-refs-continuity",
+    "video-gen-cost-gate"
+   ],
+   "message": "references, start images and the refs gate are governed by video-refs-continuity; the buy by video-gen-cost-gate"
+  },
+  {
+   "id": "gen",
+   "when": {
+    "tool": [
+     "Bash"
+    ],
+    "command": "higgsfield|fal\\.ai|fal_|seedance|hf_poll|receipts/"
+   },
+   "require_any": [
+    "video-gen-cost-gate"
+   ],
+   "message": "every billed generation call goes through video-gen-cost-gate's cost line and GO"
+  },
+  {
+   "id": "finish",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit"
+    ],
+    "command": "ffmpeg|build\\.py|finish_|final_renders|qc_deliverable|upscale|hero[-_ ]?pass|deliver/|edit/(hero|mezz)|look_sheet|\\.cube\\b|\\.drx\\b",
+    "path": "build\\.py$|finish|^deliver/|^edit/(hero|mezz)/|tools/.*build"
+   },
+   "require_any": [
+    "video-finish-qc",
+    "video-finish"
+   ],
+   "message": "the build, the finish, the grade and the QC are governed by video-finish-qc (on video-finish)"
+  },
+  {
+   "id": "edl",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit"
+    ],
+    "command": "EDL[^ ]*\\.json|prompts/v\\d+/[^ ]*\\.json|make_plans|beat[-_ ]?sheet|plan\\.json",
+    "path": "EDL[^/]*\\.json$|^prompts/v\\d+/.*\\.json$|make_plans|plan\\.json$"
+   },
+   "require_any": [
+    "video-edit-edl"
+   ],
+   "message": "the cut, its plan and every version file are governed by video-edit-edl"
+  },
+  {
+   "id": "preprod",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit"
+    ],
+    "command": "shot[-_ ]?list|BRIEF|cost[-_ ]plan|risk[-_ ]register",
+    "path": "shot[-_ ]?list|BRIEF|cost[-_ ]plan|risk[-_ ]register"
+   },
+   "require_any": [
+    "ad-spot-preprod",
+    "film-preprod",
+    "explainer-video"
+   ],
+   "message": "the brief, the script SSOT, the shot list and the cost plan are governed by the genre's pre-production skill"
+  },
+  {
+   "id": "any",
+   "when": {
+    "tool": [
+     "Bash",
+     "Edit",
+     "Write",
+     "MultiEdit",
+     "NotebookEdit"
+    ],
+    "path": ".*",
+    "command": ".*"
+   },
+   "require_any": [
+    "video-production"
+   ],
+   "message": "no phase skill has been invoked this session — start with video-production"
+  }
+ ]
+}

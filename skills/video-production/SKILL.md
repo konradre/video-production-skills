@@ -58,6 +58,17 @@ sit in the bodies — `video-finish` § 5b's verify-every-render and `video-prom
 documentary spot whose description-level routing never opened either (2026-09-15). The declarations go into the pause block
 ("skills consulted / declared not applicable").
 
+Then **the skill gate**, written once per project: `scripts/skills_invoked.py --install-gate --root <project> [--genre ads]`
+copies [`references/SKILL-GATE-TEMPLATE.json`](references/SKILL-GATE-TEMPLATE.json) — the phase → command/path → skill map
+of this corpus (a build or `ffmpeg` → `video-finish-qc`; a voice, a cue, captions → `spot-audio-assembly`; an EDL or a plan
+file → `video-edit-edl`; frame sheets → `video-take-review`; a card → `designed-elements`; client notes → `client-rounds`;
+references and stills → `video-refs-continuity` + `video-gen-cost-gate`; anything else → this skill) — to
+`<project>/.claude/skill-gate.json` (`--registry ~/.claude/skill-gate/projects.json` for a tree that must stay clean). From
+then on the `PreToolUse` hook `skill-gate.py` denies a phase action until its skill was invoked through the Skill tool since
+the last compaction; a denial names the skill. On one documentary-ad job 7 of 11 phase skills were never invoked although
+every phase ran, and the grade shipped half the look after a 15-line grep of the guide (2026-09-15) — a rule in a file did
+not hold; the gate does. A legitimate call denied → fix the project's rules file, never the gate.
+
 And **every source is probed for its DISPLAY shape** before any crop, layout or raster math — `scripts/probe_sources.py`
 prints storage, SAR, rotation and the display shape per file and exits 2 when any needs normalising (`scale=iw*sar:ih,
 setsar=1` and the rotation, before the first crop); the display shape, not the storage shape, goes into the shot list's
@@ -133,7 +144,7 @@ end of a long arc.
 
 ```bash
 date
-python3 ~/.claude/skills/video-production/scripts/pause_block.py --resume RESUME.md --deliverable deliver/<file>.mp4 --next "…" --builder "…" --keepers "…" --refs "…" --balances "$(python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --drive <drive>)" --open "…" --resume-cmd "…"
+python3 ~/.claude/skills/video-production/scripts/pause_block.py --resume RESUME.md --deliverable deliver/<file>.mp4 --next "…" --builder "…" --keepers "…" --refs "…" --balances "$(python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --drive <drive>)" --open "…" --resume-cmd "…" --transcript latest --phases .claude/skill-gate.json --root <project> [--skills "declared n/a: …"]
 ```
 
 The persist ritual, by name, before a compaction: the pause block in the RESUME (deliverable, the
@@ -141,6 +152,12 @@ builder line as the slot SSOT, keepers and voids, the reference set, balances, o
 jobs, the resume commands, NEXT), the continuity ledger, the SOP items and the retrospective where the project
 keeps them, and the agent's persistent memory with its NEXT pointer where the agent keeps one. Automatic
 compaction stays off, so nothing compacts before the ritual is done; the operator compacts.
+
+**The skills-consulted line is measured, never typed.** `--transcript latest` hands the session's transcript to
+`scripts/skills_invoked.py`, which lists every Skill tool_use with its time, the compactions, and — with the project's rules
+file — the phases whose actions ran without their skill (the gap list); `--skills` only appends the declared-not-applicable
+text next to it. A typed line needs `--skills-unmeasured` and is labelled so in the block. The retrospective's compliance
+section quotes the same output (`skills_invoked.py --transcript <jsonl> --phases … --root … --calls`).
 
 Two more things belong to every pause, and to every phase boundary. **The cleanup prompt:** the status line's superseded
 set is listed by category with sizes (`project_size.py --plan`), and the operator names what goes — one delete per category,
@@ -161,6 +178,10 @@ agent keeps one, says NEXT.
   what the files prove (deliverables on disk, receipts, the EDLs), and say what could not be established.
 - A phase skill is missing from `~/.claude/skills/` → stop and name it; never improvise the phase from
   memory.
+- The skill gate denies a call (`SKILL GATE (<project>, rule <id>): invoke Skill(<name>) …`) → invoke that skill and read
+  the section whole, then re-run; a call the rule should not cover → amend the project's `.claude/skill-gate.json`,
+  never the gate. `SKILL_GATE=off` as the literal prefix of one Bash command bypasses that call only, with the reason
+  said in the turn.
 - The next step would spend, send or delete → the gate, never the entry, decides; this skill hands off
   and waits.
 
@@ -172,7 +193,8 @@ agent keeps one, says NEXT.
 | `project_size.py --root [--keep-tags spot=tag,…] [--plan <file>] [--selftest]` | substrate vs derived by directory role; the superseded set by category with sizes; a plan file the operator names deletions from — it never deletes |
 | `corpus_sweep.py --skills <dir> --axes k=v,… [--selftest]` | every skill's body summary (What varies + section headers) against the project's axes — the reading aid behind the intake declarations |
 | `probe_sources.py <file>… [--json] [--selftest]` | storage, SAR, DAR, rotation, the DISPLAY shape, fps, codec, bit depth, duration and audio per source; exit 2 when any source must be normalised before a crop |
-| `pause_block.py --resume --deliverable --next [--builder --keepers --refs --substrate --skills --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak` |
+| `pause_block.py --resume --deliverable --next --transcript <jsonl\|latest> [--phases <rules> --root <project>] [--builder --keepers --refs --substrate --skills --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak`; the skills-consulted line comes from the transcript (`--skills-unmeasured` labels a typed one) |
+| `skills_invoked.py --transcript <jsonl\|latest> [--since --until] [--phases <rules> --root <project>] [--calls\|--line\|--json] [--selftest]` | the Skill invocations with timestamps, the compactions, and with the rules file the gap list — phases whose actions ran without their skill; `--install-gate --root <project> [--registry <file>] [--genre]` writes the project's rules file from `references/SKILL-GATE-TEMPLATE.json` |
 | `detach.py --log <abs log> -- <command> …` | starts a long job in a session of its own (Linux and macOS), so it outlives the shell and the tool call; prints the pid that leads the job's process group |
 
 ## Cross-references
