@@ -66,6 +66,12 @@ Two checks on every Starlight shot: identity across cuts (a small face is recons
 not faithfully) and invented small text (a corridor door sign grew fake lettering). Numbers in
 [`references/EVIDENCE.md`](references/EVIDENCE.md) § Starlight vs Rhea.
 
+**A third tier exists for one genre.** A creator-style / UGC spot that must read as phone-shot takes the
+**phone-native tier** (§ 5, `ugc-phone`): a faithful 1.5–2× enlargement when the source is 720p+ with a large face
+(reconstruction only when the source is genuinely under-rendered), a near-identity cube, no Dehancer, and a temporal
+layer plus a phone-class encode dosed against the project's own real phone clips. It is chosen at intake with the genre,
+never as a rescue for a take that failed the reconstructive tier.
+
 **Done when:** the tier is chosen from the source's nature, not from its price — and within the
 reconstructive tier, per shot from the face size, not once for the pipeline.
 
@@ -188,6 +194,59 @@ pushed the rejected shot, already the most saturated, further out.
 **Done when:** the grade is applied at mezzanine resolution with a Rec.709 input and exactly one
 source of the film-stock transform.
 
+### The phone-native tier (`ugc-phone`) — a creator-style spot that must read as phone-shot
+
+Phone-nativeness is not a colour transform. A `.cube` carries per-pixel colour only; what makes a phone clip read as a
+phone clip is temporal texture, camera behaviour and the encode. So `ugc-phone` is a TIER, not a look: a near-identity
+colour tier (`ugc-phone_33.cube` in the look library — no stock transform, no split-tone, a gentle consumer tone map, skin
+untouched; mid-grey 128 → 131), **no Dehancer node** (halation, bloom and film grain read as film, and a phone has none),
+and a temporal layer at DELIVERY resolution whose dose is decided by measurement. The order inverts two film rules on
+purpose:
+
+```
+upscale — faithful 1.5–2× lanczos when the source is 720p+ with a large face; reconstructive only when under-rendered
+→ the neutral cube at mezzanine resolution (chosen by rendering it, like every look — § 5)
+→ the inter-shot consistency read BEFORE any global move (saturation / white-balance spread across shots — video-finish-qc QC.md)
+→ downscale to delivery (1080×1920)
+→ the temporal layer AT DELIVERY RESOLUTION: fine sensor-style noise OR a denoise (the probe decides the direction),
+  a slow exposure drift (±3–5 %, a 2–4 s period), a stepped white-balance drift (±150 K), an auto-exposure step at each cut,
+  a 1–3 px handheld micro-shake                                           — scripts/phone_native.py
+→ captions and overlays in the native style; no watermark
+→ the phone-class encode: H.264 4:2:0 1080×1920, closed GOP, BT.709 tags, at the bitrate the band asks for (2.5–12 Mbps)
+→ audio: a room-tone bed, the phone-mic band, a light auto-gain feel, then the standing loudness pass (spot-audio-assembly)
+```
+
+Why fine noise at delivery resolution here, when § 6 says coarse grain above delivery: § 6 protects grain as an
+aesthetic through the platform's re-encode; this tier wants the phone's OWN post-compression texture, which is fine noise
+partly flattened by the encode. And why the dose is measured, never styled: the phone-texture probe
+(`video-finish-qc/scripts/phone_texture_probe.py` — dead-flat 8×8 share, noise floor, median block sd, on native centre
+crops at five points of the clip) read two real phone clips at a 0.1–0.7 noise floor and 0–10 % dead-flat, and three raw
+720p Omni Flash takes at 1.8–2.0 and 0 % — **the generated take carried MORE fine texture than the phone clips, not less**,
+so the dose that landed it inside the real band was a DENOISE (hqdn3d 6) and a 2.5 Mbps encode, and adding noise moved it
+further out. On another generator, another raster or another set of real clips the direction can reverse; the retrospective's
+"27.8 % dead-flat at a 0.00 floor" on a Seedance → Rhea → grade master was a matched-content comparison, not a universal
+threshold. The numbers: [`references/EVIDENCE.md`](references/EVIDENCE.md) § The phone-native tier.
+
+**The protocol.** (1) Probe the project's own real phone clips — as they arrived, by scene class (a flat wall, a textured
+room, a dark frame); with none, a house reference set shot on the phones the audience uses and passed through the
+platform's transcode. (2) Render the candidate through `phone_native.py --ref <real clips>`: it probes its own output
+and says, per metric, IN BAND / ABOVE / BELOW against the RANGE over every reference frame (never a mean). (3) Move the
+dose — `--denoise`, `--noise`, `--bitrate` — until all three read in band on matched content; the median block sd is
+content-dominated and says nothing across scene classes. (4) Run the existing instruments too: face detail at equal
+size, the frozen-frame fraction, the splice read, the inter-shot spread, the loudness. **Dose is an inverted U** —
+medium won the one controlled test, heavy lost — and the proof shot's legibility is never degraded; the tier is a
+candidate the operator renders and judges beside the clean finish, never a default.
+
+```bash
+python3 ~/.claude/skills/video-finish/scripts/phone_native.py --in <graded, downscaled clip> --out deliver/<name>-phone.mp4 \
+  --denoise 6 --noise 0 --bitrate 2.5M --drift 0.04 --wb 150 --shake 2 --cuts 3.2,7.8 --audio phone \
+  --ref assets/<real-phone-clip-1>.mp4 assets/<real-phone-clip-2>.mp4          # prints the band verdict per metric
+python3 ~/.claude/skills/video-finish/scripts/phone_native.py --selftest
+```
+
+**Done when:** the real band is on record (which clips, which scene class, which frames), the candidate's three numbers
+sit inside it, the existing instruments passed, and the operator has judged the phone render beside the clean one.
+
 ## 5b. Write the graded mezzanine at 10-bit — and VERIFY, do not assume
 
 The grade's output is what grain and the downscale then run on. Written at 8-bit it bands on exactly
@@ -249,6 +308,10 @@ and a "remaining grain step" then doubles it. Verify against the picture, not ag
 plugin parameters are stored encoded inside the grade export, so grepping it for `grain` or
 `halation` finds nothing whether or not they are enabled. Compare a 1:1 crop of graded against
 ungraded on a highlight — halation shows as a warm bleed, grain as texture in flat areas.
+
+**The phone-native tier is the one exception** (§ 5): there the texture is fine sensor-style noise — or a denoise — applied
+at DELIVERY resolution and flattened by a phone-class encode on purpose, dosed by the probe against real phone clips; the
+rule above protects grain as an aesthetic, the tier wants a phone's own post-compression texture.
 
 **Done when:** grain is coarse and applied on the 4K/mezzanine, or deliberately omitted with the
 delivery bitrate as the reason.
@@ -368,10 +431,17 @@ outlives the shell, and poll on demand rather than holding a follower open.
 a missing sentinel as failure regardless of file size, and re-run rather than salvaging the partial —
 a truncated mezzanine silently shortens the deliverable.
 
+## Scripts
+
+| script | does |
+|---|---|
+| `phone_native.py --in --out [--canvas] [--noise] [--denoise] [--drift] [--wb] [--period] [--shake] [--cuts] [--ae-step] [--bitrate] [--audio copy\|phone\|none] [--ref …] [--probe] [--dry-run]` · `--selftest` | the phone-native tier's temporal layer and encode at delivery resolution (§ 5): a denoise or fine sensor-style noise, a slow exposure drift, a stepped white-balance drift, an auto-exposure step at each cut, a handheld micro-shake, the phone-class H.264; `--ref` probes the output against real phone clips and says IN BAND / ABOVE / BELOW per metric; prints the filtergraph it ran |
+
 ## Cross-references
 
 - [`references/EVIDENCE.md`](references/EVIDENCE.md) — the measured A/B numbers, grain-survival
-  tables, hosted rates, Dehancer parameter split, and the Topaz-on-Linux finding. Read it before
-  choosing a model or arguing with any rule above.
+  tables, hosted rates, Dehancer parameter split, the Topaz-on-Linux finding and the phone-native tier's
+  calibration. Read it before choosing a model or arguing with any rule above.
+- `video-finish-qc` `scripts/phone_texture_probe.py` — the instrument the phone-native tier is dosed by.
 - `mastering-audio` — the audio half of a finish.
 - Deeper context — the upstream projects behind the rules here: `video-production/references/CONTEXT-MAP.md` § Where the deeper context lives.

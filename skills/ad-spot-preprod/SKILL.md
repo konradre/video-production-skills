@@ -7,7 +7,7 @@ description: >
   continuity, the script diff), the risk register and the cost plan. Use when a campaign or spot is briefed, a
   client script arrives or changes, the next spot must be chosen, or a shot list or cost plan is needed. Triggers
   — "the brief", "the client's script", "shot list", "which spot next", "what does the script call for", "cost
-  plan", "kit for this SKU", "risk register", "the alternate spec". Not for a film or a music video — use
+  plan", "kit for this SKU", "risk register", "the alternate spec", "a UGC spot", "creator-style ad". Not for a film or a music video — use
   film-preprod. Not for the reference set or the refs gate — use video-refs-continuity. Not for the cost line and
   the submit — use video-gen-cost-gate. Not for the beat gate or the EDL — use video-edit-edl.
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash(python3*), Bash(ls*)
@@ -102,6 +102,12 @@ python3 ~/.claude/skills/video-production/scripts/script_diff.py --script prompt
   or the brief's message lines, the shot list as a keeper list with a microphone-position column, the scaffold as
   `--spot-type ugc` with the gens table, the refs gate and the fill marked N/A in the header:
   [`references/INTAKE.md`](references/INTAKE.md) § Existing footage.
+- **A UGC / creator-style spot** (`--spot-type ugc`, phone-shot or generated — a person talking to the camera): the grammar
+  is [`references/UGC-GRAMMAR.md`](references/UGC-GRAMMAR.md) — the intake axes (AOV band, funnel stage, platform, real or
+  synthetic persona, phone-shot or generated), the hook core, the archetypes, the beats by duration with REAL proof
+  composited at the demo beat, the delivery and caption rules, the variant matrix, the four artifacts; the script carries a
+  disclosure column, and the compliance path is chosen at intake ([`references/RISKS.md`](references/RISKS.md) § UGC
+  compliance). A synthetic persona presents a demo, never a testimonial.
 
 **Done when:** `SCRIPT-DIFF PASS` on the beats AND on the shot list (`--shots`), the generator's cap is in the
 header with its source, every section is filled, and every partition row quotes the script lines it serves.

@@ -119,7 +119,9 @@ circle). Every instrument carries its known-answer case. With no operator reacha
 PROVISIONAL: the instruments stand in, and a look/listen queue of timecodes rides the handoff — nothing is final until the
 operator has done it.
 Designed content (explainer scenes, kinetic titles, cards) adds two judgement rows: `designed_frame_metrics.py` on the
-delivered file and `literal_audit.py` on the composition's source.
+delivered file and `literal_audit.py` on the composition's source. A creator-style spot adds two INFO reads against the
+project's own real phone clips — the phone-texture band (`--phone-ref <clips>`, `phone_texture_probe.py`) and the
+inter-shot spread before any global move — and the UGC tells by eye (`references/QC.md` § On a creator-style spot).
 The table and what each failure means: [`references/QC.md`](references/QC.md).
 
 **Done when:** `QC-DELIVERABLE PASS` and the listen/look found nothing; anything found goes back to the
@@ -162,7 +164,8 @@ file by path with its size.
 | `hero_distinct.py files…` | frame-hash distinctness of same-size heroes |
 | `finish_spot.py --root --edl [--stage] [--tag] [--min-free-gb 40]` | gate → cut → master (a static mix; the card when the EDL has one) → deliver (one measured gain, the limiting printed, the length capped) from the EDL |
 | `finish_clip.py --root --hero --take --in --out --name` | a standalone clip / excerpt deliverable |
-| `qc_deliverable.py --root --edl --deliv [--black-luma 16] [--tp-ceiling] [--max-still-s]` | the one-pass QC of the delivered file; declared `accepted_cuts` and `accepted_still` print as INFO, never as failures; near-black per event; the still threshold and the TP ceiling come from the EDL (`qc.max_still_s`, `loudnorm.TP_ceiling`) unless overridden; the source-geometry INFO row; `--selftest` |
+| `qc_deliverable.py --root --edl --deliv [--black-luma 16] [--tp-ceiling] [--max-still-s] [--phone-ref <real clips>…]` | the one-pass QC of the delivered file; declared `accepted_cuts` and `accepted_still` print as INFO, never as failures; near-black per event; the still threshold and the TP ceiling come from the EDL (`qc.max_still_s`, `loudnorm.TP_ceiling`) unless overridden; the source-geometry INFO row; `--phone-ref` adds the phone-texture band as INFO on a creator-style spot; `--selftest` |
+| `phone_texture_probe.py <clips>… [--crop 640] [--at 0.1,0.3,0.5,0.7,0.9] [--json]` · `--selftest` | the phone-texture band of a clip: dead-flat 8×8 share, noise floor, median block sd on native centre crops at five points, the mean and the frame RANGE per metric; a matched-content comparison between the project's real phone clips and a candidate, never a threshold (`video-finish` § 5 the phone-native tier; the calibration in its EVIDENCE.md); the selftest injects sd 0.5 / 1 / 2 / 4 and must read back linearly |
 | `look_sheet.py --out --cubes --looks ads-clean,ads-warm [--blend look:0.85] [--current "<vf>"] --frame <video@s|image> …` | the frame sheet the operator picks the look from, before the first delivery; `--selftest` |
 | `final_renders.sh --root spots…` | finish → QC → `deliver/final/` for every approved spot |
 

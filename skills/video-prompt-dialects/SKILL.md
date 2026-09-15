@@ -28,7 +28,9 @@ of injecting).
 
 **What varies.** Each dialect is one model's contract at one version: its layout, its caps, the words its moderator
 refuses and the beat density it renders were measured there, and a new model or version is read from its own docs before
-its first prompt. The style prefix belongs to the campaign — its genre, aspect and look. Pointing at references,
+its first prompt. The style prefix belongs to the campaign — its genre, aspect and look; a creator-style spot replaces it
+with the phone-native genre dialect ([`references/PHONE-NATIVE.md`](references/PHONE-NATIVE.md): the camera attributed,
+never named; positive-spec only; the video-call register), layered on the model's own contract. Pointing at references,
 affirmatives in the body and the lint do not move — `video-production/references/WHAT-VARIES.md`.
 
 ## 1. Resolve the venue, mode and layout
@@ -168,6 +170,8 @@ the file path.
 ❌ {WHO'S READY FOR SOME <profanity>?} (caps, the word)    ✅ {Who's ready for some… company?} → the real line dubbed in post
 ❌ "packed with dancing guests and the other women"         ✅ "the ONLY people in the shot are …; no other guests, no men"
 ❌ "medium shot, waist up" buried in the event sentence     ✅ "Cut 2 (4–7 s): medium on the lead from the front at eye level: …"
+❌ "a selfie video, she holds up her iPhone"                ✅ "shot on a front camera, handheld, at arm's length" — the device named puts a phone in her hand
+❌ "authentic UGC style, no studio lighting"                ✅ "window daylight from camera-left, a warm bulb over the counter, the frame drifting as she talks"
 ```
 
 ## Failure behavior

@@ -67,6 +67,13 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   limits.
 - A new venue or model is proven on the HARDEST shot first (a lipsync line, the product close-up),
   never the easiest — passing the easy spot proves the chain runs, not that the hard parts work.
+- **A creator-style talking head** (a UGC spot) routes by SHOT TYPE: a simple talking head or a hook sweep → Gemini Omni
+  Flash 1.1 on fal (720p native, 3–10 s, no audio input, ~15 % of takes stutter → regenerate); product-in-hand, a 30 s
+  story or a pinned voice → Seedance 2.5; a defined handheld move ≤ 8 s → Kling 3.0; the words that must land exactly →
+  an audio-driven model or a lipsync pass, never a prompt. The cost line quotes the price per USABLE take with its assumed
+  keep rate (3:1–6:1 across models), and a cheap take is regenerated where an expensive one is repaired
+  (`references/VENUES.md` § Creator-style talking heads). Sora 2 is retired; Veo 3.1, Ray3, FLUX 3, Boreal and Wan 3.0 are
+  unproven here.
 - **A vendor limit is READ, never inferred.** A cap not read from the vendor's own schema, estimator or error is
   UNKNOWN — never the largest value you happen to have used: a multi-call extension workaround was once designed
   around an 8 s "ceiling" taken from a production's own receipts, for a model whose estimator names the real cap in one

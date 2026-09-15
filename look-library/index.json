@@ -157,6 +157,37 @@
         "sharpen": "light",
         "notes": "QA on darkest-skinned subject (\u00a76.6)"
       }
+    },
+    {
+      "id": "ugc-phone",
+      "genre": "ads",
+      "description": "Phone-native neutral \u2014 near-identity, a gentle consumer tone map, no split-tone, skin untouched",
+      "tags": [
+        "ugc",
+        "phone",
+        "creator",
+        "neutral",
+        "social",
+        "native"
+      ],
+      "intensity": 1.0,
+      "yaml": "looks/ugc-phone.yaml",
+      "film_base": null,
+      "cube": {
+        "file": "cubes/ugc-phone_33.cube",
+        "size": 33,
+        "sha256": "dd754d27b84636e4cd042877d2f25aecdc3917666c2645562ef1abad1c93c316"
+      },
+      "drx": {
+        "file": null,
+        "status": "none"
+      },
+      "compression": {
+        "grain": "sensor-style noise or a denoise by phone_native.py, dosed by the texture probe",
+        "mezzanine": "yuv420p10le",
+        "sharpen": "none",
+        "notes": "phone-native tier \u2014 the phone-class H.264 encode is part of the look"
+      }
     }
   ]
 }

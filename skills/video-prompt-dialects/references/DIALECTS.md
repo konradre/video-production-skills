@@ -21,6 +21,10 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
   quality packs, no generic blacklists.
 - **Point, never describe**: a cited reference gets one narrow job and an exclusion, never adjectives
   (the most expensive lesson: the words beat the picture every time).
+- **A genre dialect layers on the model's.** A creator-style / UGC spot swaps the style prefix, the camera clause, the
+  light, the motion and the sound words for the phone-native dialect — the camera attributed, never named as a device;
+  positive-spec only; the video-call register — and touches nothing about the addressing, the caps or the tail:
+  [PHONE-NATIVE.md](PHONE-NATIVE.md).
 - **A held vendor spec is indexed by FEATURE, not only by the rules you came for.** Six consensus rules
   were extracted from the vendor's prompt-optimizer spec; two whole features (the storyboard grid, ordered
   keyframes) sat unread beside them for a week because nobody had a question that named them. On

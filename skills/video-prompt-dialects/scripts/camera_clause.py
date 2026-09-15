@@ -85,6 +85,7 @@ def main():
     ap.add_argument("--from", dest="a"); ap.add_argument("--to", dest="b"); ap.add_argument("--seconds", type=float, default=4.0)
     ap.add_argument("--sidecar", help="clip.mp4.json from scene_proxy.py --move")
     ap.add_argument("--h3", action="store_true", help="also print the MiniMax timecoded form + the proxy-clip role line")
+    ap.add_argument("--phone", action="store_true", help="also print the phone-native clause (a front camera, handheld — references/PHONE-NATIVE.md)")
     argv, it = [], iter(sys.argv[1:])            # a camera that starts with a minus sign is a value, not a flag
     for tok in it:
         if tok in ("--from", "--to", "--seconds", "--sidecar"):
@@ -108,6 +109,19 @@ def main():
         print("WARNING: compound move — the dialect wants ONE move per shot; split the cut or drop the weaker axis")
     print("\nSeedance clause (fill SUBJECT / START / ARRIVAL from the shot document):")
     print(f"  The camera {move} on SUBJECT, starting on START and arriving on ARRIVAL; {r['pace']}, one continuous move, no cut.")
+    if a.phone:
+        # The phone register has no dolly, crane or orbit words: the same measured move, said as a person holding a
+        # front camera would make it. The camera is attributed, never named as a device (PHONE-NATIVE.md).
+        phone_words = {"hold": "stays on", "dolly": ("leans in toward" if r["dolly"] > 0 else "leans back from"),
+                       "truck": "shifts sideways across", "crane": ("lifts up over" if r["crane"] > 0 else "lowers down on"),
+                       "pan": "turns toward", "tilt": ("tips up toward" if r["tilt_deg"] > 0 else "tips down toward"),
+                       "orbit": "walks around", "zoom": ("pinches in on" if r["zoom_deg"] < 0 else "pinches out from")}
+        pm = phone_words.get(r["tags"][0], "stays on")
+        print("\nPhone-native clause (a front camera, handheld — PHONE-NATIVE.md; fill SUBJECT / START / ARRIVAL):")
+        print(f"  Shot on a front camera held at arm's length, handheld; the frame {pm} SUBJECT, drifting slightly with the breath, "
+              f"starting on START and settling on ARRIVAL; one continuous take, no cut.")
+        if r["compound"]:
+            print("  WARNING: a phone shot is ONE small move — a compound move is two shots, cut in the edit")
     if a.h3:
         print("\nH3 form:")
         print(f"  [0.0-{seconds:.1f}s] The camera {move}.")

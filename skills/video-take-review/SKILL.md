@@ -106,7 +106,7 @@ Rows per seed, each answered PASS / FAIL / note; a FAIL is never overridden by a
 | audio | whisper: word-like events on an unscripted mouth = "shouting" (void); the scripted words intelligible (a near-homophone is a void); a generated tone at the head (spectral flatness < 0.3 with a stable peak); the hit's peak time |
 | named state | every frame of every window after the event, wides included, at 4× with the gamma lifted in dark cavities — a sparse sample passes defects that every frame at 4× shows |
 | dignity | awake; nobody touched unless the script does it; nobody left lying under an effect; hands high, visible, held; no hand at the bottom edge of a chest-up two-shot — the brand's standards and the genre's tone set the bar |
-| realism | poses natural; dance not jerky; no phantom extra; the runner seen from behind; the subject still in the last frame |
+| realism | poses natural; dance not jerky; no phantom extra; the runner seen from behind; the subject still in the last frame; on a creator-style take the tells pass — sound off first, hands on the product, a torso static > 6–7 s, consonant lip drift, the product morphing between shots, background warp, a phone or camera UI in frame (ACCEPTANCE-MATRIX.md row 10) |
 
 **Done when:** the matrix is filled for every seed, the worst row is the headline of each seed's line,
 and no row was inferred from a downscale.

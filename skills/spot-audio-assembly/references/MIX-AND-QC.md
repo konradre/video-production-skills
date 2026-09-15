@@ -100,3 +100,23 @@ tone), which pass while the instrument stays blind to the case that fooled it.
 magnitude spectrum colours independent white noise in one FFT over the whole length — stationary, no
 seams, no transients, RMS-matched, faded. Used under a muted window (`native_audio_from/to`) so a cut
 does not fall into digital silence.
+
+## The phone-mic register — a creator-style spot
+
+The mix reads as a phone's when the sound carries the ROOM: a room-tone bed under every line (`roomtone_synth.py`), the
+appliance hum and the handling noise the take earned kept rather than cleaned, a phone-mic band (a high-pass around
+90 Hz, a soft roll-off above ~7.5 kHz), a light auto-gain feel (a slow compressor that lifts the gaps), no noise
+reduction, no music under the open. The loudness pass does not move: the same measured master, one static gain to the
+target (the house −14 LUFS without a client reference), the limiter chain above — a phone register is a spectrum and a
+dynamic, never a level. Disfluencies are PLACED, not cleaned — 2–4 per 30 s with one in the first sentence
+(`ad-spot-preprod` UGC-GRAMMAR.md § Delivery) — and a breath before a line stays. `video-finish/scripts/phone_native.py
+--audio phone` applies the band and the compressor to a picture render; the stem, the placement and the loudness pass stay here.
+
+**A generator that speaks on its own clock is dubbed and RETIMED, always.** Gemini Omni Flash 1.1 and MiniMax H3 voice
+the line themselves and take no audio input, so the delivered voice is the VO take. Whisper both at word level, fit
+`native_t ≈ a × vo_t + b` on the matched words, then `atempo 1/a` + `adelay b` (pitch-preserving). Measured: H3's mouth
+ran ≈ 1.09–1.13× slower and started ~0.75 s late against the same ElevenLabs take, and the fit left ~160–170 ms rms per
+word with the placement at 0 ms (envelope NCC 0.99 on the delivered file) — fine at chest-up framing, loose for a close
+read, which is why the words that must land exactly go to an audio-driven model (`video-gen-cost-gate` VENUES.md
+§ Creator-style talking heads). "Every AI UGC has the same voice" is a community tell with a weak fix (a slightly
+different room reverb per persona); the strong fix is a different voice per persona and a real room tone.

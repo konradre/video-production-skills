@@ -66,3 +66,14 @@ stale); the sign-off copy loop caps at five candidates, then tighter variants of
 **Every note set names what to KEEP.** A fix note constrains one defect; a set of them with nothing protecting what
 the previous version got right flattens the piece — the brand system, each spot's hook and the concept's device all
 went in one round that landed its five fixes (2026-09-15). Beside each fix, the guard: what stays.
+
+## A UGC / creator-style spot in the round
+
+Two more locates before anything moves. The **disclosure state** of the delivered version — the on-creative line and
+overlay, the platform's paid-partnership or commercial-content setting, the AI label (`ad-spot-preprod` RISKS.md § UGC
+compliance) — is read and written down beside the note, because a "small fix" can change it: a dub, a lipsync pass or a
+face repair on a REAL creator's take moves the asset from the creator path to the AI path, and the round's ask says so.
+And the **persona line**: a note that the spot "feels like an ad" or "feels fake" is read against UGC-GRAMMAR.md § Where
+lo-fi wins and § The hook before any regen — the fix is usually the open, the light or the delivery, not the model. A new
+version re-sets what the platforms reset: TikTok's AI-content toggle clears on every campaign duplicate; a re-encode
+strips Content Credentials; the finish checklist carries both.

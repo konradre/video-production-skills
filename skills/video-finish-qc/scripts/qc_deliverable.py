@@ -22,6 +22,9 @@
   near-black   EVERY event's window sampled at three points (10 / 50 / 90 %): a window whose samples all read under
                --black-luma (16/255) FAILS unless the event declares `accepted_black: true` — a 10-bit source once rendered
                black through a grade while every other row passed (2026-09-15)
+  phone band   INFO, with --phone-ref <real phone clips>: the delivered file's phone-texture band (phone_texture_probe.py —
+               dead-flat 8×8 share, noise floor, median block sd) against the RANGE over every reference frame; a
+               creator-style spot's read, never a failure — the operator judges the phone render beside the clean one
 Every row carries a KIND: `format` rows are mechanically fixable — the agent fixes them alone (a re-mux with
 `-bsf:v h264_metadata=colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1`, a faststart re-mux, a re-encode
 at the right frame); `judgement` rows change the content (duration, loudness, cuts, black frames) and go to the operator.
@@ -80,6 +83,7 @@ def main():
     ap.add_argument('--tp-ceiling', type=float, default=None, help='the delivered true-peak bar (the platform ceiling); default = the EDL loudnorm.TP_ceiling, else -1.0 — the EDL TP is the master target under it')
     ap.add_argument('--max-still-s', type=float, default=None, help='the longest still run allowed inside the footage span; default = the EDL qc.max_still_s, else 0.5')
     ap.add_argument('--black-luma', type=float, default=16.0, help='an event whose three sampled frames all read under this mean luma (0–255) fails unless it declares accepted_black')
+    ap.add_argument('--phone-ref', nargs='*', default=[], help="the project's real phone clips: prints the delivered file's phone-texture band against theirs as INFO (a creator-style spot)")
     ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
     if a.selftest: selftest()
@@ -177,6 +181,20 @@ def main():
             verdict(ncc >= 0.9, 'end card', f"last frame vs {os.path.basename(card[0]['take'])} NCC {ncc:.3f}")
     r = sh([sys.executable, os.path.expanduser(a.placement), '--root', '.', '--edl', a.edl, '--deliv', D]); out = r.stdout.strip()
     print('      ' + out.replace('\n', '\n      ')[-900:]); verdict(r.returncode == 0 and 'PLACEMENT OK' in out, 'VO placement', 'see the lines above')
+    # ---- the phone-texture band (INFO, a creator-style spot: a comparison against the project's real phone clips, never a threshold) ----
+    if a.phone_ref:
+        pr_ = sh([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phone_texture_probe.py'), '--json', D] + a.phone_ref)
+        try: rows = json.loads(pr_.stdout)
+        except Exception: rows = []
+        if len(rows) == 1 + len(a.phone_ref):
+            dv, refs = rows[0], rows[1:]
+            for k in ('dead_flat_pct', 'noise_floor', 'median_block_sd'):
+                lo, hi = min(x[k + '_min'] for x in refs), max(x[k + '_max'] for x in refs)
+                where = 'IN BAND' if lo <= dv[k] <= hi else ('BELOW (less texture than every reference frame)' if dv[k] < lo else 'ABOVE (more texture than every reference frame)')
+                print(f"INFO phone band {k}: delivered {dv[k]} (frames {dv[k + '_min']}–{dv[k + '_max']}) vs real [{lo}, {hi}] → {where}")
+            print("      the band is a matched-content comparison (video-finish § 5 the phone-native tier); the operator judges the phone render beside the clean one")
+        else:
+            print('INFO phone band: the probe could not read every clip — ' + (pr_.stderr or pr_.stdout).strip()[-300:])
     by = {k: [l for l, kk in fails if kk == k] for k in ('format', 'judgement')}
     summary = '; '.join(f"{k}: {', '.join(v)}" for k, v in by.items() if v)
     print(f"QC-DELIVERABLE {'FAIL (' + summary + ')' if fails else 'PASS'} — {D}" + ("\n      format rows: fix mechanically and re-run; judgement rows: the operator decides" if fails else '')); sys.exit(1 if fails else 0)

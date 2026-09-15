@@ -31,6 +31,9 @@ WAV.
   `native_audio_from/to`, and the hole is filled with **synthesized room tone** (`roomtone_synth.py`):
   a pasted slice carries the take's artifacts, and a hard mute reads as a hole.
 - Designed-sound extras (the name-pop chimes on a product display) are **opt-in, default off**.
+- **A creator-style spot has no music under the open** — room tone carries the hook; a cue may enter under the demo,
+  ducked under every line; the disclosure line is never ducked over or covered by an sfx; no sign-off signature (the
+  sub-genre carries none — `ad-spot-preprod` UGC-GRAMMAR.md § The beats, MIX-AND-QC.md § The phone-mic register).
 
 ## Music
 

@@ -42,6 +42,18 @@ the captions' text against the VO variant. Every comparison instrument carries a
 same invocation (a file against itself must return `inf` / NCC 1.0): `ffmpeg -v error` suppresses the
 PSNR summary line and an empty result reads as "identical".
 
+## On a creator-style spot — the phone-texture band and the inter-shot spread
+
+Two reads the product-spot rows do not carry; both are comparisons against the project's OWN real footage, never
+thresholds, and both are INFO on the delivered file — the operator judges the phone render beside the clean one.
+
+| check | how | fail reads as |
+|---|---|---|
+| the phone-texture band | `phone_texture_probe.py` on the delivered file AND the project's real phone clips as they arrived (`qc_deliverable.py --phone-ref <clips>` prints it as INFO): dead-flat 8×8 share, noise floor (the flattest 20 % of blocks), median block sd, on native centre crops at five points of each clip; the band is the RANGE over every reference frame; matched scene class or the median says nothing | the deliverable outside the real band on all three (measured 2026-09-16: a raw 720p Omni take read 3–4× the fine texture of two phone clips — the dose was a DENOISE and a 2.5 Mbps encode, not grain); the calibration in `video-finish` EVIDENCE.md § The phone-native tier |
+| the inter-shot spread, BEFORE any global move | `video-take-review` `cut_consistency.py` across the spot's joins: light, contrast, white balance and palette as multiples of the take's own baseline; the saturation spread shot to shot | a spot that reads "unreal" whose black point and contrast measured healthy — the defect was a saturation spread of 79 → 130 across shots, and a global saturation lift would have pushed the worst shot further out (the retrospective's measurement, 2026-09-12) |
+| the UGC tells, by eye | sound off first; hands and fingers on the product; a torso static > 6–7 s (`frame_psnr.py`); consonant lip drift in the first 1–2 s of a line; the product changing between shots; background warp on movement; a phone or a camera UI in frame; the face-on-screen budget — `video-take-review` ACCEPTANCE-MATRIX.md row 10 | any of them on a delivered frame; the fix is upstream (the take, the tier's dose, the cut), never a gain nudge |
+| the upscale ratio (INFO, a hypothesis) | the deliverable's raster over the take's native raster | a ratio above ~2× on a talking head is a community warning ("upscaled AI look"), contradicted once here where the operator preferred the raw 720p take over its Starlight ×2 — record the ratio, never fail on it |
+
 ## On designed content — explainer scenes, kinetic titles, cards
 
 A defect hunt passes a film that is small and dark: four QC rounds found nothing wrong with one (an upstream explainer

@@ -1,0 +1,28 @@
+# ugc-phone — the near-identity COLOUR tier of the phone-native finish TIER (video-finish § 5, the ugc-phone tier).
+# Not a look: phone-ness is temporal texture, camera behaviour and the encode (video-finish/scripts/phone_native.py);
+# this cube only keeps the neutral grade honest — no stock transform, no split-tone, a gentle consumer tone map,
+# skin left alone. No .drx: halation, bloom and film grain would read as film, and a phone has none of them.
+# Colour tier ONLY (per-pixel ops -> .cube). Values chosen 2026-09-16 against the ads column of the consensus
+# (research/reference/look-library-preset-consensus-2026-08-29.md §4a), every stylising parameter pulled to zero.
+id: ugc-phone
+genre: ads
+description: Phone-native neutral — near-identity, a gentle consumer tone map, no split-tone, skin untouched
+tags: [ugc, phone, creator, neutral, social, native]
+intensity: 1.0            # apply at full strength; the dose lives in the temporal layer, not here
+film_base: null           # no film-stock transform — a phone is not a print
+cube: { file: cubes/ugc-phone_33.cube, size: 33 }
+drx:  { file: null, status: none }   # deliberately no Dehancer tier for this look
+params:
+  white_balance: { temp: 0.0, tint: 0.0 }
+  exposure: { stops: 0.02 }
+  lift_gamma_gain: { lift: [0.0, 0.0, 0.0], gamma: [1.0, 1.0, 1.0], gain: [1.0, 1.0, 1.0] }
+  highlight_rolloff: { knee: 0.80, strength: 0.25 }   # a phone's light HDR-style highlight compression
+  tone_curve: { strength: 0.12, pivot: 0.46 }          # consumer contrast, well under the ads-clean S (0.28)
+  split_toning:
+    shadow:    [0.0, 0.0, 0.0]
+    highlight: [0.0, 0.0, 0.0]
+    strength: 0.0
+    balance: 0.5
+  black_point: { lift: 0.004 }                          # phones rarely reach true black
+  vibrance: { vibrance: 0.06, saturation: 1.02, skin_protect: 0.9 }
+compression: { grain: "sensor-style noise or a denoise by phone_native.py, dosed by the texture probe", mezzanine: yuv420p10le, sharpen: "none", notes: "phone-native tier — the phone-class H.264 encode is part of the look" }

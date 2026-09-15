@@ -46,6 +46,29 @@ footage is cheaper than prompts ×5–10 at 720p. Seedance re-renders frame 0 fr
 accepts the same people. Photoreal portrait plates are the deepfake-reference shape: compose the figure
 into a scene rather than passing a face plate.
 
+### Creator-style talking heads — the September 2026 routing, and the venues the table above does not carry as rows
+
+Measured here (a 30 s trust-series episode, 2026-09-15/16) and agency production data; the community signal on these
+models is weak and affiliate-laden and is weighted as such — the evidence tier is stated on every row. Vendor figures stay vendor claims until a receipt confirms them.
+
+| venue · model | modes · caps | price | what it holds / what breaks |
+|---|---|---|---|
+| **fal · `google/gemini-omni-flash/v1.1/{image-to-video,reference-to-video,text-to-video,edit}`**; monid `gemini /v1/video/omni-flash-*` | 3–10 s integer; 16:9 / 9:16; **720p NATIVE** (1080p and 4k are Google's own upscale ⇒ generate at 720p and reconstruct up); r2v ≤ 6 image refs + ≤ 3 video refs of ≤ 3 s; **NO audio input on any surface** — a reference clip's audio is ignored | fal **$0.03 / 0.10 / 0.15 / 0.30 per s** at 360p / 720p / 1080p / 4k (monid +$0.01); MEASURED: a 7 s 720p 9:16 i2v = 23.39 fal units, ~44 s wall; refusals bill nothing; fal result URLs expire, monid's keep 7 days | the simple talking head and the hook sweep (360p drafts at $0.03/s for remixes of one clip); MP4 with native audio + SynthID; ~15 % of takes stutter → regenerate; it INVENTS words (a client line came back with "dollars" on two numbers, and "say exactly these words" made it worse) ⇒ a script-exact mouth needs an audio-driven model (fal `fal-ai/bytedance/omnihuman/v1.5`, image + audio) or a lipsync pass over the take (`fal-ai/sync-lipsync/v3`, Kling lipsync, HeyGen v3 — their prices render client-side and are UNREADABLE in advance: the `x-fal-billable-units` header measures them); a negation BURNED captions onto the subject's shirt — positive-spec only |
+| **Kling 3.0 Pro / Turbo** (fal, Higgsfield) | 3–15 s; talking clips **≤ 8 s** — past second 8 the lips and the audio part company (agency production data, community-corroborated); multi-shot tops at 15 s | ≈ $0.11–0.14 / s (Turbo; third-party figures) | handheld micro-motion, the phone feel; the mid-tier alternative for product-in-hand; NOT adopted here — unmeasured |
+| **Sora 2** (OpenAI) | — | — | **RETIRED** — web and app off 2026-04-26, the API off 2026-09-24 with no replacement alias (OpenAI primary); every recipe that named it is dead |
+| Veo 3.1 · Luma Ray3 · FLUX 3 (BFL, 2026-07-23, 20 s native audio) · Creatify Boreal (2026-09-15, "$0.01/s", "47× cheaper" — vendor) · Wan 3.0 (2026-08-24; **no open weights** — the last Apache release is Wan 2.2, and the April corpus's "Wan 2.7 Apache 2.0" was wrong) | — | vendor and community claims only | Veo 3.1's mouth realism fails on dialogue ⇒ non-talking b-roll and proof shots; the rest UNPROVEN here — a new model is proven on the hardest shot first (SKILL.md § 1), never adopted from a leaderboard, and Wan carries no dialect in this corpus |
+
+Rules that arrived with the data. **Cost per USABLE take, never per second**: the keep ratio runs 3:1 to 6:1 across
+models (agency data), so a 7 s Omni take at 720p is ≈ $0.83 per usable at a 15 % stutter rate and ≈ $4.20 at "six takes
+for one", and a Seedance 2.5 720p 30 s pass is ≈ $8.85 BEFORE retries — the cost line quotes the usable figure with its
+assumed keep rate. **Repair or regenerate by the take's price**: a cheap take is regenerated; an expensive one is
+repaired (clean audio + a lipsync pass over the footage) — the rule comes from a vendor that sells the repair layer, and
+is stated here with that incentive named. **Per shot type**: a simple talking head or a hook sweep → Omni 1.1;
+product-in-hand, a 30 s story, or a pinned voice → Seedance 2.5 (its audio reference on r2v is the only route to an exact
+voice; the label is drawn, never read — keep it as an image reference and the label shot short and front-on); a defined
+handheld move ≤ 8 s → Kling; the words that must land exactly → an audio-driven model, never a prompt. Every take
+carries SynthID or C2PA: the platform's auto-label is expected, never dodged (`ad-spot-preprod` RISKS.md § UGC compliance).
+
 ## Images (stills, plates, references)
 
 | venue · model | use | price | moderation | notes |

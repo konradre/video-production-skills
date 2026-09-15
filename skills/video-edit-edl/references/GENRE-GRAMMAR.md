@@ -35,6 +35,23 @@ operator corrects, never a taste of their own.
 - **Alternates** are their own EDLs and deliverables; finals are named versions per spot in
   `deliver/final/` with the current card.
 
+### The UGC / creator-style spot (a sub-genre of ads; the grammar in `ad-spot-preprod` UGC-GRAMMAR.md)
+
+- **Shape**: the hook on the FIRST frame, legible with the sound off (a person mid-action, mid-sentence, the product in
+  hand) → the problem in her words → the demo with REAL proof composited at ~8–12 s of a 30 s spot (product stills, b-roll
+  of the product in use) → a proof or an objection → the offer, the disclosure and the CTA in the last 3–5 s. Cutaways at
+  ~8 s and ~18 s; a static torso holds ≤ ~6–7 s; the talking head is ONE continuous take (~10 s), and one slightly abrupt
+  jump cut is allowed — a hidden join is not (`video-finish-qc`'s splice read finds it).
+- **No music bed under the open**; room tone carries the first beat; a cue may enter under the demo. No card unless the
+  brief asks, no wipe, no sign-off signature — the sub-genre drops the product-spot kit (`ad-spot-preprod` § 3).
+- **Captions native**: speech-aligned short chunks, or a ≤ 6-word overlay discipline — one style per platform, never over
+  the product, a face, a price or the disclosure; the house ALL-CAPS brand style is a product-spot default.
+- **The disclosure is a beat**: the spoken line and the overlay sit in the open and are never cut, ducked or captioned
+  over; a lipsync pass or a dub on a real creator's take is a compliance change (`ad-spot-preprod` RISKS.md § UGC
+  compliance), declared on the event.
+- **Alternates are the variant matrix**: one axis per EDL (hook, persona, proof, length, CTA, caption style, offer), each
+  its own file and its own deliverable.
+
 ## Film (a short)
 
 - **Canvas** 16:9 (or the festival's), 24 fps; no captions, no card, no narrator explaining the

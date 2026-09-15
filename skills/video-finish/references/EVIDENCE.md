@@ -343,6 +343,41 @@ Resolve had already written the audio out as **PCM 16/48** in the graded render,
 copy was in hand with no extra generation. **Check what the grade pass emitted before sourcing audio
 from anywhere else.**
 
+## The phone-native tier — the texture probe's calibration (2026-09-16)
+
+`video-finish-qc/scripts/phone_texture_probe.py` on native 640×640 centre crops, grey plane, five frames at 10 / 30 / 50 /
+70 / 90 % of the duration: the share of dead-flat 8×8 blocks, the noise floor (the median sd of the flattest 20 % of
+blocks) and the median block sd, each as the mean over the frames with the frame range beside it. The selftest's injected
+Gaussian noise of sd 0.5 / 1 / 2 / 4 read back 0.49 / 0.92 / 1.77 / 3.51 — linear. The layer is
+`scripts/phone_native.py` (`--ref` runs this comparison on its own output).
+
+| clip | raster · encode | dead-flat % | noise floor | median block sd |
+|---|---|---|---|---|
+| real phone clip A, as it arrived from a client | 1920×1080 H.264 ~2.5 Mbps | 2.1 [0.4–4.1] | 0.52 [0.36–0.74] | 2.99 [1.54–5.02] |
+| real phone clip B, same source | same | 2.6 [0.0–9.6] | 0.48 [0.12–0.71] | 2.24 [1.05–3.28] |
+| Gemini Omni Flash 1.1, three raw takes of one shot | 720×1280 H.264 ~2.2 Mbps | 0.0 | 1.75–1.96 | 7.06–7.18 |
+| the same take delivered: faithful 1.5× lanczos + the ads-clean cube | 1080×1920 H.264 ~5 Mbps | 0.0 | 1.10 [1.03–1.19] | 5.33 [5.17–5.52] |
+| the same take through Starlight ×2, then delivered | 1080×1920 | 0.0 | 2.37 | 7.16 |
+| `phone_native.py` a — no noise, no denoise, 12 Mbps | 1080×1920 | 0.0 | 1.16 | 4.75 |
+| b — hqdn3d 2, 12 Mbps | | 0.4 | 0.85 | 4.63 |
+| c — hqdn3d 3, 4 Mbps | | 0.7 | 0.83 | 4.46 |
+| d — noise 6, 12 Mbps | | 0.0 | 1.41 | 4.91 |
+| **e — hqdn3d 6, 2.5 Mbps** | | **1.5 [0.9–1.8]** | **0.69 [0.61–0.78]** | **4.09 [3.81–4.26]** — IN BAND on all three |
+| f — hqdn3d 8 + noise 2, 2.5 Mbps | | 0.4 [0.1–1.5] | 0.74 [0.62–0.87] | 3.95 [3.67–4.11] — in band |
+
+What the table says. (1) A generated take is NOT under-textured by default: the 720p Omni output carried three to four
+times the fine texture of two phone clips that had arrived through a ~2.5 Mbps re-encode, so the earlier "27.8 % dead-flat
+at a 0.00 noise floor" finding on a Seedance → Rhea → grade master is a matched-content result, never a universal AI
+tell. (2) The direction of the dose is decided per pair — here it was DOWN (a denoise and a lower bitrate); adding noise
+(d) moved the take further out. (3) The band of one clip is a RANGE across its frames — two frames of one real clip read
+6 % and 34 % dead-flat on an earlier three-frame read — so the acceptance compares against the range over every reference
+frame, never a mean of means. (4) The median block sd is content-dominated (an outdoor lot against a living room): matched
+scene class, or the number says nothing. (5) The encode is the largest lever: 12 → 2.5 Mbps moved more than hqdn3d 0 → 3.
+The two real clips are the only references measured so far; a house reference set by scene class (a flat wall, a
+textured room, a dark frame), shot on the phones the audience uses and passed through the platform's own transcode, is
+the open item — and the platform re-encodes both the real and the generated upload, so the band that matters is the one
+AFTER that transcode.
+
 ## Provenance
 
 Local A/B evidence, the grain/encode measurements and the look-library parameter consensus come from

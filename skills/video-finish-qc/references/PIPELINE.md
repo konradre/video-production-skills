@@ -48,7 +48,10 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
   deliverable. Nothing else touches that GPU while it runs.
 - **The hero pass**: Resolve open with a PROJECT loaded (not the project picker) and Workspace › Scripts ›
   resolve_bridge started BY THE OPERATOR (it runs silently — check the port, not a window); an agent-launched
-  Resolve refuses external scripting. One clip per call, one render job at a time, fresh timeline names. "external scripting refused" = the bridge is
+  Resolve refuses external scripting — the refusal is scoped to WHO LAUNCHED Resolve, not to the transport, so
+  against an operator-launched instance external scripting (Local) is reliable and the bridge is the deterministic
+  fallback rather than a requirement (measured on Studio 21.0.2.4, 2026-09-14; the lib and the running Resolve may
+  differ by major version). One clip per call, one render job at a time, fresh timeline names. "external scripting refused" = the bridge is
   down → stop and ask the operator to reopen it, then retry. The media pool caches paths: a re-imported
   path returns an empty list and a render of the OLD duration — fresh filenames per version.
 - **Heroes of equal frame count have identical byte sizes** (DNxHR) — verify distinctness by frame hash

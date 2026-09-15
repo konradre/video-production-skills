@@ -13,7 +13,10 @@ its own spot until it is re-cut to stand alone.
 delivered spots (retargeting) · the hero cut of the client's whole film (owned channels). Do not
 stretch them — you will be trimming. The "we need more" impulse goes to **alternate hooks** (2–3 opens
 of the same spot), not to runtime. "UGC" in a brief usually means short-form vertical ads — confirm
-the wording, not the build.
+the wording, not the build. When it does mean a creator-style spot — a person talking to the camera, phone-shot or
+generated — the axes in `UGC-GRAMMAR.md` § Where lo-fi wins (the AOV band, the funnel stage, the platform, a real or a
+synthetic persona, phone-shot or generated footage) are walked with the brief before the format is fixed, and the four
+artifacts (creative, evidence, rights, disclosure) are on the ask list from day one.
 
 ## The client's text is the SSOT
 

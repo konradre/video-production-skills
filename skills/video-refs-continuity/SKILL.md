@@ -81,7 +81,11 @@ of an accepted still › a fresh still. Build in this order:
    a close-up's background; a crop does.
 4. **Character refs cut from the first accepted take** — a frame of its upscale, the subject isolated,
    occluders painted out (the model copies whatever else sits in the crop); one ref per recurring
-   character, in every later gen.
+   character, in every later gen. On a creator-style spot the first keeper IS the presenter's identity for the
+   campaign's life (product and person morphing across shots is the tell practitioners name first); a real arm's-length
+   reference photo, upscaled first, is the community's heuristic for less morphing, and "generate the first take with no
+   reference, then lock its frame 1 as the reference" is an UNVERIFIED heuristic (one account; mechanically plausible,
+   since Seedance re-renders frame 0) — test it on one shot before a shot list relies on it.
 5. **Product shape from the client's own photo** — single pieces cut out on grey, laid as the shot's own
    scatter (the model transfers the sheet's LAYOUT: a grid renders as rows). **Size from an
    in-world crop beside a known object** (a tie knot, a seated knee); a magnified sheet pins shape only

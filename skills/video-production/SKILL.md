@@ -36,6 +36,7 @@ ads          → ad-spot-preprod   · a spot is the unit · the client's script 
 film         → film-preprod      · the film is the unit · the self-revelation paragraph → the beat sheet · a film pair · ONE upscale pass on the locked cut
 music video  → film-preprod § music video · the track is the unit · the track map → the gens table · one pass · the master carries the cut's own audio
 explainer    → explainer-video   · the film is the unit · the anchored script is the SSOT · designed motion only, nothing generated · captions measured to fit
+ads / ugc    → ad-spot-preprod --spot-type ugc · a creator-style spot is the unit (a person to camera, phone-shot or generated) · the client's text or the brief's message lines are the SSOT · the phone-native dialect (video-prompt-dialects PHONE-NATIVE.md) · the phone-native finish tier (video-finish § 5) · the two compliance paths (ad-spot-preprod RISKS.md § UGC compliance)
 ```
 
 The rules that bind every turn — the cost line and GO before any billed call, however small, approve
@@ -48,7 +49,10 @@ Then the axes that move with THIS project are walked once against the brief — 
 generator and its native raster, the tools and hardware on hand, the voices and the music licence, the client and the
 budget ([`references/WHAT-VARIES.md`](references/WHAT-VARIES.md)). Every value that differs from the skills' defaults is
 written into the project's own files: the EDL's `canvas`, `fps`, `runtime_s` and `audio.loudnorm`, the `caption_style`,
-the shot list's header, the pause block. A number in a skill is a default until the project confirms it.
+the shot list's header, the pause block. A number in a skill is a default until the project confirms it. A UGC / creator-style spot
+adds its own axes — the AOV band, the funnel stage, the platform, a real or a synthetic persona, phone-shot or generated
+footage — because each moves the build between native lo-fi and product-forward polish (`ad-spot-preprod`
+UGC-GRAMMAR.md § Where lo-fi wins).
 
 Then **the corpus sweep** — the one reading a description cannot replace: `scripts/corpus_sweep.py --skills ~/.claude/skills
 --axes footage=existing,deliverable=ad,…` prints every skill's BODY summary (its What-varies paragraph and its section
