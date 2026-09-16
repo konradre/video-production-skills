@@ -35,8 +35,13 @@ Rule for images and video alike: **quality and prompt-adherence first, permissiv
 criterion.** The table — modes, prices, caps, moderation classes, upload conventions — is
 [`references/VENUES.md`](references/VENUES.md). The decisions it settles:
 
-- Video with people in the references → Higgsfield `seedance_2_5 --mode omni_reference` (accepts person
-  refs, start image + image refs + video refs together, 480p at 2.5 cr/s). fal's Seedance refuses any
+- Video with people in the references → **treg `reapi.video-gen.seedance-2-5.unrestricted`**, the PAYG
+  people-capable route ($0.1186/s at 480p, PAYG, no plan behind it): `content_filter: false`
+  carries the BytePlus licensed-asset escape, so it takes a **real person's likeness**, which every other
+  row refuses. Its references are hosted by `treg host` and the call is **CLI-only** — the treg MCP exposes
+  no upload tool. Higgsfield `seedance_2_5 --mode omni_reference` (accepts person refs, start image + image
+  refs + video refs together, 480p at 2.5 cr/s) stays the route when the shot needs a mode treg has no row
+  for: extension on a keeper's job id, edit, `topaz_video`, `minimax_h3` at 2K. fal's Seedance refuses any
   photoreal person in a reference (`content_policy_violation`, billed 0) — fal only for people-free
   shots. MiniMax H3 is 768p minimum and a different look.
 - **People-free Seedance with no plan to feed → monid `bytedance /v1/video/seedance-2.5`, the
@@ -48,7 +53,13 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   own `sfs` store (`scripts/monid_upload.py`, $0.00), so "it needs a public URL" never routes work off
   it. **The partition is the same one fal already forces, for a different reason:** real human faces are
   rejected UPSTREAM (BytePlus ModelArk) and monid exposes none of the licensed-asset escapes, so a
-  photoreal person in a reference stays on Higgsfield.
+  photoreal person in a reference routes to treg's unrestricted row — the escape monid lacks — or to
+  Higgsfield when the shot also needs one of its extra modes.
+- **A talking head — UGC or commercial — → Omni Flash 1.1 + a `fal-ai/sync-lipsync/v3` pass over the take**, never a
+  prompt-voiced mouth (`references/VENUES.md` § The talking-head default). Omni is $0.10/s at
+  **720p native** against Seedance 2.5's $0.1029/s at 480p, so the default costs the same and generates closer to the
+  delivery raster. ⚠ The A/B behind it is confounded by the lipsync head-pad of the retrospective's Finding 15 — the
+  default rests on that read plus the price/raster argument, and the settling re-run is ~$0.
 - A continuation of a keeper → `--mode video_extension` on the keeper's own job id (same price as a
   fresh gen). On monid the edit and extend modes are **phrasing, not flags** — say so explicitly in the
   prompt or the model reads it as a plain r2v, generates a NEW video, succeeds, and bills in full with

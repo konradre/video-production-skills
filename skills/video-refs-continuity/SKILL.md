@@ -124,7 +124,9 @@ burst, motion-blurred), `split_sheet.py` (a three-view sheet → single-subject 
 **Done when:** every locked element has one accepted reference or a before/after pair; every one traces by
 crop or edit to a keeper or a client photo; the start image is the previous shot's last state; nothing in
 the set is a montage, a schematic with labels or arrows, or a photoreal person bound for a venue that
-refuses one.
+refuses one. A real person's likeness is not a gate failure by itself — it is a ROUTING fact: it is legal
+on treg's `reapi.video-gen.seedance-2-5.unrestricted` row and refused upstream on fal and monid
+(`video-gen-cost-gate` VENUES.md § Video).
 
 ## 3. Accept every generated still like a seed
 
@@ -170,7 +172,10 @@ python3 scripts/refs_gate.py --root <project> --import CLIENT-PHOTO --file asset
 ```
 
 Each target has its own upload ledger, and the gate reads the one the call will use: `receipts/<NAME>-upload-id.txt`
-for `hf`, `refs-urls.json` for `kie`, `monid-urls.json` for `monid`. A reference bound for monid is hosted on monid's own
+for `hf`, `refs-urls.json` for `kie`, `monid-urls.json` for `monid`. **`--target treg` does not exist yet** — wiring it
+into `refs_gate.py` is the open item. A treg reference is a `treg host` URL with a **7-day TTL**, so until the target is
+wired, record that url's `expires_at` beside the file and read it before the GO: the same expiry trap the monid lane
+already gates for, with none of the code behind it. A reference bound for monid is hosted on monid's own
 `sfs` store by `video-gen-cost-gate/scripts/monid_upload.py` at **$0.00** — and because a lapsed sfs URL is re-issued by a
 free `/cat` rather than re-uploaded, an expired link there costs nothing, unlike kie's ~24 h expiry. The same call also
 carries a privacy consequence the other targets do not: an sfs URL is fetchable by anyone who holds it until its `ttl`
