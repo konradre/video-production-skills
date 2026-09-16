@@ -51,8 +51,35 @@ own words.
   script question as ONE concise ask; rating, wardrobe and set where the script is silent are the
   operator's. Every decision logged with WHO and what would reopen it.
 
+**Mine the hook pattern before drafting one — read the vertical, never guess it.** On a creator-style
+spot, on a brief that asks for more hooks, or in a vertical the team has no pattern for, the cheap step
+is evidence. Pull 50–150 top-performing videos in the vertical over a bounded recent window sorted by
+engagement, transcribe the 10–15 most relevant, and tabulate one row each: views · **the first spoken
+line, 0–3 s** · when the product is first named · who is on camera. Then name the dominant pattern in
+ONE line, and say what the data said and what the pull cost. Search by TASK, not by vendor — the routed
+endpoints exist for "tiktok search videos", "instagram reels search by keyword", "tiktok video
+transcript" and the platform ad libraries, and a named competitor's live ads come from the ad library
+rather than from a guess. One measured pattern, dated and not universal: in agent and B2B-software
+verticals it runs stunt-or-claim → a specific number → the result → "here's how", with **the product
+named LATE, as the answer** (superdesigndev/treg `make-ugc`, read 2026-09-16).
+
+**A mined pattern shapes ORDER and FRAMING; it never replaces the client's line.** The SSOT rule above
+does not bend for evidence: a hook drafted against the pattern is an addition, so it is a numbered cost
+line with "no" as the default, and the client picks. Draft more than will be used — 10 hooks, the client
+picks 3–5 — because picking is cheap and generating is not.
+
+**Size a talking hook to its take, not the take to the hook.** A generated talking model fills every
+second it is given: too long and the delivery goes flat because there is nowhere to breathe, too short
+and words are dropped. **Words ÷ 4, minus 1 second** — 45–55 words ≈ a 12–14 s punchy hook, 60–70 ≈
+16–17 s, 70–80 ≈ 18–19 s and noticeably denser, 90+ splits into two clips because one take past ~20 s of
+continuous speech drifts. Join clauses with commas rather than full stops where no hold is wanted: the
+model reads a period as permission to stop for about half a second, which `video-take-review`'s delivery
+row then reports as a HOLD. Confirm the script verbatim including slang, and warn the client that the
+on-screen captions follow the TRANSCRIPT — a transcriber normalises "gonna" to "going to".
+
 **Done when:** the script file, the brand-kit table, the asset checklist and the decision log exist,
-and every open question is a single numbered ask.
+every open question is a single numbered ask, and — where hooks were mined — the pattern table and its
+one-line verdict sit beside them.
 
 ## 3. Fix the global spec and the standing rules
 

@@ -59,6 +59,25 @@ builder stops otherwise (re-run that line's word times with `--only`).
 minute. A swapped take re-runs that line ONLY (`--only`) so hand patches on the others survive. Whisper
 mis-times onsets in noisy sections — patch by ear against the placement check, never by re-running.
 
+## Card boundaries — half-open, never `between()`
+
+The cards are PNG layers composited by `video-finish-qc/scripts/finish_spot.py`, and the expression that
+switches them is load-bearing. **`enable='between(t,a,b)'` is inclusive at BOTH ends**, so two layers that
+share a boundary are both enabled on the frame that lands exactly on it. Every word-highlight layer inside a
+card shares one by construction: `build_captions.py` hands layer *k* the `t1` that is layer *k+1*'s `t0`.
+Card-to-card the builder already leaves a frame of air (`nxt - LEAD - 1/24`), so a card-to-card collision
+cannot arise; the exposure is the highlight layers alone. No delivered spot is known to have carried the
+defect — what follows is the mechanism reproduced in a scratch render, not an incident.
+
+Measured 2026-09-17 in a scratch render, 24 fps, boundary at t = 1.0: with `between()` one frame composited
+both layers; with `enable='gte(t,a)*lt(t,b)'` zero frames showed both **and** zero showed neither. The
+half-open form is the fix. **An epsilon trim is not** — subtracting 2 ms from the earlier layer trades a
+collision that needs exact equality for an uncovered window 2 ms wide, and at 24 fps a frame lands in that
+window about one time in twenty. A doubled frame is a smudge; a blank frame is a missing caption.
+
+A designed card that carries a **colour emoji** is rendered by PIL with `embedded_color=True`; ffmpeg's
+`drawtext` cannot draw one at all, which is the reason these are PNG overlays rather than a text filter.
+
 ## Alternates
 
 An alternate quip or an alternate cut is its own EDL with its own captions; a caption never carries a

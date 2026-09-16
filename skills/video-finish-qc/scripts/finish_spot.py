@@ -178,7 +178,13 @@ def main():
         CAPD = AU.get('captions_dir', 'edit/captions'); caps = json.load(open(f'{CAPD}/manifest.json')) if os.path.exists(f'{CAPD}/manifest.json') else []
         cin = []; chain = f'[0:v]scale={edl.get("canvas", [1080, 1920])[0]}:{edl.get("canvas", [1080, 1920])[1]}:flags=lanczos,format=yuv420p[v0]'; last = 'v0'
         for k, c in enumerate(caps):
-            cin += ['-i', c['file']]; chain += f";[{last}][{k + 1}:v]overlay=0:0:enable='between(t,{c['tl'][0]},{c['tl'][1]})'[v{k + 1}]"; last = f'v{k + 1}'
+            # HALF-OPEN, never between(): between(t,a,b) is inclusive at BOTH ends, so two cards that share a
+            # boundary (every word-highlight layer inside one card does — build_captions.py hands layer k the
+            # t1 that is layer k+1's t0) BOTH composite on the frame that lands exactly on it. Measured
+            # 2026-09-17, 24 fps, boundary t=1.0: with between() one frame showed both layers; with
+            # gte()*lt() zero frames showed both AND zero showed neither. An epsilon trim is the wrong fix —
+            # it trades a measure-zero double for a real uncovered window.
+            cin += ['-i', c['file']]; chain += f";[{last}][{k + 1}:v]overlay=0:0:enable='gte(t,{c['tl'][0]})*lt(t,{c['tl'][1]})'[v{k + 1}]"; last = f'v{k + 1}'
         lim = f"alimiter=limit={10 ** (ln['TP'] / 20):.4f}:attack=5:release=60:level=false"
         af = f"volume={g:.3f}dB,aresample=192000,{lim},aresample=48000,{lim}"   # limit at 192 kHz, where inter-sample peaks are visible; 48 kHz; limit again
         # Measured on a real master (TP target -2.4, AAC 192k): limiter after the resample only -> -1.0 dBTP; before only -> -2.0; both -> -2.1; none -> -1.9.

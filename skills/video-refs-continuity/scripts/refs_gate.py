@@ -14,6 +14,12 @@ Layout under --root (default: the current directory):
                                  monid_upload.py). For this target the gate ALSO checks the signed url's
                                  expiry — a lapsed url FAILS, because the model fetches it at generation
                                  time and the job bills at acceptance. The fix is a free re-issue.
+  treg-urls.json                 references hosted on treg for target `treg` ({NAME: url} + `_meta`;
+                                 treg_host.py). Same expiry check, one fact different: a `treg host`
+                                 url is an OPAQUE token with a 7-day TTL and NOTHING encoded in it, so
+                                 an unrecorded expiry cannot be recovered from the url the way monid's
+                                 `?e=` recovers it — it FAILS rather than warns. Re-hosting is free and
+                                 mints a NEW url, so the ledger is rewritten, never patched.
 
 Rules: each rule = an element (a regex over the prompt body, negated clauses removed) + the reference ROLES it needs;
 a role is met by any listed reference NAME that is in --refs AND uploaded for --target, or inherited from the START
@@ -28,7 +34,7 @@ LOOK: when the rules list look_plates, light or grade language in the prose with
 keeps a prose-only light on purpose). COMPETING: a cited reference no matched rule depends on is a WARN — a reference
 the prompt does not need competes with the ones it does.
 
-  refs_gate.py --prompt <file> --refs A,B,C [--target hf|kie|monid] [--start-image NAME] [--births R,R]
+  refs_gate.py --prompt <file> --refs A,B,C [--target hf|kie|monid|treg] [--start-image NAME] [--births R,R]
                [--prose X,Y] [--fresh-scene] [--record NAME]            → table + REFS-GATE PASS|FAIL, exit 0|1
   refs_gate.py --register NAME --file <path>                            → bind a reference name to its file (sha256, size)
   refs_gate.py --import NAME --file <path> --provenance "<who, when, how>" → a CLIENT-SUPPLIED asset, a lineage root of its own
@@ -37,6 +43,14 @@ the prompt does not need competes with the ones it does.
   refs_gate.py --selftest
 """
 import argparse, hashlib, json, os, re, subprocess, sys, tempfile, time
+
+# One upload ledger per target. `hf` has none: it writes receipts/<NAME>-upload-id.txt per reference.
+LEDGERS = {'kie': 'refs-urls.json', 'monid': 'monid-urls.json', 'treg': 'treg-urls.json'}
+# Targets whose reference url LAPSES, so the gate reads its expiry before the GO. The value is
+# whether an unrecorded expiry can be recovered from the url itself: monid signs with `?e=<unix>`,
+# treg mints an opaque token that says nothing. No recovery ⇒ an unrecorded expiry FAILS.
+EXPIRING = {'monid': True, 'treg': False}
+REFRESH = {'monid': 'monid_upload.py', 'treg': 'treg_host.py'}   # the free fix, named in the FAIL row
 
 CAPS = re.compile(r'\b[A-Z][A-Z0-9]{1,}\b')
 DEFAULT_TAKE_RE = r'^S\d\d-[A-Z0-9]+(-v\d+)?-s\d+$'   # a generated take id — a root that continues a scene
@@ -91,50 +105,64 @@ class Gate:
         if target == 'hf':
             return os.path.exists(os.path.join(self.root, 'receipts', f'{name}-upload-id.txt'))
         # monid hosts its references on sfs (free, and a lapsed URL is re-issued rather than re-uploaded);
+        # treg hosts them on treg.to (free, but the BYTES die with the url — a refresh re-uploads);
         # kie uploads to its own store, where a lapsed URL means a real re-upload. One ledger each.
-        p = os.path.join(self.root, 'monid-urls.json' if target == 'monid' else 'refs-urls.json')
+        p = os.path.join(self.root, LEDGERS.get(target, 'refs-urls.json'))
         return os.path.exists(p) and name in json.load(open(p, encoding='utf-8'))
 
-    def monid_freshness(self, name, label):
-        """A monid reference rides as a SIGNED URL that lapses with its ttl. The name being present in
-        the ledger proves nothing about the url still resolving, and the model fetches it at generation
-        time — so a lapsed url would pass a name check and fail (or worse, silently drop a reference)
-        after the job is already billed at acceptance. Expiry is read LOCALLY: from the recorded
-        expiresAt, else from the url's own `?e=<unix>`. Zero API calls. The fix is free
-        (`monid_upload.py --refresh <NAME>`), so this fails closed."""
-        p = os.path.join(self.root, 'monid-urls.json')
+    def url_freshness(self, name, label, target):
+        """A monid or treg reference rides as a url that LAPSES. The name being present in the ledger
+        proves nothing about the url still resolving, and the model fetches it at generation time — so a
+        lapsed url would pass a name check and fail (or worse, silently drop a reference) after the job is
+        already billed at acceptance. Expiry is read LOCALLY, at zero API calls: from the recorded
+        expiry, else from the url itself where the url carries one. Both fixes are free, so this fails closed.
+
+        The two targets differ in exactly one place, and it is the reason EXPIRING is a map and not a set:
+        monid signs its url with `?e=<unix>`, so a lost ledger is recoverable and an unrecorded expiry is
+        only a WARN; `treg host` mints an opaque token that encodes nothing, so an unrecorded expiry
+        cannot be recovered at all and FAILS."""
+        led = LEDGERS.get(target)
+        p = os.path.join(self.root, led)
         if not os.path.exists(p):
             return [], 0
         try:
             d = json.load(open(p, encoding='utf-8'))
         except Exception:
-            return [(f'{label} url', 'WARN', 'monid-urls.json does not parse')], 0
+            return [(f'{label} url', 'WARN', f'{led} does not parse')], 0
         url = d.get(name)
         if not isinstance(url, str):
             return [], 0
-        exp = ((d.get('_meta') or {}).get(name) or {}).get('expiresAt')
+        meta = (d.get('_meta') or {}).get(name) or {}
+        exp = meta.get('expiresAt') or meta.get('expires_at')      # monid spells it one way, treg the other
         left = None
         if exp:
-            try:
-                t = time.strptime(exp.replace('Z', '+0000'), '%Y-%m-%dT%H:%M:%S.%f%z')
-                left = time.mktime(t) - time.timezone - time.time()
-            except Exception:
-                left = None
-        if left is None:
+            for fmt in ('%Y-%m-%dT%H:%M:%S.%f%z', '%Y-%m-%dT%H:%M:%S%z'):   # isoformat() drops .%f at a whole second
+                try:
+                    t = time.strptime(exp.replace('Z', '+0000'), fmt)
+                    left = time.mktime(t) - time.timezone - time.time()
+                    break
+                except Exception:
+                    continue
+        if left is None and EXPIRING.get(target):
             m = re.search(r'[?&]e=(\d+)', url)
             if m:
                 left = int(m.group(1)) - time.time()
         if left is None:
-            return [(f'{label} url', 'WARN', 'no expiry recorded — run monid_upload.py --verify')], 0
+            if EXPIRING.get(target):
+                return [(f'{label} url', 'WARN', 'no expiry recorded — run monid_upload.py --verify')], 0
+            return [(f'{label} url', 'FAIL',
+                     'no expiry recorded, and a `treg host` url is an opaque token that carries none — '
+                     f'nothing local can say whether it still resolves. Free fix: treg_host.py --root <project> '
+                     f'--refresh {name} --go')], 1
         if left <= 0:
             return [(f'{label} url', 'FAIL',
-                     'the signed sfs url has EXPIRED — the model fetches it at generation time, and the '
-                     f'job bills at acceptance. Free fix: monid_upload.py --root <project> --refresh {name} --go')], 1
+                     f'the {target} reference url has EXPIRED — the model fetches it at generation time, and the '
+                     f'job bills at acceptance. Free fix: {REFRESH[target]} --root <project> --refresh {name} --go')], 1
         if left < 1800:
             return [(f'{label} url', 'WARN',
                      f'url lapses in {left/60:.0f} min and a generation p95 is ~10 min — '
                      f'refresh it before the GO (free)')], 0
-        return [(f'{label} url', 'ok', f'signed url good for {left/3600:.1f} h')], 0
+        return [(f'{label} url', 'ok', f'{target} url good for {left/3600:.1f} h')], 0
 
     def latest_record(self, asset):
         rec = None
@@ -241,13 +269,13 @@ class Gate:
                                  f"derive the plate from the previous shot's LAST keeper frame, --import the client's approved image, or declare --fresh-scene")); fail += 1
             if rec is not None:
                 crows, cfail = self.content(start_image, '  start image'); rows += crows; fail += cfail
-        if target == 'monid' and start_image:
-            frows, ffail = self.monid_freshness(start_image, '  start image'); rows += frows; fail += ffail
+        if target in EXPIRING and start_image:
+            frows, ffail = self.url_freshness(start_image, '  start image', target); rows += frows; fail += ffail
         for r in refs:
             if not self.uploaded(r, target):
                 rows.append(('ref ' + r, 'FAIL', f'not uploaded for target {target}')); fail += 1
-            elif target == 'monid':
-                frows, ffail = self.monid_freshness(r, 'ref ' + r); rows += frows; fail += ffail
+            elif target in EXPIRING:
+                frows, ffail = self.url_freshness(r, 'ref ' + r, target); rows += frows; fail += ffail
             if r == start_image:
                 continue
             crows, cfail = self.content(r, 'ref ' + r); rows += crows; fail += cfail
@@ -380,6 +408,25 @@ def selftest():
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], target='monid')
         cases.append(('monid: a url lapsing inside the gen p95 WARNs but still passes',
                       ok and any(r[1] == 'WARN' and 'lapses in' in r[2] for r in rows)))
+        # --- target treg: the same expiry contract, minus the url's own fallback ---
+        os.remove(mpath)
+        tpath = os.path.join(d, 'treg-urls.json')
+        iso = lambda secs: time.strftime('%Y-%m-%dT%H:%M:%S.000000Z', time.gmtime(time.time() + secs))
+        tregged = lambda a, b: {'VISITOR-ref': 'https://treg.to/m/AAAAAAAAAAAAAAAAAAAAAAAA',
+                                'LOOK-warm': 'https://treg.to/m/BBBBBBBBBBBBBBBBBBBBBBBB',
+                                '_meta': {'VISITOR-ref': {'expires_at': iso(a)}, 'LOOK-warm': {'expires_at': iso(b)}}}
+        json.dump(tregged(6 * 24 * 3600, 6 * 24 * 3600), open(tpath, 'w'))
+        ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], target='treg')
+        cases.append(('treg: a LIVE hosted url passes', ok and any(r[1] == 'ok' and 'treg url good for' in r[2] for r in rows)))
+        json.dump(tregged(-60, 6 * 24 * 3600), open(tpath, 'w'))
+        ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], target='treg')
+        cases.append(('treg: an EXPIRED hosted url FAILS before the GO',
+                      not ok and any(r[1] == 'FAIL' and 'EXPIRED' in r[2] and 'treg_host.py' in r[2] for r in rows)))
+        t = tregged(6 * 24 * 3600, 6 * 24 * 3600); t['_meta']['VISITOR-ref'] = {}
+        json.dump(t, open(tpath, 'w'))
+        ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], target='treg')
+        cases.append(('treg: an UNRECORDED expiry FAILS (the opaque token carries none to fall back on)',
+                      not ok and any(r[1] == 'FAIL' and 'opaque token' in r[2] for r in rows)))
     for name, ok in cases: print(f"  {'ok  ' if ok else 'FAIL'} {name}")
     ok = all(v for _, v in cases); print(f"refs_gate selftest {'PASS' if ok else 'FAIL'}"); return 0 if ok else 1
 
@@ -391,7 +438,7 @@ def main():
     ap.add_argument('--ledger', help='ledger jsonl (default <root>/receipts/refs-gate.jsonl)')
     ap.add_argument('--prompt', help='prompt file to gate')
     ap.add_argument('--refs', default='', help='comma-separated reference NAMES in @Image order')
-    ap.add_argument('--target', default='hf', choices=['hf', 'kie', 'monid'])
+    ap.add_argument('--target', default='hf', choices=['hf', 'kie', 'monid', 'treg'])
     ap.add_argument('--start-image')
     ap.add_argument('--births', default='', help='roles born in this gen')
     ap.add_argument('--prose', default='', help='roles/subjects consciously left prose-only (LOOK = a prose-only light)')

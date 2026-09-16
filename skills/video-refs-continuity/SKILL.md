@@ -85,7 +85,12 @@ of an accepted still › a fresh still. Build in this order:
    campaign's life (product and person morphing across shots is the tell practitioners name first); a real arm's-length
    reference photo, upscaled first, is the community's heuristic for less morphing, and "generate the first take with no
    reference, then lock its frame 1 as the reference" is an UNVERIFIED heuristic (one account; mechanically plausible,
-   since Seedance re-renders frame 0) — test it on one shot before a shot list relies on it.
+   since Seedance re-renders frame 0) — test it on one shot before a shot list relies on it. **A recurring
+   character with no keeper and no client photo is the one reference that must be AUTHORED**, and an authored
+   identity is a lineage root: write it as a locked JSON prompt, save that JSON beside the frame it produced, and
+   register the frame with the JSON as its provenance. These routes carry no seed, so the prompt is the seed and
+   only its lack of freedom makes it one — [`references/REFERENCE-CONTRACT.md`](references/REFERENCE-CONTRACT.md)
+   § Generating an identity reference.
 5. **Product shape from the client's own photo** — single pieces cut out on grey, laid as the shot's own
    scatter (the model transfers the sheet's LAYOUT: a grid renders as rows). **Size from an
    in-world crop beside a known object** (a tie knot, a seated knee); a magnified sheet pins shape only
@@ -172,10 +177,8 @@ python3 scripts/refs_gate.py --root <project> --import CLIENT-PHOTO --file asset
 ```
 
 Each target has its own upload ledger, and the gate reads the one the call will use: `receipts/<NAME>-upload-id.txt`
-for `hf`, `refs-urls.json` for `kie`, `monid-urls.json` for `monid`. **`--target treg` does not exist yet** — wiring it
-into `refs_gate.py` is the open item. A treg reference is a `treg host` URL with a **7-day TTL**, so until the target is
-wired, record that url's `expires_at` beside the file and read it before the GO: the same expiry trap the monid lane
-already gates for, with none of the code behind it. A reference bound for monid is hosted on monid's own
+for `hf`, `refs-urls.json` for `kie`, `monid-urls.json` for `monid`, `treg-urls.json` for `treg`. A reference bound for
+monid is hosted on monid's own
 `sfs` store by `video-gen-cost-gate/scripts/monid_upload.py` at **$0.00** — and because a lapsed sfs URL is re-issued by a
 free `/cat` rather than re-uploaded, an expired link there costs nothing, unlike kie's ~24 h expiry. The same call also
 carries a privacy consequence the other targets do not: an sfs URL is fetchable by anyone who holds it until its `ttl`
@@ -184,6 +187,17 @@ not the default. **The gate checks that url's EXPIRY, not just its presence** �
 check and then cost the batch, because the model fetches it at generation time while the job bills at acceptance. Expiry is
 read locally from the recorded `expiresAt` or the url's own `?e=<unix>` (zero API calls); an expired url FAILS, one lapsing
 inside a generation's p95 WARNs, and the fix is free: `monid_upload.py --refresh <NAME> --go`.
+
+**A treg reference expires the same way and is checked the same way, with one fact reversed.** It is hosted by
+`video-gen-cost-gate/scripts/treg_host.py` at **$0.00** — hosting on treg is deliberately un-metered, a courtesy beside
+polling — and the url carries a **7-day TTL**. But `treg host` returns an OPAQUE token, not a signed url: nothing about
+the expiry is encoded in the link, so a treg reference whose expiry the ledger does not record **FAILS** where the same
+monid reference only WARNs, because monid's `?e=<unix>` can rebuild a lost ledger and treg's token cannot. The other
+reversal is the refresh: monid re-issues a link over bytes that never moved, while a treg refresh **re-uploads** and mints
+a NEW url — free in money, not free in treg's **300 MB per org per 24 h** quota (30 MB per file). `treg_host.py` counts
+the bytes it has hosted in that window and refuses before the server's 429, which arrives only after the upload has
+streamed. `treg_host.py --root <project> --verify` reads every recorded expiry at zero API calls; `--refresh --go` fixes
+what has lapsed.
 
 Rules live in `<project>/prompts/refs-required.json`
 ([template](references/refs-required.example.json)): each element the prompt matches needs its reference

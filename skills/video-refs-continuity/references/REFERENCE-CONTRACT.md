@@ -84,6 +84,65 @@ never against other prose — consistency between documents is not evidence.
   set is built, and never pass a real person's photo — crops of OUR keepers only.
 - **A likeness check on cast refs:** a character who resembles a public figure is re-rolled before it ships.
 
+## Generating an identity reference — the locked JSON is the seed these routes do not have
+
+The order of preference above puts a fresh still LAST, and this section is for that last resort: a
+character the campaign will reuse who has no keeper and no client photo behind them. Everything else
+derives; this one has to be *authored*, and an authored identity is a lineage ROOT — so it must be
+re-generable after the output URL has lapsed and the frame is the only copy left. None of the image
+routes carry a seed, so the prompt IS the seed, and the only thing that makes it one is how little
+freedom it leaves. **Write it as JSON, save it beside the frame it produced, and register the frame with
+the JSON as its provenance.** A frame whose prompt was prose cannot be regenerated; it can only be
+re-rolled, which is a new character.
+
+**Lock every variable, because an unlocked one is a variable the model chooses.** One concrete value per
+attribute — never "or", never a range ("20–30"), never "natural-looking" without the specifics. Quantify
+what can be quantified: degrees for head turn and tilt, cm for distances, mm for small detail (liner
+flick, nail length, chain thickness), % for framing and headroom, counts for countable things, **a hex for
+every colour**. Left and right are the subject's; frame positions are "frame left". Small items sit at an
+anatomical landmark ("2 cm below the collarbones"), never "on the chest".
+
+**Lock ABSENCE, twice.** Anything a model might add that the reference does not contain is stated as
+`"none"` *and* listed in the negative prompt: glasses, hat, earrings, bag, a second person, text, logos,
+props, tattoos elsewhere. An absence stated once, positively, is not locked.
+
+**One anchor image sets pose, framing, lighting, camera and aspect; every other image refines identity
+only.** On a conflict, trust the sharpest, most frontal, least compressed evidence — motion blur,
+compression and lens distortion are properties of the capture, not traits of the person.
+
+**Counter the model's default prior explicitly, or the deviation is ignored.** Image models pull every
+person toward a default attractive face, and any trait that differs from it is quietly discarded unless
+it is escalated in all three places at once: described geometrically in its own field, restated as a
+one-line imperative constraint, and its default-prior version added to the negative list. The axes worth
+walking every time are eye shape and lid, face shape and symmetry, build, clothing COVERAGE, hair volume
+and gloss, skin texture, stance, overall "look", background saturation, and unrequested additions.
+Counter-steer toward the reference's own features, never toward plainness: a glamorous reference is
+described faithfully, not flattened.
+
+**De-slop in the same pass, always.** Quality boosters ("8K", "ultra-detailed", "masterpiece", "sharp
+focus", "flawless") belong in the NEGATIVE list, never the positive fields. A capture pipeline — body,
+lens, aperture, ISO, codec or film stock — replaces every adjective about quality. Imperfections are
+present and LOCATED (skin micro-texture, facial asymmetry, hair clumps, fabric creases, sensor noise),
+because an imperfection that is not located is random. Grading stays flat, sharpening stays off, and the
+constraint list ends by naming the medium the image must read as — an unretouched real capture, never a
+render.
+
+**Iterating is a variable audit, not a patch.** When a generated frame misses, diff it against the
+reference across the WHOLE list, not only the trait that was named: every difference means some variable
+was under-locked, and the fix is to split that field into finer sub-fields with more geometry, strengthen
+its constraint line, and add the drifted appearance to the negatives. Output the complete JSON with its
+version bumped, even for a one-field change — a patch that lives only in the conversation is lost the
+moment the session ends, and the frame it produced then has no provenance.
+
+**Two boundaries.** Never put a real person's name, a celebrity comparison or "looks like X" in the JSON —
+appearance descriptors only, and never an inferred nationality or religion. And an authored JSON locks a
+consistent ORIGINAL character, never a verified identity: a real person's likeness is a routing fact with
+its own rights path (SKILL.md § 2), not something a prompt can assert.
+
+Method adapted from `portrait-clone` (superdesigndev/treg, Apache-2.0), read 2026-09-16; its full field
+schema is the floor, and the corpus rules above — one subject per reference, the role line, the preserve
+list — still govern how the resulting frame is CITED.
+
 ## Look plates — light and palette as a reference
 
 A **look plate** is an abstract full-frame field of colour and light with no subject — a golden hour, a

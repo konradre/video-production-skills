@@ -165,6 +165,9 @@ python3 scripts/gen_video_fal.py --root <project> --prompt-file … --engine see
 python3 scripts/monid_upload.py --root <project> --batch 'references/*.png' --go   # sfs, $0.00, idempotent
 python3 scripts/monid_upload.py --root <project> --verify        # ONE recursive /ls for the whole set
 python3 scripts/monid_upload.py --root <project> --refresh --go  # re-issue lapsed urls, moves no bytes
+python3 scripts/treg_host.py --root <project> --batch 'references/*.png' --go     # treg.to, $0.00, idempotent
+python3 scripts/treg_host.py --root <project> --verify           # every recorded expiry, zero API calls
+python3 scripts/treg_host.py --root <project> --refresh --go     # RE-UPLOADS: a new url, and it spends quota
 python3 scripts/monid_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \
     --mode t2v|i2v|flf|r2v --duration 7 --refs ROOM,W1 --resolution 480p --ratio 9:16 [--go]
 ```
@@ -174,7 +177,8 @@ cost, parses the venue's reply shape-safely (Higgsfield `generate create --json`
 job ids), writes the raw reply to `receipts/raw/`, appends a ledger record per seed BEFORE polling,
 and detaches the poller. Reference names resolve through `receipts/<NAME>-upload-id.txt`
 (`scripts/hf_upload.py`), `refs-urls.json` (`scripts/kie_upload.py`, which MERGES — an overwrite once
-dropped eleven live URLs) or `monid-urls.json` (`scripts/monid_upload.py`, which merges the same way); a
+dropped eleven live URLs), `monid-urls.json` (`scripts/monid_upload.py`, which merges the same way) or
+`treg-urls.json` (`scripts/treg_host.py`, which merges and re-hosts); a
 raw UUID or a raw URL is refused because the gate must see a name. kie URLs expire in
 about 24 h ("Image fetch failed" = expired, billed 0 → re-upload). A prompt over 5000 chars is warned
 (6629 worked; 7840 was trimmed); on monid 6000 is the endpoint's own cap and `monid_submit.py` refuses
