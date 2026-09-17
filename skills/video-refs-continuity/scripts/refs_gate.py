@@ -444,7 +444,7 @@ def main():
     ap.add_argument('--ledger', help='ledger jsonl (default <root>/receipts/refs-gate.jsonl)')
     ap.add_argument('--prompt', help='prompt file to gate')
     ap.add_argument('--refs', default='', help='comma-separated reference NAMES in @Image order')
-    ap.add_argument('--target', default='hf', choices=['hf', 'kie', 'monid', 'treg'])
+    ap.add_argument('--target', default='hf', choices=['hf', 'hfapi', 'kie', 'monid', 'treg'])
     ap.add_argument('--start-image')
     ap.add_argument('--births', default='', help='roles born in this gen')
     ap.add_argument('--prose', default='', help='roles/subjects consciously left prose-only (LOOK = a prose-only light)')

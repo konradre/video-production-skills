@@ -100,8 +100,18 @@ def bytes_last_24h(led):
 def host_one(led, root, src, name, force, go):
     """-> (status, note). Idempotent: a recorded name whose file has not changed and whose url has more
     than a day left is left alone, because a re-host would spend quota to produce an identical reference."""
+    if not os.path.isfile(src) and not os.path.isabs(src):
+        # A relative path is resolved against --root as well as the cwd, because every OTHER uploader in
+        # this skill (hf_api_upload.py, monid_upload.py, kie_upload.py) joins against the root and a caller
+        # reasonably expects the same here. Resolving cwd-only produced 'no file at references/X.jpg' for a
+        # file that plainly existed under --root, which reads like a missing file rather than a path bug
+        # (2026-09-18). The cwd is tried FIRST so no existing caller changes behaviour.
+        alt = os.path.join(root, src)
+        if os.path.isfile(alt):
+            src = alt
     if not os.path.isfile(src):
-        return 'ERR', f'no file at {src}'
+        return 'ERR', (f'no file at {src}' if os.path.isabs(src) else
+                       f'no file at {src} — tried the cwd and {os.path.join(root, src)}')
     size = os.path.getsize(src)
     if size > MAX_BYTES:
         return 'ERR', f'{size} bytes; treg refuses anything over {MAX_BYTES} (30 MB) — downscale it first'
