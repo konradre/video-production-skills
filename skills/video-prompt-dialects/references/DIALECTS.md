@@ -35,6 +35,9 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
 - **Modes**: `t2v` · `omni_reference` (r2v: start image + ≤30 image refs + ≤10 video refs + ≤10 audio, ≤50
   total — on Higgsfield; fal splits i2v and r2v into two endpoints that cannot be mixed) · `video_edit` ·
   `video_extension` (`--extension_mode forward`, the keeper's job id as the video reference).
+  On **fal** all three reference modes are the ONE `reference-to-video` endpoint selected by a `task` enum
+  (`reference` / `editing` / `extension`); `editing` coerces `aspect_ratio` and `duration` to `auto`,
+  `extension` coerces `aspect_ratio`. There is no separate edit or extend path there (VENUES.md § Video).
 - **Addressing**: `@Image1 @Video1 @Audio1`, numbered per type in upload order — verify the order before
   citing; emit `@Image1` without a space. The start image is passed on its own flag and referred to as
   "the start frame".
@@ -61,7 +64,9 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
 - **Supplied-audio polarity**: when `@AudioN` carries the words they must NOT appear in the prompt at all —
   direct the lip-sync to the asset and forbid replacement speech. Text-authored lines are quoted. Written
   dialogue beats reference audio (the audio supplies timbre only) unless the user asks to reuse the words.
-- **Edit / extend are phrasing, not flags**: `Video edit: … @Video1 is the sole editing master … Except
+- **Edit / extend are phrasing, not flags — and on fal they are BOTH**: the `task` enum tells the gateway which
+  mode to bill and which fields to coerce, and the prompt still has to tell the MODEL what to do. Setting the
+  flag without the wording below still generates a NEW video. `Video edit: … @Video1 is the sole editing master … Except
   for the objects explicitly modified above, all other visible characters, props and background elements
   in @Video1 remain unchanged` (the scope-closure sentence is mandatory); `Extend @Video1 forward. The first
   frame of the extended segment directly continues from the final frame of @Video1 …` + the single-instance

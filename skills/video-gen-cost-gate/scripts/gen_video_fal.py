@@ -41,6 +41,11 @@ ENGINES = {
         "rates": {"480p": 0.2205, "720p": 0.4730, "1080p": 1.164},
         "res_default": "480p",
         "duration_range": (4, 30),
+        # fal's own schema, read free 2026-09-17. The TOTAL is the cap the vendor states in prose
+        # ("total files across all modalities must not exceed 50"); the per-array caps are stated
+        # there too. 2.5 states them in PROSE ONLY — the arrays carry no maxItems — so nothing but
+        # this check stops an over-cap body reaching the runner and failing after the queue accepts it.
+        "ref_caps": {"image": 30, "video": 10, "audio": 10, "total": 50},
     },
     "h3": {
         # H3 has no i2v-with-references split; r2v carries images, videos and audio.
@@ -51,6 +56,10 @@ ENGINES = {
         "res_default": "768P",
         "res_floor": ("480P",),
         "duration_range": (5, 15),   # hard, per fal's own OpenAPI schema
+        # Re-read 2026-09-17: the combined 12 is right ("must add up to at most 12 files"), but each
+        # array carries a REAL maxItems that is tighter, and checking the total alone lets 12 images
+        # through our gate for fal to reject.
+        "ref_caps": {"image": 9, "video": 3, "audio": 3, "total": 12},
     },
 }
 
@@ -140,9 +149,17 @@ def main():
             sys.exit("--mode r2v needs --refs")
         srcs = [Path(x.strip()) for x in a.refs.split(",") if x.strip()]
         vids = [Path(x.strip()) for x in (a.ref_videos or "").split(",") if x.strip()]
-        cap = 12 if a.engine == "h3" else 30
-        if len(srcs) + len(vids) > cap:
-            sys.exit(f"{a.engine} r2v takes at most {cap} reference files; got {len(srcs)+len(vids)}")
+        caps = eng["ref_caps"]
+        # PER-ARRAY first, then the total. The total alone is not the vendor's rule: fal caps each
+        # modality separately AND caps their sum, and a body inside the sum can still be over on one
+        # array. The queue accepts any body and validates on the runner, so a cap missed here surfaces
+        # as a COMPLETED-then-422 long after the submit looked fine.
+        for n, kind in ((len(srcs), "image"), (len(vids), "video")):
+            if n > caps[kind]:
+                sys.exit(f"{a.engine} r2v takes at most {caps[kind]} {kind} references; got {n}")
+        if len(srcs) + len(vids) > caps["total"]:
+            sys.exit(f"{a.engine} r2v takes at most {caps['total']} reference files in total; "
+                     f"got {len(srcs)+len(vids)}")
     for p in srcs + vids:
         if not p.exists():
             sys.exit(f"missing: {p}")
