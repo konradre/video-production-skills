@@ -147,8 +147,14 @@ def tokens_ceiling(resolution, gen_s, in_s=0.0):
     `W × H × fps × seconds ÷ 1024` was measured SHORT BY EXACTLY ONE FRAME — a 4 s clip returns 97
     frames, not 96, because 4.0416667 s = 97/24 — and only a real receipt found it. Higgsfield's
     wording carries no such frame, and its own list price reproduces the no-extra-frame figure to four
-    decimals ($0.2057/s at 480p), so the plain form above is the headline. This is the ceiling the GO
-    is safe against until a Higgsfield receipt settles which one bills: one extra frame, W×H/1024
+    decimals ($0.2057/s at 480p), so the plain form above stays the headline.
+
+    🔴 A HIGGSFIELD TAKE NOW SHOWS THE SAME EXTRA FRAME IN ITS OUTPUT (2026-09-18): a 4 s 480p request
+    returned `nb_frames=97`, `duration=4.041667` — 97/24 exactly. That raises this arm from an analogy
+    to evidence, and it is still NOT proof of the BILLING basis: the frame count is what can be
+    measured, and with no balance endpoint there is nothing to read back that says which basis was
+    charged. 96 frames = 38,430 tok = $0.5757 net; 97 = 38,830 = $0.5817. Quote the ceiling, and let a
+    receipt — not a frame count — be what finally settles it. The gap is one extra frame, W×H/1024
     tokens, ≈ 1 % on a 4 s take and ≈ 0.14 % on a 30 s one."""
     w, h = RASTER[resolution]
     n = 0 if (float(in_s) + float(gen_s)) <= 0 else 1
