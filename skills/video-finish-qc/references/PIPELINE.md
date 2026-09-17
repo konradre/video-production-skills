@@ -46,13 +46,21 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
   timeout above the job; a Bash-backgrounded run dies at 10 min. Poll the log on demand. **A missing
   completion sentinel = failure whatever the file size** — a truncated mezzanine silently shortens the
   deliverable. Nothing else touches that GPU while it runs.
-- **The hero pass**: Resolve open with a PROJECT loaded (not the project picker) and Workspace › Scripts ›
-  resolve_bridge started BY THE OPERATOR (it runs silently — check the port, not a window); an agent-launched
-  Resolve refuses external scripting — the refusal is scoped to WHO LAUNCHED Resolve, not to the transport, so
-  against an operator-launched instance external scripting (Local) is reliable and the bridge is the deterministic
-  fallback rather than a requirement (measured on Studio 21.0.2.4, 2026-09-14; the lib and the running Resolve may
-  differ by major version). One clip per call, one render job at a time, fresh timeline names. "external scripting refused" = the bridge is
-  down → stop and ask the operator to reopen it, then retry. The media pool caches paths: a re-imported
+- **The hero pass**: **Resolve 21** open with a PROJECT loaded (not the project picker), driven on
+  **`--transport auto`** — the ladder tries Local external scripting first and falls through to the in-app
+  bridge (Workspace › Scripts › resolve_bridge; it runs silently, so check the PORT, never a window).
+  **Never pin `--transport local`: it `die()`s rather than falling through**, so a transport that is merely
+  unavailable reads as a hard failure. **Local's availability is NOT predictable from who launched Resolve.**
+  An earlier reading — that the refusal is scoped to WHO LAUNCHED the instance — was refuted: a human-launched
+  Studio 21 with a project open refused `scriptapp("Resolve")` under both an 18.5 and the portable 21's own
+  `RESOLVE_SCRIPT_LIB`, while the in-app bridge answered and `auto` rendered. What differed was the LAUNCHER —
+  a portable Resolve started through its own launcher installs the sandbox junctions that redirect
+  `%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve` at the portable's tree, and a direct `Resolve.exe` start
+  does not. Treat Local as the preferred rung and the bridge as the one that always answers; let `auto` decide
+  per run. **Diagnose before escalating** — a scripting probe answers "is it reachable, and on what project"
+  for free, and the window title names the open project; process memory size is not evidence about whether a
+  project is open. One clip per call, one render job at a time, fresh timeline names. The media pool caches
+  paths: a re-imported
   path returns an empty list and a render of the OLD duration — fresh filenames per version.
 - **Heroes of equal frame count have identical byte sizes** (DNxHR) — verify distinctness by frame hash
   (`hero_distinct.py`) before trusting a listing.

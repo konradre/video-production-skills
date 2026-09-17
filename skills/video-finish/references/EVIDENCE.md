@@ -185,7 +185,7 @@ Aspect ratio matters — **do not carry a benchmark across it.** Multiply by `du
 a 90-second 24 fps cut is ~2,150 frames, so roughly 3.3 hours at the landscape rate. VRAM sat at
 **92%** of 11 GB throughout.
 
-## DaVinci Resolve — render codecs, and the call that hides them (Studio 18.5)
+## DaVinci Resolve — render codecs, and the call that hides them (measured on Studio 18.5; carries forward to 21)
 
 🔴 **`Project.GetRenderCodecs()` takes the format's EXTENSION — the dict VALUE from
 `GetRenderFormats()` — never the display KEY.** Addressed by key it returns an empty dict for most
@@ -210,8 +210,9 @@ extension first.**
 - The edition is confirmed by `Resolve.GetProductName()` → `"DaVinci Resolve Studio"`. Ask the API,
   never infer the edition from which codecs appear.
 - **External scripting being refused is not an edition signal either.** On this Studio install
-  `scriptapp("Resolve")` returns `None` while the in-app bridge connects fine — the documented cause
-  is an agent-launched Resolve instance, unrelated to licensing.
+  `scriptapp("Resolve")` returns `None` while the in-app bridge connects fine. It is unrelated to
+  licensing — and the cause is **not** simply an agent-launched instance; see § DaVinci Resolve 21
+  below, where a human-launched Studio 21 refused it too.
 - The bridge transport is **not** lossy for this call: bridge-by-extension returns all 60/75 codecs.
 
 **Practical consequence:** on Studio, prefer **ProRes 422 HQ in `mov`** for a graded mezzanine — 10-bit
@@ -229,6 +230,50 @@ against an unpadded render of the same grade, versus **22.34 dB** at `x=8`. Carr
 89.39 s / 2145 frames at 3416×1920, one Dehancer `.drx` grade (2 nodes), to CineForm 10-bit:
 **227.6 s (3.8 min), 6.91 GB.** A 1-second smoke of the same chain took 3.7 s — so the smoke
 over-predicted the full run by ~45%, which is the right direction to be wrong in.
+
+## DaVinci Resolve 21 — the default baseline, and how to choose a transport
+
+**Resolve 21 is the version this kit targets.** A look library authored on 18.5 needs **no rework**:
+
+- **`.drx` authored on 18.5 apply unchanged** — the files carry an 18.5 `DbAppVer` and
+  `ApplyGradeFromDRX` succeeds on 21 with no migration step.
+- **Dehancer Pro 7.4 instantiates and renders clean.** Prove it from the node graph, not the eye:
+  `GetToolsInNode(2)` naming the OFX entry is the proof. 21 sits inside the 7.4 Setup Guide's
+  "19 and later", where 18.5 was only its "may work on earlier".
+- **The Graph object is reachable** (it arrives in 19): `GetNumNodes`, `GetToolsInNode`,
+  `GetLUT`/`SetLUT`, `ApplyGradeFromDRX`. Replacement-only — there is no append mode on any version.
+
+🔴 **`fusionscript.dll` and the running Resolve may differ by major version.** An 18.5
+`RESOLVE_SCRIPT_LIB` has driven a 21 instance with no error, so a version mismatch is not the first
+thing to chase when a connection fails.
+
+🔴 **Do not predict which transport will work — use a ladder.** A reading that scoped the
+external-scripting refusal to *who launched Resolve* was refuted: a human-launched Studio 21 with a
+project open returned `None` from `scriptapp("Resolve")` under both an 18.5 and the portable 21's own
+`RESOLVE_SCRIPT_LIB`, while the in-app bridge answered and `--transport auto` rendered normally.
+
+**What actually varies is the LAUNCHER.** A portable Resolve started through its own launcher installs
+sandbox junctions that redirect `%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve` at the portable's
+tree; started directly from the inner `Resolve.exe` those junctions are absent and the scripting paths
+resolve to whatever major version is *installed*. The `External scripting using` preference is not
+stored as plain text, so it cannot be read off disk either.
+
+**Doctrine.** Drive the hero pass on **`--transport auto`**: Local external scripting first, the in-app
+bridge as the fallback. **`--transport local` calls `die()` instead of falling through**, so it must
+never be the house flag — pinning it once turned an available bridge into a reported blocker. And
+**diagnose before escalating**: a scripting probe answers "is it reachable, and on what project" for
+free, the window title names the open project, and the bridge is a listening port rather than a window.
+Process memory size is not evidence about whether a project is open.
+
+🔴 **The API has no call that ADDS an OFX to a node.** The graph surface is `GetNumNodes`,
+`GetLUT`/`SetLUT`, `GetNodeLabel`, `GetToolsInNode`, `SetNodeEnabled`, `ApplyGradeFromDRX`,
+`ApplyArriCdlLut`, `ResetAllGrades` — none instantiates a plugin. An OFX reaches a node only by a UI
+click or inside a `.drx`. A plugin listed in `OFXPluginCacheV2.xml` with `status="0"` was **scanned**,
+which is not the same as loaded; the node-graph read-back is the only proof it instantiated.
+
+🔴 **Never grep a `.drx` for a plugin name — it false-negatives.** `<Body>` is hex-encoded ASCII;
+decoded it starts `0x81` then the zstd magic `28 b5 2f fd`. Every library look carries
+`com.dehancer.film_pro.v7`, and `grep dehancer` matches none of them.
 
 ## Hard-cap variant — the worked budget (Discord 50 MB)
 

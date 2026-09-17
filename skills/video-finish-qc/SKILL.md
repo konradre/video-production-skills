@@ -56,9 +56,14 @@ python3 ~/.claude/skills/video-finish-qc/scripts/hero_distinct.py edit/hero/<A>_
 
 - The local upscale runs **detached**, every path absolute, a timeout above the job; poll the log, never
   follow it; **a missing sentinel is a failure whatever the file size**. Nothing else uses that GPU.
-- The hero pass needs Resolve open with a PROJECT and the bridge started **by the operator**; one clip
-  per call, one job at a time, fresh names ("external scripting refused" = bridge down → stop, ask,
-  retry). Heroes of equal length have identical byte sizes — distinctness by frame hash.
+- The hero pass needs **Resolve 21** open with a PROJECT, and runs on **`--transport auto`**: Local
+  external scripting first (the Studio-native path, no in-app script needed), the in-app bridge as the
+  fallback. **Never pass `--transport local` — it calls `die()` instead of falling through**, which
+  turns a recoverable transport miss into a hard stop. One clip per call, one job at a time, fresh
+  names. A connection error is DIAGNOSED before anyone is asked to touch Resolve: a scripting probe
+  answers "is it reachable" for free, the window title names the open project, and the bridge is a
+  listening PORT, not a window. Heroes of equal length have identical byte sizes — distinctness by
+  frame hash.
 - Hosted jobs log their request id before polling and re-attach with `--resume`; a billed job is never
   resubmitted; the receipt keeps both billing reads.
 - Probe every mezzanine (`yuv422p10le`, the raster, the frame count) and look at 3–4 frames after each of

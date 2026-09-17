@@ -62,7 +62,7 @@ there, never a pass/fail threshold on a different generator, raster or genre. Th
 
 | what moves | the skills' default | re-derive from | where it lives |
 |---|---|---|---|
-| the finishing stack | Topaz (local Rhea, hosted Starlight), then Resolve + Dehancer over a bridge the operator starts | another upscaler or grading stack keeps the ORDER and replaces the arm (`upscale_local.sh`, `hero_pass.sh`) | `video-finish`, `video-finish-qc` § 2 |
+| the finishing stack | Topaz (local Rhea, hosted Starlight), then Resolve 21 + Dehancer on the `auto` transport (Local first, in-app bridge as the fallback) | another upscaler or grading stack keeps the ORDER and replaces the arm (`upscale_local.sh`, `hero_pass.sh`) | `video-finish`, `video-finish-qc` § 2 |
 | a local GPU | the scene proxy's server, local H3, the local upscale | without one: the proxy fails closed ("no scene proxy for this shot"), local H3 is off, the upscale goes hosted through a cost line | `video-refs-continuity` § 1, VENUES.md, `video-finish` § 2 |
 | the render host for designed elements | a GPU VM (headless Chromium hangs under WSL2) | any host where the composition renders headless at its declared raster (Node ≥ 22) | `designed-elements` § 3 |
 | transcription | local faster-whisper, free; Scribe billed per minute | the machine and the language; a billed engine goes through the cost line | `spot-audio-assembly` § 5 |

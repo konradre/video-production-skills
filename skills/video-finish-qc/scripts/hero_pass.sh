@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # hero_pass.sh — the Resolve + Dehancer hero pass on already-upscaled mezzanines, ONE clip per call, through the resolve-pass
-# tool over the in-app bridge. Resolve must be open with a PROJECT loaded and Workspace › Scripts › resolve_bridge started
-# by the operator (an agent-launched Resolve refuses external scripting; "external scripting refused" = the bridge is down —
-# stop and ask the operator to reopen it, then retry). Never parallelise render jobs. Output: <out-dir>/<stem>__<look>.mov
+# tool. Resolve 21 must be open with a PROJECT loaded. The transport DEFAULTS TO auto: Local external scripting first, the
+# in-app bridge (Workspace › Scripts › resolve_bridge, a listening port rather than a window) as the fallback. NEVER pass
+# --transport local: it die()s instead of falling through, so an unavailable rung reads as a hard failure. On a connection
+# error DIAGNOSE first — a scripting probe answers "is it reachable" for free, and the window title names the open project —
+# before asking anyone to touch Resolve. Never parallelise render jobs. Output: <out-dir>/<stem>__<look>.mov
 # (DNxHR HQX 10-bit 4:2:2 by default). Sentinel HERO-PASS-END.
 #
 #   hero_pass.sh --root <project> --look ads-clean [--in-dir edit/upscale-out] [--out-dir edit/hero] [--codec DNxHR_HQX] [--format mov]
