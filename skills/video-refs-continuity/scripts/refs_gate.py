@@ -45,12 +45,17 @@ the prompt does not need competes with the ones it does.
 import argparse, hashlib, json, os, re, subprocess, sys, tempfile, time
 
 # One upload ledger per target. `hf` has none: it writes receipts/<NAME>-upload-id.txt per reference.
-LEDGERS = {'kie': 'refs-urls.json', 'monid': 'monid-urls.json', 'treg': 'treg-urls.json'}
+LEDGERS = {'kie': 'refs-urls.json', 'monid': 'monid-urls.json', 'treg': 'treg-urls.json',
+           'hfapi': 'hf-api-urls.json'}
 # Targets whose reference url LAPSES, so the gate reads its expiry before the GO. The value is
-# whether an unrecorded expiry can be recovered from the url itself: monid signs with `?e=<unix>`,
-# treg mints an opaque token that says nothing. No recovery ⇒ an unrecorded expiry FAILS.
-EXPIRING = {'monid': True, 'treg': False}
-REFRESH = {'monid': 'monid_upload.py', 'treg': 'treg_host.py'}   # the free fix, named in the FAIL row
+# whether an unrecorded expiry can be resolved WITHOUT paying for it: monid signs with `?e=<unix>`
+# so the url answers the question itself; the Higgsfield API signs its upload `x-amz-tagging:
+# retention=temporary` and states no window at all, but a HEAD on the public url is free, so the
+# unknown converts to a fact at zero cost. treg has neither — an opaque token and no free probe — so
+# there an unrecorded expiry FAILS. No free route to the answer ⇒ FAIL; a free route ⇒ WARN naming it.
+EXPIRING = {'monid': True, 'treg': False, 'hfapi': True}
+REFRESH = {'monid': 'monid_upload.py', 'treg': 'treg_host.py',
+           'hfapi': 'hf_api_upload.py'}                         # the free fix, named in the FAIL row
 
 CAPS = re.compile(r'\b[A-Z][A-Z0-9]{1,}\b')
 DEFAULT_TAKE_RE = r'^S\d\d-[A-Z0-9]+(-v\d+)?-s\d+$'   # a generated take id — a root that continues a scene
@@ -149,7 +154,8 @@ class Gate:
                 left = int(m.group(1)) - time.time()
         if left is None:
             if EXPIRING.get(target):
-                return [(f'{label} url', 'WARN', 'no expiry recorded — run monid_upload.py --verify')], 0
+                return [(f'{label} url', 'WARN',
+                         f'no expiry recorded — free check: {REFRESH[target]} --root <project> --verify')], 0
             return [(f'{label} url', 'FAIL',
                      'no expiry recorded, and a `treg host` url is an opaque token that carries none — '
                      f'nothing local can say whether it still resolves. Free fix: treg_host.py --root <project> '

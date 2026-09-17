@@ -236,7 +236,26 @@ python3 scripts/treg_host.py --root <project> --verify           # every recorde
 python3 scripts/treg_host.py --root <project> --refresh --go     # RE-UPLOADS: a new url, and it spends quota
 python3 scripts/monid_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \
     --mode t2v|i2v|flf|r2v --duration 7 --refs ROOM,W1 --resolution 480p --ratio 9:16 [--go]
+python3 scripts/hf_api.py quote --resolution 720p --duration 8 --seeds 3   # COMPUTED, free, no network
+python3 scripts/hf_api.py balance                                # the wallet — its ONLY copy, see below
+python3 scripts/hf_api_upload.py --root <project> --batch 'references/*.png'   # free; mp3 → WAV here
+python3 scripts/hf_api_upload.py --root <project> --verify       # free HEAD per url; the lifetime check
+python3 scripts/hf_api_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \
+    --mode t2v|i2v|r2v|edit|extend --duration 8 --refs ROOM,W1 [--audio VO] [--video-refs ORBIT] \
+    [--source <keeper URL>] [--input-seconds N] --resolution 480p|720p [--model h3] [--go]
 ```
+
+**The Higgsfield API is the one venue that hands back NO price, so the gate computes one.** `/estimate`
+answers a token-metered model with `{"type":"description","pricing_description":"<formula>"}` and no
+number at all — so `hf_api.py` carries the formula (`ceil((in_s + gen_s) × W × H × 24 ÷ 1024) × rate`),
+quotes LIST beside NET because the launch discount is dated and expiring, and prints the `+1 frame`
+ceiling because ByteDance's published formula was measured short by exactly one frame on monid and no
+Higgsfield receipt has settled which one bills here. **It is also the one venue with NO balance
+endpoint** (`higgsfield account status` reports the frozen PLAN wallet, a different account), so
+`hf_api.py`'s ledger — `$HF_API_LEDGER`, default `~/.local/state/higgsfield-api/ledger.json` — is the
+only copy of that wallet that exists: `hf_api_submit.py` writes a spend at acceptance and
+`hf_api_poll.py` writes the matching refund for a `failed` / `nsfw` / cancelled request, which are not
+charged. An unrecorded spend there is not untracked but **unknowable**.
 
 Dry run by default; `--go` spends. Each path runs the refs gate first and holds on FAIL — a priced warning an
 explicit GO overrides, never a silent or unoverridable stop (§ 0) — prints the
