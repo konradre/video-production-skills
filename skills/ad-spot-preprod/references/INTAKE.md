@@ -81,7 +81,7 @@ hand mid-phase. What each stage becomes:
 
 | stage | with generated footage | with the client's footage |
 |---|---|---|
-| the sources | the generator's native raster, known | every clip probed for its DISPLAY shape first (`video-production/scripts/probe_sources.py`: SAR, rotation, bit depth, audio) and normalised before any crop; a word-timed transcript of every clip, whole; a timecoded keeper sheet per clip (`video-take-review` § 1) |
+| the sources | the generator's native raster, known | every clip probed for its DISPLAY shape and frame rate first (`video-production/scripts/probe_sources.py`: SAR, rotation, bit depth, audio) and normalised before any crop; the frame-rate conform chosen against its printed motion cost, the originals kept until the cut is locked (`video-production/scripts/conform_cfr.py --plan`); a word-timed transcript of every clip that speaks, whole; every clip broken down and read whole (`video-take-review/scripts/footage_intake.py`) |
 | the SSOT | the client's script | the client's script when there is one; otherwise the brief's message lines and CTA, saved verbatim, and the on-screen words diffed against THEM — the footage's own speech is heard, never captioned as the message |
 | the beats | one per script line | one per message line or per footage moment the operator picked, in the order the operator gave; markers measured on the clips |
 | the generator's cap | read from the vendor before the shot list | not applicable — the cap is each clip's own length and its internal cuts |
@@ -96,3 +96,10 @@ hand mid-phase. What each stage becomes:
 Two shapes of this job exist: a brief with no script (the operator's direction is the SSOT, saved verbatim as dated notes)
 and a script over supplied footage (the script is the SSOT and the footage is the coverage). Both keep the order: sources
 probed → transcripts → beats from the SSOT → keepers → the checkpoint → the build.
+
+**How the keepers are chosen is its own procedure — [`FOOTAGE-CURATION.md`](FOOTAGE-CURATION.md):** the pack de-duplicated
+by hash; the frame-rate decision with its cost in pixels; per clip a record, three tiers of sheet and a written read; the
+pack grouped into camera routes; picture slots measured from the programme audio; candidate windows read through the
+delivery crop; relevance to the words, then looks, then no route + subject twice; the plan file, a labelled proxy over the
+mix and its cut-check sheet; the operator's pick. A requested visual that is not in the pack is reported as missing — the
+operator decides whether to ask the client; nothing generated or borrowed stands in for it.

@@ -7,7 +7,8 @@ description: >
   continuity, the script diff), the risk register and the cost plan. Use when a campaign or spot is briefed, a
   client script arrives or changes, the next spot must be chosen, or a shot list or cost plan is needed. Triggers
   — "the brief", "the client's script", "shot list", "which spot next", "what does the script call for", "cost
-  plan", "kit for this SKU", "risk register", "the alternate spec", "a UGC spot", "creator-style ad". Not for a film or a music video — use
+  plan", "kit for this SKU", "risk register", "the alternate spec", "a UGC spot", "creator-style ad", "the client's
+  footage", "which clips do we use", "pick the b-roll". Not for a film or a music video — use
   film-preprod. Not for the reference set or the refs gate — use video-refs-continuity. Not for the cost line and
   the submit — use video-gen-cost-gate. Not for the beat gate or the EDL — use video-edit-edl.
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash(python3*), Bash(ls*)
@@ -128,7 +129,11 @@ python3 ~/.claude/skills/video-production/scripts/script_diff.py --script prompt
   with the reason — the sources probed for their DISPLAY shape and transcribed whole first, the beats from the client's text
   or the brief's message lines, the shot list as a keeper list with a microphone-position column, the scaffold as
   `--spot-type ugc` with the gens table, the refs gate and the fill marked N/A in the header:
-  [`references/INTAKE.md`](references/INTAKE.md) § Existing footage.
+  [`references/INTAKE.md`](references/INTAKE.md) § Existing footage. **Choosing the shots out of the client's pack is a
+  phase with its own procedure** — the frame-rate decision with its motion cost stated first, every clip broken down and
+  read whole, the pack grouped into camera ROUTES (no route + subject twice), picture slots measured from the programme
+  audio's phrases, candidate windows read at the delivery shape, relevance to the words before looks, a labelled proxy
+  over the mix for the operator's pick: [`references/FOOTAGE-CURATION.md`](references/FOOTAGE-CURATION.md).
 - **A UGC / creator-style spot** (`--spot-type ugc`, phone-shot or generated — a person talking to the camera): the grammar
   is [`references/UGC-GRAMMAR.md`](references/UGC-GRAMMAR.md) — the intake axes (AOV band, funnel stage, platform, real or
   synthetic persona, phone-shot or generated), the hook core, the archetypes, the beats by duration with REAL proof
@@ -196,7 +201,8 @@ plan is saved in the project with its path in the ask.
 
 ## Cross-references
 
-- [`references/INTAKE.md`](references/INTAKE.md) · [`references/GLOBAL-SPEC.md`](references/GLOBAL-SPEC.md) ·
+- [`references/INTAKE.md`](references/INTAKE.md) · [`references/FOOTAGE-CURATION.md`](references/FOOTAGE-CURATION.md) ·
+  [`references/GLOBAL-SPEC.md`](references/GLOBAL-SPEC.md) ·
   [`references/SHOTLIST-CONTRACT.md`](references/SHOTLIST-CONTRACT.md) · [`references/RISKS.md`](references/RISKS.md).
 - `video-edit-edl` — the beats contract and the gate; `video-refs-continuity` — the reference set the plan
   names; `video-gen-cost-gate` — the cost line form; `designed-elements` — the kit's designed pieces;

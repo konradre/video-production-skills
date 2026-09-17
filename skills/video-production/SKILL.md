@@ -80,6 +80,14 @@ setsar=1` and the rotation, before the first crop); the display shape, not the s
 header. Width × height alone read 11 of 17 vertical client clips as landscape, and every render stretched them 3.16× wide
 (2026-09-15).
 
+And **a frame-rate conform of supplied footage is decided against its motion cost, before it runs** —
+`scripts/conform_cfr.py --plan` prints, per file, what each honest mode does: `same-speed` keeps real time and the audio
+but drops or repeats frames (29.97 → 24 drops one in five, so every 4th frame carries a double step — invisible on a slow
+move, a stutter on a fast pan), `all-frames` keeps every real frame and even motion but runs the clip slower or faster.
+The mode is the operator's, the conversion is verified per file with a receipt, and **the originals stay until the cut is
+locked**: a same-speed master cannot give its dropped frames back — a pack conformed and its originals deleted lost every
+wide pan to a ~30 px stutter (2026-09-18). Choosing shots from a supplied pack: `ad-spot-preprod/references/FOOTAGE-CURATION.md`.
+
 **Done when:** the root, the genre and the pre-production skill are named in the first status line, every axis on
 which the project differs from the defaults has its value on disk — the sources' display shapes among them — and the sweep's
 declarations are written down.
@@ -200,6 +208,7 @@ agent keeps one, says NEXT.
 | `probe_sources.py <file>… [--json] [--selftest]` | storage, SAR, DAR, rotation, the DISPLAY shape, fps, codec, bit depth, duration and audio per source; exit 2 when any source must be normalised before a crop |
 | `pause_block.py --resume --deliverable --next --transcript <jsonl\|latest> [--phases <rules> --root <project>] [--builder --keepers --refs --substrate --skills --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak`; the skills-consulted line comes from the transcript (`--skills-unmeasured` labels a typed one) |
 | `skills_invoked.py --transcript <jsonl\|latest> [--since --until] [--phases <rules> --root <project>] [--calls\|--line\|--json] [--selftest]` | the Skill invocations with timestamps, the compactions, and with the rules file the gap list — phases whose actions ran without their skill; `--install-gate --root <project> --genre <g> [--registry <file>]` writes the project's rules file from `references/SKILL-GATE-TEMPLATE.json`, the genre's `require_any` overrides applied |
+| `conform_cfr.py --dir\|--files --fps <rate> --plan` · `--mode same-speed\|all-frames [--crf 14] [--preset] [--only] [--receipt]` · `--selftest` | supplied footage to one constant frame rate as new masters: `--plan` prints each mode's motion cost per file and converts nothing; a conversion needs `--mode`; per file the rates, CFR packet durations, the predicted frame count, raster and pixel format, a clean decode and whole-file SSIM through the same frame mapping are verified; duplicates by sha256 skipped; never overwrites; a receipt with every source hash |
 | `detach.py --log <abs log> -- <command> …` | starts a long job in a session of its own (Linux and macOS), so it outlives the shell and the tool call; prints the pid that leads the job's process group |
 
 ## Cross-references

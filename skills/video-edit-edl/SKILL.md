@@ -60,6 +60,12 @@ designed event  → source designed, its own look, no src; the card = role endca
 native bed      → only when the keeper EARNED its sound; native_audio_from/to mute what it did not
 punch-in        → zoom + anchor keeps the wrong thing out of frame without a regen
 montage         → COPY delivered spots' events, window them on the disclaimer's word times
+cutaways under a voiced line (supplied footage, b-roll, stills)
+                → the slots are the line's PHRASES, measured on the programme audio: scripts/phrase_slots.py (words on the
+                  WHOLE voice file with two models → the mix shares the dry timeline, lag 0 → the cut 2 frames before each
+                  phrase's first word); one continuous shot beats two cuts of one subject; a recommended cut goes to the
+                  operator as a labelled proxy over the mix (scripts/preview_cut.py + its cut-check sheet) BEFORE any window
+                  is conformed — the procedure: ad-spot-preprod/references/FOOTAGE-CURATION.md
 prefix          → events inserted at t=0 (a generated open) shift EVERY absolute time the plan holds — type cards,
                   the logo, cue edges — so those times are derived from events, never typed; a bed that is now too short
                   is re-looped by whole bars so its ending still lands on the card (`video-refs-continuity` § zoom-out chain)
@@ -182,6 +188,8 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
 | `edl_check.py --root --edl [--require-endcard] [--cuts] [--fps]` | the structural read: continuity, files, windows, cues, the seek convention, rogue frames — a crossing the event declares in `accepted_cuts` prints INFO; a VO line with no `source` WARNs |
 | `edl_insert.py --root --edl --after --id --take --in --out [--replace]` | insert or re-time an event, shifting everything downstream |
 | `trim_for_upscale.py --root --edl --ids [--out-dir]` | cut keepers with handles for a hosted upscale; writes `handle_head` |
+| `phrase_slots.py words --audio --out` · `timeline --mix --dry` · `slots --words --phrases "a\|b\|…" --fps --out [--lead 2] [--next-onset\|--end] [--lag] [--onset S1=<s>]` · `--selftest` | picture slots for a voiced section: two-model word times on the whole file with their disagreements, the proof that the mix shares the dry voice's timeline (envelope lag and score), and phrases → onsets → the cut `--lead` frames before each → slots in whole frames; flags a short slot and an onset the models dispute (pass the envelope read with `--onset`) |
+| `preview_cut.py --root --plan --mix --out [--size 540x960] [--aspect 9:16] [--alt S1=<clip>:<f0>:<x> …] [--check-sheet <jpg>]` · `--selftest` | a labelled REVIEW PROXY of a recommended cut over the programme mix: each slot's window through its delivery crop, grey slates for what is not made yet, `--alt` for a side-by-side version without touching the plan, and the check sheet — the frame either side of every cut, with timeline frame numbers — to be read before the preview is sent; never a deliverable, never overwrites |
 
 ## Cross-references
 

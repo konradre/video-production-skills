@@ -7,7 +7,8 @@ description: >
   to the operator with residual doubts and frame times. Use when seeds land, a take must be judged against the
   ledger, the operator names a defect on a frame, a keeper's window must be set, or an instrument's number is
   about to be trusted. Triggers — "review the seeds", "which take", "continuity sheet", "is this seed usable",
-  "cut before it breaks", "the same guy?", "frame 0:41", "check every frame". Not for building the references the
+  "cut before it breaks", "the same guy?", "frame 0:41", "check every frame", "break down the client's clips",
+  "which window of this clip". Not for building the references the
   next shot needs — use video-refs-continuity. Not for the cost line or the submit — use video-gen-cost-gate. Not
   for placing the pick or applying a cut note — use video-edit-edl. Not for the delivered file's loudness or
   encode — use video-finish-qc.
@@ -44,7 +45,12 @@ transcript. Read the sheet at 2–4×: every background element in every cut (on
 all of them). The transcript is of the WHOLE take, windowed afterwards to the excerpt in question — a short excerpt
 transcribed alone loses the agreement between models that the full take keeps (`spot-audio-assembly` § 5). Client footage
 is a take too: the same sheet, cut list and transcript per clip, and its display shape from
-`video-production/scripts/probe_sources.py` before any crop.
+`video-production/scripts/probe_sources.py` before any crop. A whole PACK of supplied clips is broken down in one pass —
+`scripts/footage_intake.py --src <dir> --out review/<pack>-intake` writes, per clip, the record (hash, display raster, the
+delivery crop, cut candidates, motion with the conform's cadence read, colour steps), `per-frame.csv`, and three tiers of
+sheet (overview → which clips are one camera ROUTE · survey → what is in frame across the whole clip · every frame → a
+window's in and out), plus the stub for the written read. The procedure around it — routes, slots, windows, the pick —
+is `ad-spot-preprod/references/FOOTAGE-CURATION.md`.
 
 **Done when:** every seed has a sheet, a cut list, a transcript and a peak time in `review/`, and the
 previous keeper's last frame (or the plate) sits beside them.
@@ -126,6 +132,14 @@ python3 scripts/window_frames.py --in takes/S01B-CCU2-s2.mp4 --from 2.9 --to 3.3
 python3 scripts/frame_match.py --take takes/S01B-F4-s1.mp4 review/operator-frame.png      # "which event is this?"
 ```
 
+**A window of supplied footage is ranked at the DELIVERY shape, never on the source frame.**
+`scripts/window_metrics.py --root --candidates <json> --out --intake <intake dir> --stack` decodes each candidate once
+through its delivery crop and raster and prints, per metric with its validity: sharpness (comparable only inside one
+camera route), luma and clipping, colourfulness, speed in frame-widths per second, the frame-to-frame **step in pixels at
+the delivery width** — on a dropped-frame conform the recurring double step is twice it: under ~5 px it does not read,
+near 30 px a pan stutters — and shake on the axis the move does not use. The 5-frame strip is the verdict; a window that
+opens on the wrong thing fails on its first frame.
+
 **Done when:** every seed is VOID (reason) or KEEPER (window, in/out, the state at the window's end).
 
 ## 5. Clips to the operator; the pick is theirs
@@ -156,6 +170,8 @@ after approval) can start from the record alone.
 ❌ A take VOIDed because it contains a cut                     ✅ The cut listed; faces, wardrobe, room, light, register read across it
 ❌ A lossless full frame as a review image                     ✅ A crop of what is judged at q95; surveys at q85
 ❌ "the face clears 60 px" as a pass                           ✅ The floor cleared; detail compared at equal size
+❌ "jitter 2.6 px - stabilise the pan"                         ✅ The residual ALONG a pan reads the conform cadence; shake is on the other axis
+❌ 17 supplied files ranked as 17 shots                        ✅ The route table first: one subject + one move = one shot, whatever the file count
 ```
 
 ## Failure behavior
