@@ -72,13 +72,54 @@ for one", and a Seedance 2.5 720p 30 s pass is ≈ $8.85 BEFORE retries — the 
 assumed keep rate. **Repair or regenerate by the take's price**: a cheap take is regenerated; an expensive one is
 repaired (clean audio + a lipsync pass over the footage) — the rule comes from a vendor that sells the repair layer, and
 is stated here with that incentive named. **Per shot type**: EVERY talking head — UGC or commercial —
-→ **Omni Flash 1.1 + a fal lipsync pass** (§ The talking-head default); a hook sweep → Omni 1.1 at 360p;
+→ **audio-driven Seedance 2.5 at 1080p native** when a locked VO must land on the mouth, else Omni Flash 1.1
+(§ The talking-head default); a hook sweep → Omni 1.1 at 360p;
 product-in-hand or a 30 s story → Seedance 2.5 (the label is drawn, never read — keep it as an image reference and the
 label shot short and front-on); a defined handheld move ≤ 8 s → Kling; the words that must land exactly → an
 audio-driven model or a lipsync pass, never a prompt. Every take
 carries SynthID or C2PA: the platform's auto-label is expected, never dodged (`ad-spot-preprod` RISKS.md § UGC compliance).
 
-#### The talking-head default — Omni Flash 1.1 + fal lipsync
+#### The talking-head default — audio-driven Seedance 2.5 at 1080p native (SUPERSEDES the Omni + lipsync default below)
+
+🔴 **Client-quality talking head, locked VO ⇒ generate at 1080p native on a venue that takes an audio reference, and
+skip the lipsync pass entirely.** A post-generation lipsync pass was not good enough on a commercial spot; generating at
+1080p with the VO supplied as an audio reference was, and it needs no reconstructive upscale — the Dehancer/look pass
+alone finishes it.
+
+**Which venues take an audio reference — read from each vendor's own schema, 2026-09-17:**
+
+| route | audio in | 1080p | 1080p price | notes |
+|---|---|---|---|---|
+| **treg `reapi.video-gen.seedance-2-5.unrestricted`** | `audio_urls` ≤ 10 | ✅ | **$0.462/s** | model `doubao-seedance-2.5-face`; the ONLY row documenting *"a photo of a real person is accepted as the subject reference **and a voice clip as the speech reference**"*; 100 % over 244 observed calls; refunded on failure; `treg host <file>` mints a compliant URL free |
+| **Higgsfield `seedance_2_5`** | `audio_references` (array) | ✅ | **9 cr/s ≈ $0.45/s** (480p 3, 720p 6.5) | the proven route: two takes landed 1080×1920 in ~3 min each. `--audio-references` takes a UUID **or a local path the CLI auto-uploads** |
+| treg `piapi.video-gen.seedance-2-5` | `audio_urls` ≤ 3, 15 s total | ✅ | $0.80/s | dearer, tighter cap |
+| **monid `bytedance /v1/video/seedance-2.5`** | `audio_url` role `reference_audio`, ≤ 10, each 2–30 s, ≤ 30 s total | ❌ | — | **480p/720p ONLY — cannot serve this default** |
+| treg `openrouter.video-gen.seedance-2-5` | none | ❌ | — | first/last frame only |
+
+Providers disagree on the duration cap — one enforces ≤ 30 s **per clip** (probed at submit), another a 30 s **combined**
+cap. Unresolved; a measured run settles it. Reference **images and audio do not move the price**; only a reference VIDEO
+does (it shifts the upstream generation mode).
+
+**The method, in the order it has to run:**
+1. Cut the driving audio **from the programme VO itself**, frame-exact, so the take maps onto the timeline with no
+   arithmetic left over. Silence the tail before the next line so it cannot leak in.
+2. Mode `omni_reference` — `t2v` refuses every reference, audio included. A start image is legal beside the audio here.
+3. **The words never appear in the prompt.** Point the lip-sync at `@Audio1`, forbid replacement speech in the tail,
+   and pin the VO's own speech windows as numeric beats.
+4. **No reconstructive upscale.** The take is already at the delivery raster. Straight to the Dehancer hero.
+   ⚠ `.drx` and `.cube` are PARALLEL renderers of one look, never stacked — `look-library/GUIDE.md`.
+5. Accept the residual timing, or re-roll. **A post retime is judged by eye, never by its metric.**
+
+**What it costs against the superseded default.** 7 s at 1080p = 63 cr ≈ $3.15, against Omni 7 s at 720p ($0.70) plus a
+`sync-lipsync/v3` pass ($0.93) plus an upscale — so roughly $3.15 against $1.63 plus the upscale arm's time. The quality
+is what buys it: at 1080p native the skin keeps individual stubble hairs and pores where the lipsync chain returned a
+waxy chin and jaw with the stubble rendered as a texture patch.
+
+⚠ **Higgsfield's Lipsync Studio lists SYNC LIPSYNC 3** ("precise lip sync, up to 4K") — the model fal resells at
+$8/min — **but it is WEB-UI ONLY**: absent from all 91 CLI job types and all 22 workflows (only `dubbing` and
+`voice_change` are there). Not automatable today.
+
+<details><summary>The superseded default — Omni Flash 1.1 + fal lipsync (kept for its evidence)</summary>
 
 **Every talking head starts on Omni Flash 1.1 and gets a `fal-ai/sync-lipsync/v3` pass against the locked VO.** UGC and
 commercial ads alike; Seedance 2.5 keeps product-in-hand, the 30 s story and — through treg's unrestricted row — a real
@@ -101,6 +142,8 @@ the price/raster argument, not on a controlled comparison.
 ⚠ Omni's own traps stay in force: ~15 % of takes stutter (regenerate), **no audio input on any surface**, and a quoted
 word in the prompt body can PRINT on a garment — a take was voided when the quoted gesture word "worn" appeared on a
 polo's badge. Negations burn captions onto clothing; positive-spec only.
+
+</details>
 
 ## Images (stills, plates, references)
 

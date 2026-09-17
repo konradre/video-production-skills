@@ -36,7 +36,16 @@ head < ~50 px (any full-body wide) or text / fine graphics that must read      �
                                                                                   ORIGINAL TAKE (never stacked); cost line → GO
 a punch-in (zoom) on a Rhea hero                                                 → Iris ×1 after Rhea (marginal); never Iris ×4 alone
 generated above 480p native                                                      → upscale from the native version, not a flattened master
+generated AT the delivery raster (a 1080p native take for a 1080p master)        → NO upscale arm at all; straight to the hero
 ```
+
+🔴 **A take generated at the delivery raster gets NO reconstructive upscale.** The arm exists to reconstruct detail that
+is not there; at the delivery raster there is nothing to reconstruct, and the tier table above does not apply. The finish
+is the Dehancer hero alone. ⚠ `.drx` and `.cube` are PARALLEL renderers of one look and are NEVER stacked — the `.drx`
+already holds everything the cube holds plus the spatial pass a 3D LUT cannot carry (`look-library/GUIDE.md`). A Resolve
+host takes the `.drx` and `look: "none"` in the finisher; the cube is for a host with no Resolve.
+⚠ The mezzanine canvas is then an upscale-then-downscale round trip for those events. Harmless, and not free to change
+while designed cards and conformed footage still sit above the delivery raster — note it, do not silently re-canvas.
 
 The ~50 px cut-off was measured on 480×854 takes (`video-finish` § 1); on another native raster, count the head in that
 take's own pixels. Generate clean (no grain/halation/bloom in a prompt); never post-scale in the upscale pass — the deliver
@@ -151,6 +160,18 @@ bash ~/.claude/skills/video-finish-qc/scripts/final_renders.sh --root <project> 
 file by path with its size.
 
 ## Failure behavior
+
+🔴 **A repair is judged by OUTCOME, on the picture — never by the metric that motivated it.** Measured on a synthesised
+talking head whose mouth ran ahead of the locked VO: a uniform `setpts` + `minterpolate` retime cut the drift spread from
+0.26 s to ±0.055 s, and a 5-segment piecewise re-pace moved the phrase onsets from −0.13/−0.56/−0.38 to −0.02/−0.01/−0.06
+and lifted the own-audio correlation from 0.513 to 0.799. **Both were rejected on sight as dropped frames**, and the
+UNREPAIRED takes were accepted at ±0.13 s drift. Same failure class as ranking a resynthesised mouth by edge energy: an
+instrument that improves while the image degrades. **An alignment metric is a SELECTION aid, never a repair verdict.**
+Build the repair if you like; ship it only if it survives a look beside the unrepaired take, and put both in front of the
+operator. Two sub-facts, true and now moot: a uniform stretch kills DRIFT but creates a constant OFFSET needing a
+separate in-point shift, and `minterpolate` does not honour a `setpts` factor exactly — force the count with
+`-frames:v N`.
+
 
 - Gate FAIL, a null keeper, a missing source → the finish stops with the event named; fix upstream.
 - Bridge down → stop and ask the operator to reopen Resolve + bridge; never launch Resolve from the agent.

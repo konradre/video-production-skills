@@ -55,11 +55,19 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   rejected UPSTREAM (BytePlus ModelArk) and monid exposes none of the licensed-asset escapes, so a
   photoreal person in a reference routes to treg's unrestricted row — the escape monid lacks — or to
   Higgsfield when the shot also needs one of its extra modes.
-- **A talking head — UGC or commercial — → Omni Flash 1.1 + a `fal-ai/sync-lipsync/v3` pass over the take**, never a
-  prompt-voiced mouth (`references/VENUES.md` § The talking-head default). Omni is $0.10/s at
-  **720p native** against Seedance 2.5's $0.1029/s at 480p, so the default costs the same and generates closer to the
-  delivery raster. ⚠ The A/B behind it is confounded by the lipsync head-pad of the retrospective's Finding 15 — the
-  default rests on that read plus the price/raster argument, and the settling re-run is ~$0.
+- **A talking head that must carry a LOCKED voice-over → Seedance 2.5 generated at 1080p NATIVE with the VO as an
+  `audio_references` clip**, on a venue that accepts one — never a post-generation lipsync pass, and never a
+  prompt-voiced mouth (`references/VENUES.md` § The talking-head default, which supersedes the earlier Omni Flash 1.1 +
+  `sync-lipsync/v3` default). The audio drives the WORDS, not just the timbre: both proof takes spoke the script line
+  verbatim. 🔴 **The words must be ABSENT from the prompt** — written dialogue beats reference audio and demotes it to
+  timbre (`video-prompt-dialects` DIALECTS.md § Supplied-audio polarity). At 1080p native the take is already at the
+  delivery raster, so the reconstructive upscale and the lipsync pass BOTH disappear, and with them that pass's
+  face-shaped softening tax — there is nothing to claw back because nothing is paid. Omni Flash 1.1 keeps the shots with
+  NO locked VO (it takes no audio input on any surface).
+- **A prompt for an audio-driven take carries the VO's own speech windows as numeric beats** — it fixes the ENDPOINT
+  (end-of-line error 0.83 s → 0.06 s, measured) but not the interior: the model buys the ending by elongating one word.
+  🔴 **Do NOT repair the residue by retiming in post on the strength of a metric** — two repairs measured better and were
+  rejected on sight as dropped frames. Judge a repair by eye against the unrepaired take, or re-roll.
 - A continuation of a keeper → `--mode video_extension` on the keeper's own job id (same price as a
   fresh gen). On monid the edit and extend modes are **phrasing, not flags** — say so explicitly in the
   prompt or the model reads it as a plain r2v, generates a NEW video, succeeds, and bills in full with

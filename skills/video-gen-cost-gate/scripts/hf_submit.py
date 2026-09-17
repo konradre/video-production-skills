@@ -7,8 +7,13 @@ hf_poll.py detached → takes/<SCENE>-s<n>.mp4 (log takes/hf-poll-<scenekey>.log
 `generate cost` (it hung with --mode); the price is --rate credits per second at --resolution.
 
   hf_submit.py --root <project> --scene S01-E --prompt prompts/r2v/S01-E.txt --mode omni_reference|t2v|video_extension
-               --duration 4 [--refs NAME,NAME] [--start-image NAME] [--video-ref <keeper job id>] [--seeds 3]
-               [--births R,R] [--prose X,Y] [--fresh-scene] [--rate 2.5] [--resolution 480p] [--aspect 9:16] [--go]
+               --duration 4 [--refs NAME,NAME] [--start-image NAME] [--audio-ref <path|uuid>] [--video-ref <keeper job id>]
+               [--seeds 3] [--births R,R] [--prose X,Y] [--fresh-scene] [--rate 2.5] [--resolution 480p] [--aspect 9:16] [--go]
+
+`--audio-ref` is the talking-head default's load-bearing flag (VENUES.md § The talking-head default): seedance_2_5's own
+schema carries an `audio_references` array, and the CLI's `--audio-references` takes a UUID or a LOCAL PATH it uploads
+itself — so no name/upload-id indirection applies to it. The audio drives the generated speech, so the mouth follows the
+clip; `t2v` refuses it like every other reference.
 
 Reference NAMES resolve through <root>/receipts/<NAME>-upload-id.txt (written by hf_upload.py); a raw UUID is
 refused — the gate must see a name. The gate is video-refs-continuity's refs_gate.py (--gate to override).
@@ -16,6 +21,7 @@ refused — the gate must see a name. The gate is video-refs-continuity's refs_g
 import argparse, importlib.util, json, os, subprocess, sys
 
 DEFAULT_GATE = os.path.expanduser('~/.claude/skills/video-refs-continuity/scripts/refs_gate.py')
+DEFAULT_POLLER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hf_poll.py')
 
 
 def load_gate(path):
@@ -37,6 +43,7 @@ def main():
     ap.add_argument('--duration', required=True, type=int)
     ap.add_argument('--refs', default='')
     ap.add_argument('--start-image')
+    ap.add_argument('--audio-ref', help='audio reference: a local file path (the CLI auto-uploads it) or an upload UUID')
     ap.add_argument('--video-ref', help='a previous job id (video_extension / voice+blocking reference)')
     ap.add_argument('--seeds', type=int, default=3)
     ap.add_argument('--births', default='')
@@ -47,6 +54,7 @@ def main():
     ap.add_argument('--aspect', default='9:16')
     ap.add_argument('--model', default='seedance_2_5')
     ap.add_argument('--gate', default=DEFAULT_GATE, help='path to refs_gate.py')
+    ap.add_argument('--poller', default=DEFAULT_POLLER, help='path to hf_poll.py (override when this script is copied out of the skill)')
     ap.add_argument('--go', action='store_true')
     a = ap.parse_args()
 
@@ -70,7 +78,7 @@ def main():
     text = open(prompt_path, encoding='utf-8').read()
     m = g.spot_re.search(os.path.basename(prompt_path)); spot = m.group(1) if m else None
     ok, rows, roles = g.check(text, refs, 'hf', start, csv(a.births), csv(a.prose), spot, fresh=a.fresh_scene)
-    print(f"REFS-GATE {a.prompt}  refs: {', '.join(refs) or '-'}  start: {start or '-'}")
+    print(f"REFS-GATE {a.prompt}  refs: {', '.join(refs) or '-'}  start: {start or '-'}  audio: {a.audio_ref or '-'}")
     print(gate.fmt(rows))
     cost = a.rate * a.duration * a.seeds
     print(('REFS-GATE PASS' if ok else f"REFS-GATE FAIL ({sum(1 for r in rows if r[1] == 'FAIL')} missing) — REFUSED")
@@ -85,6 +93,10 @@ def main():
     cmd = ['higgsfield', 'generate', 'create', a.model, '--mode', a.mode]
     if start_id: cmd += ['--start-image', start_id]
     for i in ids: cmd += ['--image', i]
+    if a.audio_ref:
+        ar = a.audio_ref if (len(a.audio_ref) == 36 and a.audio_ref.count('-') == 4) else os.path.join(root, a.audio_ref)
+        if not (ar == a.audio_ref or os.path.exists(ar)): sys.exit(f'audio ref not found: {ar}')
+        cmd += ['--audio-references', ar]
     if a.video_ref: cmd += ['--video-references', a.video_ref]
     if a.mode == 'video_extension': cmd += ['--extension_mode', 'forward']
     cmd += ['--prompt', text, '--resolution', a.resolution, '--duration', str(a.duration), '--aspect_ratio', a.aspect, '--json']
@@ -100,7 +112,7 @@ def main():
             print(f'{a.scene}-s{s} UNPARSED reply:', out.stdout[:200], out.stderr[:200]); continue
         jid = j[0] if isinstance(j, list) else (j.get('id') or j.get('job_id'))
         if isinstance(jid, dict): jid = jid.get('id') or jid.get('job_id')
-        R.append({'name': f'{a.scene}-s{s}', 'job_id': jid, 'mode': a.mode, 'duration': a.duration, 'resolution': a.resolution, 'rate': a.rate})
+        R.append({'name': f'{a.scene}-s{s}', 'job_id': jid, 'mode': a.mode, 'duration': a.duration, 'resolution': a.resolution, 'rate': a.rate, 'audio_ref': a.audio_ref, 'start_image': start})
         print(f'{a.scene}-s{s} job {jid}  (BILLED at acceptance)', flush=True)
         # the ledger record BEFORE polling — a hard kill still leaves a recoverable id
         rp = os.path.join(root, 'receipts', f'hf-jobs-{key}.json'); json.dump(R, open(rp, 'w'), indent=1)
@@ -109,7 +121,7 @@ def main():
     print(f'receipts {rp} ({len(R)} jobs) · billed ≈ {a.rate * a.duration * len(R):g} cr')
     if R:
         log = open(os.path.join(root, 'takes', f'hf-poll-{key}.log'), 'ab')
-        poller = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hf_poll.py')
+        poller = a.poller
         subprocess.Popen(['python3', poller, '--root', root, rp], stdout=log, stderr=subprocess.STDOUT,
                          stdin=subprocess.DEVNULL, start_new_session=True)
         print(f'poll detached → takes/hf-poll-{key}.log → takes/{a.scene}-s<n>.mp4  (match " DONE | FAILED|HF-POLL-END")')
