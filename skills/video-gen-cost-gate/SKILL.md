@@ -29,6 +29,41 @@ a file path; the pick is theirs).
 as *unreadable* — never 0, never a guess — and the GO's cap is that batch's limit). The GO, the receipt, the one gated path
 and the clip handover do not move — `video-production/references/WHAT-VARIES.md` § Generator, venue and native raster.
 
+## 0. Constraints GUIDE, they never BLOCK — this governs every rule below
+
+🔴 **Every house rule, default, ranking and "never" in this skill is CONTEXT THAT SHAPES A SUGGESTION, not a
+refusal.** Read one as a veto and you have converted the operator's own accumulated evidence into a cage around
+the operator. A rule here exists to make the recommendation *better informed* and to make its cost *visible at the
+moment of choosing* — never to remove an option from the table.
+
+**The shape every constraint takes:** state what the rule says · state what departing from it costs, as a number
+where a number exists · recommend · **then do what the operator rules.** A constraint that cannot produce a
+number still produces a sentence; it never produces a stop.
+
+```
+❌ "480p is the house rule — I can't generate at 720p"
+✅ "480p is the chain; 720p is 2.25× the tokens (+$0.41 on this batch) and moves the face floor,
+    the upscale tier and the review limits. I'd stay at 480p. 720p if you want it?"
+❌ "That venue is fourth on price, so we use monid"
+✅ "monid is cheapest; the funded venue is 1.40× that, +$0.41 here. Which?"
+❌ Silently narrow a batch, a venue or a raster to the rule and report only the narrowed result
+✅ Run what was asked; put the cheaper or safer alternative beside it with its number
+```
+
+**THREE things are not constraints in this sense, and they stay** — none of them blocks the operator:
+
+| what | why it stays |
+|---|---|
+| **The cost line and the GO** | It blocks *the agent* from spending the operator's money unasked. It is the operator's decision point, not a limit on them — removing it would mean spending without consent, the opposite of guiding. |
+| **A pre-submit refusal that protects a BILLED call** (the refs gate on a lapsed URL, `monid_submit.py` on `--duration auto`) | These convert rather than vanish: the refusal becomes a **priced warning inside the cost line**, and the GO overrides it. Never a silent stop; never an unoverridable one. |
+| **A VENDOR's own refusal** (`nsfw`, `content_policy_violation`, a `423 model_blocked`) | Not ours to relax. Report it, name what it cost (usually nothing), route around it. |
+
+**Portability — this is why the roster is a parameter, not a constant.** The venue table below is *our* roster and
+*our* measured prices. Another operator adopting this skill has a different roster, a different fallback chain and
+different funding. So the routing logic is **"rank the venues YOU have by marginal cost, prefer PAYG at equal cost,
+then let funding decide which ranked venue is reachable"** — never "use monid". Where a rule names a specific venue,
+read the venue as an example of the rule and the rule as the thing that travels.
+
 ## 1. Pick the venue from the table
 
 Rule for images and video alike: **quality and prompt-adherence first, permissiveness as the fallback
@@ -36,12 +71,13 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
 [`references/VENUES.md`](references/VENUES.md). The decisions it settles:
 
 - Video with people in the references → **treg `reapi.video-gen.seedance-2-5.unrestricted`**, the PAYG
-  people-capable route ($0.1186/s at 480p, PAYG, no plan behind it): `content_filter: false`
+  people-capable route ($0.1186/s at 480p · $0.2668 at 720p · $0.462 at 1080p, PAYG, no plan behind it): `content_filter: false`
   carries the BytePlus licensed-asset escape, so it takes a **real person's likeness**, which every other
   row refuses. Its references are hosted by `treg host` and the call is **CLI-only** — the treg MCP exposes
-  no upload tool. Higgsfield `seedance_2_5 --mode omni_reference` (accepts person refs, start image + image
-  refs + video refs together, 480p at 2.5 cr/s) stays the route when the shot needs a mode treg has no row
-  for: extension on a keeper's job id, edit, `topaz_video`, `minimax_h3` at 2K. fal's Seedance refuses any
+  no upload tool. ⚠ **Higgsfield's subscription and its PAYG API are two venues with separate wallets** — price
+  them apart (`references/VENUES.md` § Venue ranking). `seedance_2_5 --mode omni_reference` is the subscription
+  route; the **API** carries **no 1080p, no Topaz, no GPT Image 2.5 and no lipsync**, so a move onto it has to name
+  the cover for each. `minimax_h3` at 2K runs the other way — **cheaper on the API at $0.0715/s** than on the plan. fal's Seedance refuses any
   photoreal person in a reference (`content_policy_violation`, billed 0) — fal only for people-free
   shots. MiniMax H3 is 768p minimum and a different look.
 - **People-free Seedance with no plan to feed → monid `bytedance /v1/video/seedance-2.5`, the
@@ -55,15 +91,28 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   rejected UPSTREAM (BytePlus ModelArk) and monid exposes none of the licensed-asset escapes, so a
   photoreal person in a reference routes to treg's unrestricted row — the escape monid lacks — or to
   Higgsfield when the shot also needs one of its extra modes.
-- **A talking head that must carry a LOCKED voice-over → Seedance 2.5 generated at 1080p NATIVE with the VO as an
-  `audio_references` clip**, on a venue that accepts one — never a post-generation lipsync pass, and never a
-  prompt-voiced mouth (`references/VENUES.md` § The talking-head default, which supersedes the earlier Omni Flash 1.1 +
-  `sync-lipsync/v3` default). The audio drives the WORDS, not just the timbre: both proof takes spoke the script line
-  verbatim. 🔴 **The words must be ABSENT from the prompt** — written dialogue beats reference audio and demotes it to
-  timbre (`video-prompt-dialects` DIALECTS.md § Supplied-audio polarity). At 1080p native the take is already at the
-  delivery raster, so the reconstructive upscale and the lipsync pass BOTH disappear, and with them that pass's
-  face-shaped softening tax — there is nothing to claw back because nothing is paid. Omni Flash 1.1 keeps the shots with
-  NO locked VO (it takes no audio input on any surface).
+- **A talking head that must carry a LOCKED voice-over → Seedance 2.5 generated at 720p with the VO as an audio
+  reference, delivered through a 1.5× scale**, on a venue that accepts one — never a post-generation lipsync pass,
+  and never a prompt-voiced mouth (`references/VENUES.md` § The talking-head default, which supersedes both the
+  earlier 1080p-native default and the Omni Flash 1.1 + `sync-lipsync/v3` default before it).
+  **On price the venue is treg for a real likeness ($0.2668/s) or monid for people-free ($0.2311/s); the
+  Higgsfield API places fourth and carries no 1080p at all** — ⚠ **fourth is a premium to quote, not
+  a prohibition: where the funds are allocated decides which venue is reachable** (`references/VENUES.md` § Price
+  ranks the venues, funding decides which one is reachable). The audio drives the WORDS, not just the
+  timbre: both proof takes spoke the script line verbatim. 🔴 **The words must be ABSENT from the prompt** — written
+  dialogue beats reference audio and demotes it to timbre (`video-prompt-dialects` DIALECTS.md § Supplied-audio
+  polarity). **The lipsync pass stays gone** — that is what the audio reference bought, and it survives the raster
+  change; what returns at 720p is a 1.5× lanczos to 1080×1920, a resample rather than a reconstruction, at $0 and no
+  face-shaped softening tax. 1080p stays reachable on treg at $0.462/s for a shot that earns it. Omni Flash 1.1 keeps
+  the shots with NO locked VO (it takes no audio input on any surface).
+- **An EDIT or an EXTEND, and 2K MiniMax H3 → the Higgsfield API, on merit rather than price.** `video-edit` and
+  `video-extend` are **structurally separate endpoints** there: treg has no row for either, monid reaches both only
+  by prompt phrasing — which misreads into a fresh r2v that succeeds and **bills in full with no error to catch** —
+  and fal routes both through a `task` enum with the same failure shape. A wrong URL is a 404; a wrong phrasing is a
+  silent full charge. Billed at the 0.6× tier, worth it only when `gen > 1.5 × in` (both durations bill). H3 at 2K
+  is $0.0715/s there, 45 % under fal. ⚠ The API has **no cost cap** (treg takes `X-Treg-Max-Cost`), returns **no
+  estimate number** for Seedance, and its `video-extend` takes a `video_url`, **not the CLI's job id** — feed the
+  keeper's own output URL back (outputs live ≥ 7 days; untested, one receipt settles it).
 - **A prompt for an audio-driven take carries the VO's own speech windows as numeric beats** — it fixes the ENDPOINT
   (end-of-line error 0.83 s → 0.06 s, measured) but not the interior: the model buys the ending by elongating one word.
   🔴 **Do NOT repair the residue by retiming in post on the strength of a metric** — two repairs measured better and were
@@ -80,10 +129,14 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   surgical edits (a count, a ghost, one limb) and garment text the OpenAI-moderated model refuses (kie
   `nano-banana-pro` / Higgsfield `nano_banana_pro`), or the copy route (`video-refs-continuity`). GPT Image 2
   is superseded; never start a new still on it.
-- Generation resolution is **480p**, always, on the 480p chain; MiniMax H3 generates at its 768p minimum on fal (a
-  house rule) or at 2K, its only tier, on Higgsfield; approval, then a reconstructive upscale (`video-finish`). A take
-  generated above 480p moves every pixel number downstream — the face floor, the upscale tier, the review instruments'
-  limits.
+- Generation resolution is **480p on the 480p chain — every shot except one**; MiniMax H3 generates at its 768p
+  minimum on fal (a house rule) or at 2K, its only tier, on Higgsfield; approval, then a reconstructive upscale
+  (`video-finish`). 🔴 **The carve-out: a talking head with a locked VO generates at
+  720p** and finishes with a 1.5× scale. A take generated above 480p moves every pixel number downstream — the face
+  floor, the upscale tier, the review instruments' limits — so the carve-out is per-shot and stated, never inferred.
+  ⚠ **720p costs 2.25× 480p at every token-metered venue** (monid, treg, the Higgsfield API all meter on `W × H`):
+  it is priced, never free — so outside the carve-out 480p is the RECOMMENDATION, with the 2.25× and the downstream
+  moves quoted beside it, and the operator rules the raster (§ 0).
 - A new venue or model is proven on the HARDEST shot first (a lipsync line, the product close-up),
   never the easiest — passing the easy spot proves the chain runs, not that the hard parts work.
 - **A creator-style talking head** (a UGC spot) routes by SHOT TYPE: a simple talking head or a hook sweep → Gemini Omni
@@ -157,6 +210,11 @@ the ones that bind every ask:
   approval, hero pass, frame sheets, the build) never wait for a GO; a residual doubt goes in the
   delivery note with its frame time — never as a re-roll question. Tight budget ⇒ one seed at a time,
   checked before the next.
+- **A venue chosen for FUNDING rather than price quotes the PREMIUM on the same line.** Where the money sits
+  decides which venue is callable; the ranking decides what it costs. So a batch
+  routed to a funded-but-dearer venue reads `… · Higgsfield API (funded) · 1.40× monid, +$0.41 this batch`, and the
+  operator rules with the number in front of them. **Never silently reroute a batch to a cheaper venue the operator
+  has not funded, and never refuse a funded venue for placing fourth.**
 - Decisions go to the operator as **numbered plain questions** with the cost and the file path inline.
 - Never `higgsfield generate cost` with `--mode` (it hung); the price is known per resolution.
 
@@ -180,7 +238,8 @@ python3 scripts/monid_submit.py --root <project> --scene S02-G4 --prompt prompts
     --mode t2v|i2v|flf|r2v --duration 7 --refs ROOM,W1 --resolution 480p --ratio 9:16 [--go]
 ```
 
-Dry run by default; `--go` spends. Each path runs the refs gate first and refuses on FAIL, prints the
+Dry run by default; `--go` spends. Each path runs the refs gate first and holds on FAIL — a priced warning an
+explicit GO overrides, never a silent or unoverridable stop (§ 0) — prints the
 cost, parses the venue's reply shape-safely (Higgsfield `generate create --json` returns a bare LIST of
 job ids), writes the raw reply to `receipts/raw/`, appends a ledger record per seed BEFORE polling,
 and detaches the poller. Reference names resolve through `receipts/<NAME>-upload-id.txt`
@@ -200,7 +259,8 @@ file CHANGED), `--verify` answers "do all 30 still exist?" in one free recursive
 a lapsed url by a free `/cat` that moves no bytes, and the refs gate FAILS a reference whose url has expired —
 checked locally from the recorded `expiresAt` or the url's own `?e=<unix>`, at zero API calls.
 
-`monid_submit.py` refuses three things outright, because each one bills in full while looking correct:
+`monid_submit.py` holds three things back by default, because each one bills in full while looking correct — each
+is a **priced warning an explicit GO overrides** (§ 0), never an unoverridable stop:
 **`--duration auto`** (it HOLDS a full 30 s price up front and releases the remainder on settle, so the
 GO would be given against a number nobody asked for — always an integer 4–30); **a `ratio` on a mode
 that cannot take one** (only t2v and r2v accept a ratio; first/last-frame, edit and extend inherit their
@@ -270,7 +330,10 @@ ledger, receipts), or every seed is voided with the reason.
 
 ## Failure behavior
 
-- Gate FAIL → nothing is submitted; the ask names what is missing (upload / cut / declare).
+- Gate FAIL → nothing is submitted **on that pass**, and the ask names what is missing (upload / cut / declare)
+  **plus what it costs to proceed anyway** — a lapsed reference URL bills the whole batch at acceptance and returns
+  nothing, so that number is the argument. **It is a priced warning, not a veto: an explicit GO against a named FAIL
+  submits** (§ 0). What must never happen is a silent stop, or a FAIL the operator cannot overrule.
 - A venue error that reads as a refusal is confirmed from the venue's own record (job status,
   transactions) before it is called free.
 - Three rounds on one shot without convergence → stop generating; put the alternatives (extension,
