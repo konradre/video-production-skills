@@ -96,7 +96,7 @@ declarations are written down.
 
 ```bash
 date
-python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --deliverable deliver/<latest>.mp4 --drive <drive> --keep-tags "<spot>=<tag>,…" --higgsfield --monid --elevenlabs --open "…"
+python3 ~/.claude/skills/video-production/scripts/status_line.py --root <project> --deliverable deliver/<latest>.mp4 --drive <drive> --keep-tags "<spot>=<tag>,…" --higgsfield --higgsfield-api --monid --treg --elevenlabs --open "…"
 ```
 
 `--drive` is the HOST drive the project lives on (on a VM, never the guest's root: its disk image only grows), and the line
@@ -202,7 +202,7 @@ agent keeps one, says NEXT.
 
 | script | does |
 |---|---|
-| `status_line.py --root [--deliverable --drive --keep-tags --higgsfield --monid --elevenlabs --open --job]` | the status template with free reads only; unreadable balances said, never 0; the project's size and its superseded derived set; the render floor |
+| `status_line.py --root [--deliverable --drive --keep-tags --higgsfield --higgsfield-api --monid --treg --elevenlabs --open --job]` | the status template with free reads only; unreadable balances said, never 0; the Higgsfield subscription and API wallets as two lines, the API's labelled a ledger ESTIMATE; the project's size and its superseded derived set; the render floor |
 | `project_size.py --root [--keep-tags spot=tag,…] [--plan <file>] [--selftest]` | substrate vs derived by directory role; the superseded set by category with sizes; a plan file the operator names deletions from — it never deletes |
 | `corpus_sweep.py --skills <dir> --axes k=v,… [--selftest]` | every skill's body summary (What varies + section headers) against the project's axes — the reading aid behind the intake declarations |
 | `probe_sources.py <file>… [--json] [--selftest]` | storage, SAR, DAR, rotation, the DISPLAY shape, fps, codec, bit depth, duration and audio per source; exit 2 when any source must be normalised before a crop |

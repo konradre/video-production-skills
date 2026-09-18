@@ -30,10 +30,11 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
   keyframes) sat unread beside them for a week because nobody had a question that named them. On
   adoption, enumerate every feature the spec documents into the dialect table, even those with no use yet.
 
-## Seedance 2.5 (Higgsfield CLI `seedance_2_5`; fal `bytedance/seedance-2.5/*`; also hosted on Monid, which no script calls)
+## Seedance 2.5 (Higgsfield CLI `seedance_2_5`; Higgsfield API `bytedance/seedance-2.5/*`; fal `bytedance/seedance-2.5/*`; monid `bytedance /v1/video/seedance-2.5`; treg `reapi.video-gen.seedance-2-5.unrestricted` — five routes to one model; which shot goes where, each contract and each measured rate are `video-gen-cost-gate/references/VENUES.md`)
 
 - **Modes**: `t2v` · `omni_reference` (r2v: start image + ≤30 image refs + ≤10 video refs + ≤10 audio, ≤50
-  total — on Higgsfield; fal splits i2v and r2v into two endpoints that cannot be mixed) · `video_edit` ·
+  total — on the Higgsfield CLI; fal and the Higgsfield API split i2v and r2v into separate endpoints that
+  cannot be mixed) · `video_edit` ·
   `video_extension` (`--extension_mode forward`, the keeper's job id as the video reference).
   On **fal** all three reference modes are the ONE `reference-to-video` endpoint selected by a `task` enum
   (`reference` / `editing` / `extension`); `editing` coerces `aspect_ratio` and `duration` to `auto`,
@@ -106,9 +107,10 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
 - **Emotion**: trigger event → immediate observable reaction → the few clearest cues (eyes, brows, mouth,
   breathing, hands) → the target expressed outwardly; a causal reveal shows the trigger BEFORE the reaction
   and keeps both in frame or links them by an eyeline.
-- **Wire limits**: 480p / 720p (/1080p on Higgsfield); duration 4–30 s (integer on Higgsfield, or `auto`
-  on fal); prompt ≤ 6000 chars (≈ 2.5–3.2 k worked; > 5 k warned; 7840 was trimmed); `ratio` adaptive by
-  default; public https or asset ids on the wire (Higgsfield uploads by UUID); result URLs expire ~24 h.
+- **Wire limits**: 480p / 720p (/1080p on the Higgsfield CLI and on treg — never on the Higgsfield API);
+  duration 4–30 s (integer on Higgsfield, or `auto` on fal); prompt ≤ 6000 chars (≈ 2.5–3.2 k worked; > 5 k
+  warned; 7840 was trimmed); `ratio` adaptive by default; public https or asset ids on the wire (the
+  Higgsfield CLI uploads by UUID); result URLs expire ~24 h.
 - **The monid wire shape is NOT the @-flag shape — the DIALECT above is unchanged, the CALL is not.**
   One `content[]` array carries everything: a `{type:"text"}` item holding the whole prompt, then one
   `{type:"image_url", image_url:{url}, role}` per picture with `role` ∈ `first_frame` · `last_frame`
@@ -120,6 +122,13 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
   is accepted ONLY for t2v and r2v: first/last-frame, video edit and extend inherit their source's
   aspect and REQUIRE `adaptive`. Pictures ride as public https URLs, which monid's own `sfs` store
   issues for $0.00 (`monid_upload.py`) — so nothing here is blocked on "it needs a public URL".
+- **The Higgsfield API and treg wire shapes — the DIALECT above is unchanged here too.** The API has five
+  dedicated endpoints and no `mode` flag (`hf_api_submit.py`): i2v takes `image_url` [+ `end_image_url`] and
+  r2v takes `image_urls` ≤30 + `video_urls` ≤10 + `audio_urls` ≤10, at least one required, so a start image
+  never rides beside references there; `video-edit` omits `duration` (the source decides). treg's `reapi`
+  row does r2v and i2v in ONE body, with lowercase `@image1` / `@audio1` placeholders in the prompt, and a
+  placeholder for media you did not attach is a 400 (references hosted by `treg_host.py`). Caps, prices and
+  moderation per venue: `video-gen-cost-gate/references/VENUES.md`.
 - **Moderation is on the prompt WORDS**: "penis", "dick", "thrusting" → `nsfw` on the whole batch
   (refunded); a woman looking a man up and down → nsfw on 2/3; a bare-torso waist frame or a headless
   start image → refused unbilled; ALL-CAPS script words trip the refs gate's subject scan. fal additionally
@@ -128,7 +137,7 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
 - **Native audio** (2.5 on Higgsfield): the take's bangs, clangs and knocks ride in it — name them in `< >` and
   keep `generate_audio` on; 2.0-era runs returned silence on no-dialogue shots (per-version flag).
 
-## Seedance 2.0 fast (draft engine; fal; also hosted on Monid, which no script calls)
+## Seedance 2.0 fast (draft engine; fal; monid `bytedance /v1/video/seedance-2.0-fast` — priced but **NOT adopted**, see `video-gen-cost-gate/references/VENUES.md`)
 
 - Same contract as 2.5 except: `Shot 1:` storyboard line, **never numeric timestamps** ("does not respond
   to timestamps"); slots 9 img / 3 vid / 3 aud (identical to H3, so a refused job recompiles to H3 without

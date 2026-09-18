@@ -47,9 +47,9 @@ The table follows a production in the order it runs. Each row names a step and i
 on top of the base install, and the key or variable it reads from `.env`. Set up the rows you will use. The
 entry skill (`video-production`), pre-production (`ad-spot-preprod`, `film-preprod`), the prompt
 (`video-prompt-dialects`), the cut (`video-edit-edl`) and the client round (`client-rounds`) need nothing
-more, and the status line reads the balances of a Higgsfield subscription, monid and ElevenLabs once those are
-set up. The Higgsfield API has no balance to read, so its row keeps the wallet in a local ledger. Three rows want a
-GPU of your own, and how much VRAM it has decides which. [If you have no GPU, or a small one](#if-you-have-no-gpu-or-a-small-one) is the whole answer in one place.
+more, and the status line reads the balances of a Higgsfield subscription, monid, treg and ElevenLabs once those
+are set up. The Higgsfield API has no balance to read, so its row keeps the wallet in a local ledger, and the
+status line shows that figure marked as an estimate. Three rows want a GPU of your own, and how much VRAM it has decides which. [If you have no GPU, or a small one](#if-you-have-no-gpu-or-a-small-one) is the whole answer in one place.
 
 | step · skill | what it does | install or sign up for | key or variable |
 |---|---|---|---|

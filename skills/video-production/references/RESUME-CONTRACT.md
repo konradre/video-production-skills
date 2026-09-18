@@ -35,3 +35,7 @@ open: <items>
 ```
 
 A balance the API cannot read is SAID to be unreadable, never shown as 0; a balance is given on demand.
+One wallet sits between the two: the Higgsfield API has no balance endpoint, but `hf_api.py` keeps a local ledger
+of every load, spend and refund, so `--higgsfield-api` shows that figure labelled an ESTIMATE (our arithmetic,
+never the vendor's), and with no ledger it is unreadable like any other. It is a different wallet from the
+subscription's, which `--higgsfield` reads.
