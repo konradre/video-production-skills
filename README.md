@@ -1,18 +1,19 @@
 # video-production-skills
 
 Fifteen agent skills, two host-side tools and a look library for producing video: short-form
-ad campaigns, short films and music videos made from generated footage, and narrated motion-graphics
-explainers drawn in code. The measurements behind the finishing rules are in the references.
+ad campaigns, short films and music videos made from generated footage or from a client's own clips, and
+narrated motion-graphics explainers drawn in code. The measurements behind the finishing rules are in the
+references.
 
 ## What is in the box
 
 | directory | what |
 |---|---|
-| `skills/video-production` | the entry skill. Fixes the genre, rehydrates a paused project, routes the next step to the phase skill that owns it |
-| `skills/ad-spot-preprod` · `skills/film-preprod` | pre-production for an ad campaign, polished or creator-style, or for a film and a music video |
+| `skills/video-production` | the entry skill. Fixes the genre, rehydrates a paused project, routes the next step to the phase skill that owns it, and conforms supplied footage to one frame rate |
+| `skills/ad-spot-preprod` · `skills/film-preprod` | pre-production for an ad campaign, polished or creator-style, or for a film and a music video. When the client supplies the picture, a curation procedure picks the shots from their pack of clips |
 | `skills/video-refs-continuity` | the derived reference set, the start image, the continuity ledger and a refs gate that runs in code before any generation call |
 | `skills/video-prompt-dialects` | the prompt compiled per venue dialect (Seedance 2.5 / 2.0, MiniMax H3, a web front end, two image models), with a linter, and the phone-native dialect a creator-style spot is prompted in |
-| `skills/video-gen-cost-gate` | the venue table, the cost line and the operator's GO, the gated submit path, receipts at acceptance, detached polling. Two hosted routes buy the same Seedance 2.5 model — one by subscription, one pay-as-you-go — and the table ranks them by marginal cost |
+| `skills/video-gen-cost-gate` | the venue table, the cost line and the operator's GO, the gated submit path, receipts at acceptance, detached polling. Five hosted routes sell the same Seedance 2.5 model, and the table ranks whichever of them you hold by marginal cost. The table is a roster you declare, and its rules shape a recommendation rather than refuse a run |
 | `skills/video-take-review` | the per-seed read: continuity first, then the acceptance matrix, voids and usable windows, instruments with self-tests |
 | `skills/video-edit-edl` | the edit as a derived EDL: the beat list from the script, a builder that computes every time, a script-fidelity gate |
 | `skills/spot-audio-assembly` | voice-over, dubs, off-screen voices, sfx and music cues, room tone, captions, the loudness pass and its verification |
@@ -46,15 +47,18 @@ The table follows a production in the order it runs. Each row names a step and i
 on top of the base install, and the key or variable it reads from `.env`. Set up the rows you will use. The
 entry skill (`video-production`), pre-production (`ad-spot-preprod`, `film-preprod`), the prompt
 (`video-prompt-dialects`), the cut (`video-edit-edl`) and the client round (`client-rounds`) need nothing
-more, and the status line reads the Higgsfield and ElevenLabs balances once those are set up. Three rows want a
+more, and the status line reads the balances of a Higgsfield subscription, monid and ElevenLabs once those are
+set up. The Higgsfield API has no balance to read, so its row keeps the wallet in a local ledger. Three rows want a
 GPU of your own, and how much VRAM it has decides which. [If you have no GPU, or a small one](#if-you-have-no-gpu-or-a-small-one) is the whole answer in one place.
 
 | step · skill | what it does | install or sign up for | key or variable |
 |---|---|---|---|
-| references · `video-refs-continuity` | makes the stills: the reference set and the start image | a [kie.ai](https://kie.ai/api-key) key, the default still route; Higgsfield credits are the second | `KIE_API_KEY` |
+| references · `video-refs-continuity` | makes the stills: the reference set and the start image | a [kie.ai](https://kie.ai/api-key) key, the default still route; credits on a Higgsfield subscription are the second, since the Higgsfield API does not sell that image model | `KIE_API_KEY` |
 | references · `video-refs-continuity` | the scene proxy, a room rebuilt as labelled boxes on your own GPU | ComfyUI with one node pack and two checkpoints, listed under [ComfyUI](#comfyui-only-for-work-on-your-own-gpu) | `COMFY_HOST`, plus `COMFY_DIR`, `COMFY_VENV`, `COMFY_ARGS`, `COMFY_LOG` and `COMFY_SSH` for `comfy_up.sh` |
-| generation · `video-gen-cost-gate` | buys Seedance 2.5 and MiniMax H3 seeds, each behind a cost line and your go | a [Higgsfield](https://higgsfield.ai) account with credits and its CLI: `npm install -g @higgsfield/cli`, then `higgsfield auth login` and `higgsfield workspace set <workspace-id>`. A [fal.ai](https://fal.ai/dashboard/keys) key opens a second route, which refuses photoreal people in references | `FAL_KEY`; Higgsfield logs in through its CLI |
+| generation · `video-gen-cost-gate` | buys Seedance 2.5 and MiniMax H3 seeds by subscription, each behind a cost line and your go | a [Higgsfield](https://higgsfield.ai) subscription and its CLI: `npm install -g @higgsfield/cli`, then `higgsfield auth login` and `higgsfield workspace set <workspace-id>`. This is the one route that reaches 1080p Seedance, the hosted Topaz upscale and GPT Image 2.5. A [fal.ai](https://fal.ai/dashboard/keys) key opens a second route, which refuses photoreal people in references | `FAL_KEY`; the Higgsfield CLI logs in on its own |
+| generation · `video-gen-cost-gate` | the same Seedance 2.5 on the Higgsfield REST API, pay-as-you-go, with edit and extend as endpoints of their own. The API quotes no price for Seedance, so `hf_api.py` computes the cost line from the vendor's token formula. It has no balance endpoint either, so the same script keeps the wallet in a local ledger that the submit and poll scripts write | an API key pair from the [Higgsfield console](https://console.higgsfield.ai). It is a separate account with its own wallet, apart from any subscription. It generates at 480p or 720p only. Its uploads take no mp3, so `hf_api_upload.py` converts a voice reference to WAV | `HF_API_KEY_ID`, `HF_API_KEY_SECRET`; `HF_API_LEDGER`, optional |
 | generation · `video-gen-cost-gate` | buys the same Seedance 2.5 seeds pay-as-you-go — by the second rather than by the month — and hosts the reference images they cite, free | a [monid](https://monid.ai) account and its CLI: `npm install -g @monid-ai/cli`, then `monid keys add` to store the key and `monid balance` to confirm it. Credit is pay-as-you-go, so there is no plan to exhaust and no credits to expire. People-free shots only: real human faces are refused upstream by the model host | none — monid keeps the key in its own CLI store, not in `.env` |
+| generation · `video-gen-cost-gate` | the same Seedance 2.5 with its content filter relaxed, pay-as-you-go, for a shot whose reference is a real person | a [treg](https://treg.to) account and its CLI: `pipx install tools-registry`, then `treg login`, which registers you the first time. A call that carries a file has to go through the CLI, and `treg host` is how each reference gets its public URL | none; the CLI keeps its own login |
 | generation · `video-gen-cost-gate` | MiniMax H3 seeds on your own GPU, free per take | an NVIDIA card (we ran a 24 GB one), ComfyUI and the weights in [MiniMax H3 on your own GPU](#minimax-h3-on-your-own-gpu) | the `COMFY_*` variables |
 | the read · `video-take-review` | a take's cut list, contact sheet and frame instruments | nothing more; [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (`pip install faster-whisper`) adds a transcript to the take's record | none |
 | the sound · `spot-audio-assembly` | voice-over, dubs, voice clones and generated sfx | an [ElevenLabs](https://elevenlabs.io/app/settings/api-keys) key | `ELEVENLABS_API_KEY` |
@@ -64,14 +68,21 @@ GPU of your own, and how much VRAM it has decides which. [If you have no GPU, or
 | designed elements · `designed-elements`, `explainer-video` | end cards, turntables and piece walls, and narrated explainers drawn in code | [Node.js](https://nodejs.org/en/download) 22 or newer and `unzip` on the machine that renders, and your display font as a TTF. `npx` fetches HyperFrames, which draws in headless Chromium. Headless Chromium hangs under WSL2, so from WSL2 `render_hyper.sh --host` renders on another Linux machine over ssh and rsync. An explainer's voice and word times come from the sound rows | none |
 | the finish · `video-finish`, `video-finish-qc` | a look's colour | nothing more; ffmpeg's `lut3d` filter applies the cubes | `LOOK_LIBRARY_CUBES`, optional |
 | the finish · `video-finish`, `video-finish-qc` | the phone-native tier: the texture probe, the temporal layer and the phone-class encode | nothing more; ffmpeg 4.4 or newer, which has the `colortemperature` filter, and numpy for the probe | none |
-| the finish · `video-finish-qc` | the hosted upscale, a billed 4× pass for wides where faces sit small and shots with text to read, and for every take if you skip Topaz | the fal key (Topaz Starlight) or Higgsfield credits (Rhea), behind a cost line and your go | `FAL_KEY` |
-| the finish · `video-finish-qc` | the local upscale, a free 4× Rhea pass over approved takes framed chest-up or closer, before the grade | Topaz Video and a GPU with room for it, only if you upscale on your own card; see [Topaz](#topaz-only-for-upscaling-on-your-own-gpu) | `TOPAZ_FFMPEG`, `TVAI_MODEL_DIR` and `TVAI_MODEL_DATA_DIR`, all optional |
-| the finish · `video-finish-qc` | a look's halation, bloom and grain, graded clip by clip in the hero pass | Windows with an NVIDIA GPU, [DaVinci Resolve Studio](https://www.blackmagicdesign.com/products/davinciresolve) (we verified 18.5), a [Dehancer Pro](https://www.dehancer.com/shop/davinci_resolve/pro) 7.x licence, and the in-app bridge from [davinci-resolve-mcp](https://github.com/samuelgursky/davinci-resolve-mcp) | `RESOLVE_PY`, `DAVINCI_RESOLVE_MCP_DIR` and the rest in `tools/README.md` |
+| the finish · `video-finish-qc` | the hosted upscale, a billed 4× pass for wides where faces sit small and shots with text to read, and for every take if you skip Topaz | the fal key (Topaz Starlight) or a Higgsfield subscription (Rhea; the Higgsfield API has no Topaz), behind a cost line and your go | `FAL_KEY` |
+| the finish · `video-finish-qc` | the local upscale, a free 4× Rhea pass over approved takes framed chest-up or closer, before the grade. A talking head generated at 720p skips it for a 1.5× scale; see [How a production runs](#how-a-production-runs) | Topaz Video and a GPU with room for it, only if you upscale on your own card; see [Topaz](#topaz-only-for-upscaling-on-your-own-gpu) | `TOPAZ_FFMPEG`, `TVAI_MODEL_DIR` and `TVAI_MODEL_DATA_DIR`, all optional |
+| the finish · `video-finish-qc` | a look's halation, bloom and grain, graded clip by clip in the hero pass | Windows with an NVIDIA GPU, [DaVinci Resolve Studio](https://www.blackmagicdesign.com/products/davinciresolve) (the kit targets 21; the looks were authored on 18.5 and need no rework), a [Dehancer Pro](https://www.dehancer.com/shop/davinci_resolve/pro) 7.x licence, and the in-app bridge from [davinci-resolve-mcp](https://github.com/samuelgursky/davinci-resolve-mcp) | `RESOLVE_PY`, `DAVINCI_RESOLVE_MCP_DIR` and the rest in `tools/README.md` |
 | any step, optional · your agent | lets the agent drive Resolve itself, to inspect a project, apply a grade or render outside the hero pass | the MCP server from [davinci-resolve-mcp](https://github.com/samuelgursky/davinci-resolve-mcp), v4.1.3 or newer. `npx davinci-resolve-mcp setup` installs it and can register it with Claude Code and eleven other agents and editors. In Resolve Studio, set Preferences ▸ General ▸ External scripting using to Local | none |
 | looks · `look-library/` | rebakes a look or ships a new one | the spectral base cubes from `look-library/fetch_spectral_bases.sh`, and an ffmpeg built with libvmaf for the VMAF gate | none |
 | mastering · `mastering-audio` | a standalone loudness master for a finished mix | Node.js 18 or newer, then `npm install` once in `skills/mastering-audio` | none |
 
 `tools/README.md` and `look-library/GUIDE.md` §5 walk through both Windows setups.
+
+A real person in a reference narrows the routes, and the dividing line is whose face it is, not which venue
+you pick. fal refuses any photoreal person, and monid's model host refuses real faces before generation starts.
+The Higgsfield API and treg both generated from a photograph of an ordinary person, and both refused a
+photograph of a public figure. treg refused it with its content filter switched off, so that switch relaxes the
+check on ordinary faces and leaves the public-figure check in place. No venue checks whether you hold the rights
+to a likeness; that clearance is yours.
 
 ### ComfyUI, only for work on your own GPU
 
@@ -172,6 +183,8 @@ always worse.
 | an ElevenLabs key | generated voice-over and generated sfx | the take's own sound, a library sound, and every caption, loudness and mix step |
 | a music vendor | generated cues | a cue the operator brings or a library bed — the cut, duck and licence rules are the same either way |
 | the monid CLI | the pay-as-you-go generation route and its free reference hosting | the subscription route for the same model, and any other venue in the table |
+| a Higgsfield API key | a pay-as-you-go route that takes an ordinary face, the edit and extend endpoints, and 2K MiniMax H3 at the API's rate | the subscription CLI, which reaches the same models and adds 1080p; treg for an ordinary face; every other Seedance route |
+| the treg CLI | the relaxed-filter route for an ordinary face | the Higgsfield API, which also takes one; fal and monid do not |
 
 The rule the kit holds to: **nothing you are asked to watch needs a build step.** A master plays in any
 player; a designed element's source is one HTML file a browser opens.
@@ -229,8 +242,9 @@ One caveat on `scene_blockout.py`: it ran in ~15–25 s per frame on a 24 GB car
 to run on, **not a measured requirement** — its two checkpoints are small and nobody has tried it on a lesser card.
 If you have some GPU, it is worth one attempt before you assume it is out.
 
-You keep all fifteen skills and every generation route, because all four are hosted: Seedance 2.5 on
-Higgsfield by subscription or on monid pay-as-you-go, fal for people-free shots, kie for stills. You keep the
+You keep all fifteen skills and every generation route, because all of them are hosted: Seedance 2.5 on
+Higgsfield by subscription or through its API, on monid or treg pay-as-you-go, and on fal for people-free
+shots, plus kie for stills. You keep the
 whole finish chain, with the hosted upscale doing the job Topaz would have done. And you keep `look-library/`,
 because applying a look is an ffmpeg `lut3d` filter — Resolve is only needed to author or rebake one. The
 phone-native finish is ffmpeg from end to end.
@@ -295,6 +309,15 @@ the amount does not matter. Nothing is upscaled before the operator has approved
 client's text is the single source of truth and additions are proposed as cost lines. Continuity is
 the first acceptance test, before the gag. Masters are 1080p only. Decisions go to the operator as
 numbered questions with the cost and the file path inline.
+
+Every other house rule in the kit guides rather than blocks. It says what departing from it would cost, as a
+number where one exists, recommends, and then does what the operator decides.
+
+Seedance seeds generate at 480p and are upscaled only after approval, with one exception. A talking head that
+has to speak a locked voice-over generates at 720p, with the voice-over passed as an audio reference on a route
+that accepts one. The audio drives the words, so there is no lipsync pass, and the finish is a 1.5× lanczos
+scale to 1080×1920 in place of a reconstructive upscale. Leave the words out of the prompt: written dialogue
+outranks the audio and demotes it to timbre.
 
 ## The phone-native finish
 
