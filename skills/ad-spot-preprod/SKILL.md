@@ -8,7 +8,8 @@ description: >
   client script arrives or changes, the next spot must be chosen, or a shot list or cost plan is needed. Triggers
   — "the brief", "the client's script", "shot list", "which spot next", "what does the script call for", "cost
   plan", "kit for this SKU", "risk register", "the alternate spec", "a UGC spot", "creator-style ad", "the client's
-  footage", "which clips do we use", "pick the b-roll". Not for a film or a music video — use
+  footage", "which clips do we use", "pick the b-roll", "tear down a reference", "the structure of this reference",
+  "a shot-by-shot breakdown of a reference". Not for a film or a music video — use
   film-preprod. Not for the reference set or the refs gate — use video-refs-continuity. Not for the cost line and
   the submit — use video-gen-cost-gate. Not for the beat gate or the EDL — use video-edit-edl.
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash(python3*), Bash(ls*)
@@ -118,6 +119,13 @@ python3 ~/.claude/skills/video-production/scripts/script_diff.py --script prompt
   `beats.json` from the client's script FIRST, never from a prior cut; the generator's maximum duration READ before
   the shot list exists and written in its header; the script partitioned on CONTINUITY, never on shots — one
   generation per partition within the cap; with voice-over, the lines timed before any duration is fixed.
+- **A format the team has not measured → tear down 3–5 real references BEFORE the shot list.** The reference's STRUCTURE
+  is the asset, never its pixels: `scripts/reference_teardown.py --refs <a> <b> <c> --out review/teardown-<format>
+  --runtime <s>` measures every shot (length, framing by face size, motion, the words with `--asr`) and the rhythm across
+  the set, and writes a timestamped beat grid at that rhythm; the content of each shot is then written by hand (or drafted
+  by a multimodal lane, never its durations), what is kept and what is swapped goes into a table, and each slot takes ONE
+  of our beats — the client's script stays the SSOT, and with a voice-over the VO's phrases cut and the grid only checks
+  the rhythm: [`references/REFERENCE-TEARDOWN.md`](references/REFERENCE-TEARDOWN.md).
 - Then the per-spot shot list from the scaffold (`--spot-type product` for a product spot, `ugc` for one with no
   product, card or wipe): the method line, the cap, the kit table, the room geometry pin, the cast (closed after
   the first keeper), the PARTITIONS with the script lines each serves in full, the audio plan, the acceptance
@@ -142,7 +150,8 @@ python3 ~/.claude/skills/video-production/scripts/script_diff.py --script prompt
   compliance). A synthetic persona presents a demo, never a testimonial.
 
 **Done when:** `SCRIPT-DIFF PASS` on the beats AND on the shot list (`--shots`), the generator's cap is in the
-header with its source, every section is filled, and every partition row quotes the script lines it serves.
+header with its source, every section is filled, every partition row quotes the script lines it serves, and — for a
+new format — `TEARDOWN.md` holds the measured references, the written read, the kept/swapped table and the filled grid.
 
 ## 5. Write the risk register and the fallbacks
 
@@ -198,11 +207,12 @@ plan is saved in the project with its path in the ask.
 | `video-production/scripts/script_diff.py --script --beats [--cover --cover-section] [--elements] [--shots --max-duration]` | quotes token-exact against the client's text (FAIL), uncovered sentences, unnamed fills, and the segmentation gate — a sentence or a partition split across rows (FAIL); `--selftest` |
 | `shotlist_scaffold.py --beats --out [--spot-type product\|ugc] [--max-duration] [--sku]` | the per-spot shot list skeleton — the cap in its header, partition rows with the script lines in full |
 | `cost_plan.py --scenes [--rate] [--extra]` | rounds by dependency, the numbered cost lines, clean and worst case |
+| `reference_teardown.py --refs … --out [--runtime] [--card] [--asr small.en]` · `--selftest` | the measured structure of 3–5 real references in display geometry — shots (a cut = the coarse layout jumps AND the histogram jumps or the frame decorrelates hard), framing by the largest verified face, motion by phase correlation, the words with `--asr` — the rhythm across the set, a timestamped beat grid at that rhythm, `TEARDOWN.md` with the CONTENT column to write, one contact sheet per reference; never overwrites |
 
 ## Cross-references
 
 - [`references/INTAKE.md`](references/INTAKE.md) · [`references/FOOTAGE-CURATION.md`](references/FOOTAGE-CURATION.md) ·
-  [`references/GLOBAL-SPEC.md`](references/GLOBAL-SPEC.md) ·
+  [`references/REFERENCE-TEARDOWN.md`](references/REFERENCE-TEARDOWN.md) · [`references/GLOBAL-SPEC.md`](references/GLOBAL-SPEC.md) ·
   [`references/SHOTLIST-CONTRACT.md`](references/SHOTLIST-CONTRACT.md) · [`references/RISKS.md`](references/RISKS.md).
 - `video-edit-edl` — the beats contract and the gate; `video-refs-continuity` — the reference set the plan
   names; `video-gen-cost-gate` — the cost line form; `designed-elements` — the kit's designed pieces;

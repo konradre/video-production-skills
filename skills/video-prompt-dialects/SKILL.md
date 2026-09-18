@@ -105,7 +105,10 @@ Rules that hold in every section:
 - **Blocking in metres, on named floor and furniture sides** ("two metres in front of the cab glass",
   "along the left side of the table, on the carpet") — a step "toward camera along the table" walked on it.
 - **Beat density ≤ ~1 beat per 3 s**; the model renders locomotion and physical state, not intent — plan
-  comedy around situation, and shrink the beat count before shrinking the seconds.
+  comedy around situation, and shrink the beat count before shrinking the seconds. A reference that cuts faster
+  (`ad-spot-preprod` REFERENCE-TEARDOWN.md's grid) is realised by cuts — composed or edited — never by more actions per
+  shot. ⚠ UNDER TEST since 2026-09-18, not rules: a timestamped beat script as a long generation's prompt and an
+  identity block at the prompt's end — the house template stays the default until a costed A/B lands.
 - **The verb must be the scripted action** ("he drinks from the bottle", not "the others hold him") and the
   reaction's emotion matches its cause (shock, not joy, at a collapse).
 

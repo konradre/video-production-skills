@@ -10,7 +10,7 @@ references.
 | directory | what |
 |---|---|
 | `skills/video-production` | the entry skill. Fixes the genre, rehydrates a paused project, routes the next step to the phase skill that owns it, and conforms supplied footage to one frame rate |
-| `skills/ad-spot-preprod` · `skills/film-preprod` | pre-production for an ad campaign, polished or creator-style, or for a film and a music video. When the client supplies the picture, a curation procedure picks the shots from their pack of clips |
+| `skills/ad-spot-preprod` · `skills/film-preprod` | pre-production for an ad campaign, polished or creator-style, or for a film and a music video. When the client supplies the picture, a curation procedure picks the shots from their pack of clips. For a new format, a reference teardown measures the shot lengths, face sizes, camera moves and speech timing of three to five real examples and turns them into a timed beat grid |
 | `skills/video-refs-continuity` | the derived reference set, the start image, the continuity ledger and a refs gate that runs in code before any generation call |
 | `skills/video-prompt-dialects` | the prompt compiled per venue dialect (Seedance 2.5 / 2.0, MiniMax H3, a web front end, two image models), with a linter, and the phone-native dialect a creator-style spot is prompted in |
 | `skills/video-gen-cost-gate` | the venue table, the cost line and the operator's GO, the gated submit path, receipts at acceptance, detached polling. Five hosted routes sell the same Seedance 2.5 model, and the table ranks whichever of them you hold by marginal cost. The table is a roster you declare, and its rules shape a recommendation rather than refuse a run |
@@ -38,7 +38,7 @@ issue rather than a patch.
 ## What you need
 
 The base install is an agent that reads `SKILL.md` — Claude Code and Codex both do — Python 3.10 or newer
-with numpy, Pillow, scipy and PyYAML (`pip install numpy pillow scipy pyyaml`), and
+with numpy, Pillow, scipy, PyYAML and OpenCV (`pip install numpy pillow scipy pyyaml opencv-python`), and
 [ffmpeg](https://ffmpeg.org/download.html).
 On Windows, run the kit inside WSL2. The skills give the agent bash commands, and WSL2 is where we built the kit.
 `AGENTS.md` is the short orientation an agent reads before its first action; this file is the long form.

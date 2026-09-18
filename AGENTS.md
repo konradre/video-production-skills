@@ -33,7 +33,7 @@ exists and is not a symlink.
 Discovery: Codex scans `.agents/skills` and `$HOME/.agents/skills` and invokes with `$<skill-name>`.
 Claude Code scans `~/.claude/skills`.
 
-Base: Python 3.10 or newer with `numpy`, `Pillow`, `scipy`, `PyYAML`, plus `ffmpeg`. On Windows, run the
+Base: Python 3.10 or newer with `numpy`, `Pillow`, `scipy`, `PyYAML`, `opencv-python`, plus `ffmpeg`. On Windows, run the
 kit inside WSL2.
 
 ## Keys
