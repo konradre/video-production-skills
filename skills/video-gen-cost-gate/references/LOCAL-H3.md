@@ -44,6 +44,28 @@ the same job at no cost.
 it is a RESTORATION pass — it earns its keep on degraded or external footage and does nothing for a clean
 native take: see § "Whether a second pass earns its place".
 
+## Why posted H3 looks better than this recipe — the recipe is tuned for SPEED
+
+The recipe above was tuned for time per take (14× end to end, § "The four config rules"); quality was held only
+where it was measured. The H3 people post that looks far better is bought differently. Community corpus,
+2026-09-19 — r/StableDiffusion and the Banodoco Discord, several independent posters per lever — and **not yet
+measured here** (the arms below are queued):
+
+| lever | posted quality work | this recipe |
+|---|---|---|
+| steps and distill | the reference sampler is 50 flow-matching steps on full weights (AMD's day-0 H3 serving article: Euler-ancestral, `flow_shift` 12 / audio 3). Local quality runs use 16–50 steps with no turbo LoRA, or an 8-step DMD turbo LoRA; the top-voted local showcase dropped turbo LoRAs because they lost detail. 10–65 min per clip | 4 steps on a 4-step turbo LoRA, ~2 min |
+| resolution | ~0.98 MP is the trained native, but heavy users call anything under ~2 MP "token-starved": a SECOND pass re-samples at 1.8–2 MP for 3–12 real steps (8 DMD steps at 0.9 MP + 3 at 1.8 MP; 16 at 1 MP + a 6-step de-rope at 2 MP) | 0.98 MP, then the 2-step light refine to 2.09 MP over the 4-step base |
+| face size | far and small faces are H3's best-known weakness; showcase work frames medium or close, and a wide gets a Topaz or crop-regenerate-blend face pass | S02's face is ~56 px at 768p — under the review floor (`video-take-review` § 3, faces) |
+| sparse window | sol attention kept to 40–90 % of the schedule, "really better" (one report) | sol from 20 % to the end |
+| motion | "de-rope", a targeted temporal re-sample, for fast-motion smear | none; S02 barely moves |
+| curation | cheap previews per seed, re-renders, the best of many posted | every seed is read |
+
+The operator's eye on the ×2 master (2026-09-19): both passes read low-res, and the ×2 reads better because more
+of the mouth is legible — the face-size row, not a sampler setting. Queued on S02 the same day: a 2× punch-in
+start still cut from the 2K plate (framing), and no turbo at 20 and 50 steps with sol on 0.4–0.9 under the same
+×2 refine, against the shipped ×2 route as the control (compute). Until they land, the table is the community's
+claim — and the step arm below is why each one gets an audio read as well as a frame read.
+
 ## The four config rules, each measured
 
 **1. The CUDA build is the single biggest lever, and it is silent when wrong.** The fast attention
@@ -108,7 +130,8 @@ handoff that rescales mid-sampling holds the grade from frame 0 — § "Starting
 ## How many steps — 4 stays, and the reason is the AUDIO
 
 **Keep the 4 steps the recipe ships.** A lower count measures better on every video instrument we own and
-is still the wrong call, and the way that was caught is the point of this section.
+is still the wrong call, and the way that was caught is the point of this section. More steps without the turbo
+LoRA is the community's quality route and is not measured here yet (§ "Why posted H3 looks better").
 
 Measured on one box, one prompt, one trunk, a locked static shot, two seeds, everything else identical:
 

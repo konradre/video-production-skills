@@ -145,7 +145,9 @@ haphazard angles), lettering (string and position against the accepted close-up)
 previous keeper (every person's position, the door leaf's swing, their distance from it), the cast
 counted once each at 2× across the crowd, anatomy per person in a per-person crop at 3× (arms, hands,
 legs, where each arm ends; one prop per hand), a silent subject's mouth closed (frame 0 copies the still, and a
-mouth caught mid-word opens the take on a flap: 0.31 → 0.19 with only the mouth closed, local H3, 2026-09-19),
+mouth caught mid-word opens the take on a flap: 0.31 → 0.19 with only the mouth closed, 0.15 with a concrete
+soundscape too, local H3, 2026-09-19) — and a SPEAKING subject's mouth open mid-syllable, because the model reads
+the picture's mouth as the resting state and a closed one gives a lazy mouth (community, not measured here),
 and the ledger (what has happened is visible; what the script has not yet done is absent).
 
 ```

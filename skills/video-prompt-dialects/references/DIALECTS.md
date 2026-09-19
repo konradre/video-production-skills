@@ -237,11 +237,17 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
     still that catches the subject mid-word opens the take on an open mouth the model then works. Local, 2026-09-19,
     six paired seeds per arm, first-1.5 s mouth-open ratio (inner-lip gap ÷ mouth width): both stills mid-word 0.31;
     the same room still with ONLY the mouth closed 0.19 — lower on 6 of 6 seeds, shut through 1.5 s on 5 of 6.
-    Accept a silent subject's start still with the mouth closed (`video-refs-continuity` § 3). What did NOT fix it:
-    "nobody speaks" and "keeps his mouth naturally closed" (09-10), anchoring digital silence as the soundtrack
-    (0.32), deleting every speech word (0.27, a little). The seated people held shut under "keep their mouths
-    naturally closed". With no closed-mouth still to hand, trim the first second in the edit, or write the line.
-    ⚠ One scene, our own measurement; not yet corroborated upstream.
+    Accept a silent subject's start still with the mouth closed (`video-refs-continuity` § 3). With the concrete
+    soundscape below as well the two fixes stack: 0.15, none of six above 0.30, shut through 1.5 s on 6 of 6, and no
+    invented sound on 6 of 6 — the seed that invented speech under three other arms included (09-19). What did NOT
+    fix it: "nobody speaks" and "keeps his mouth naturally closed" (09-10 — the wording the official guide and the
+    community quote), anchoring digital silence as the soundtrack (0.32), deleting every speech word (0.27, a
+    little). The seated people held shut under "keep their mouths naturally closed". With no closed-mouth still to
+    hand, trim the first second in the edit, or write the line. The mechanism is corroborated from the other side,
+    independently on r/StableDiffusion and the Banodoco Discord: the reference's mouth state is read as the RESTING
+    state — a closed mouth gave a speaking subject a lazy mouth for the whole clip, and a picture caught mid-syllable
+    drove the articulation more than any prompt wording. So a SPEAKING subject's picture shows the mouth open
+    mid-syllable (community practice; not measured here).
   - **A quiet shot gets a CONCRETE soundscape, never an absence.** "the room's natural quiet; no speech, no music"
     left invented sound in 2 of 6 takes; "soft living-room room tone with a low ventilation hum continues
     throughout" with `non_diegetic_music: N/A` left it in 0 of 6 and calmed the mouth later in the take (median
