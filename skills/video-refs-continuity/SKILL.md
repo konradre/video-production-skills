@@ -72,7 +72,11 @@ of an accepted still › a fresh still. Build in this order:
    camera rides as its layout-only reference (SCENE-PROXY.md). Which shots take a start image and which go
    refs-only is decided per shot by what it must hold (`video-gen-cost-gate` SKILL § Mode by what the shot
    must hold): an exact continuation or a defined Seedance move → a start image; a fresh angle → refs + the
-   grey frame.
+   grey frame. A continuation's frame 0 comes back drifted from its start image — Seedance 2.5 flatter and
+   cooler (red contrast −6 to −9 %, blue +0.011 to +0.030, same sign on 5 of 5), Seedance 2.0 and local H3
+   darker (2026-09-19) — and the drift compounds over chained continuations (the community reports burn-in
+   by the third hop). Grade-match every continuation cut in finishing (`video-finish` "Diagnose a look
+   complaint per shot"), and plan a long chain with that correction in it.
 2. **Before/after pairs from ONE source** — the "after" still is an edit of the accepted "before". A kept
    post-state element (a transformed mantel) has its pre-state DERIVED from the kept frame with the
    change reversed. Pre-state refs ride only pre-transition gens, post-state refs only post-transition
@@ -140,8 +144,9 @@ run the scene's acceptance rows on it at zoom and record them: product pieces at
 haphazard angles), lettering (string and position against the accepted close-up), geometry against the
 previous keeper (every person's position, the door leaf's swing, their distance from it), the cast
 counted once each at 2× across the crowd, anatomy per person in a per-person crop at 3× (arms, hands,
-legs, where each arm ends; one prop per hand), and the ledger (what has happened is visible; what the
-script has not yet done is absent).
+legs, where each arm ends; one prop per hand), a silent subject's mouth closed (frame 0 copies the still, and a
+mouth caught mid-word opens the take on a flap: 0.31 → 0.19 with only the mouth closed, local H3, 2026-09-19),
+and the ledger (what has happened is visible; what the script has not yet done is absent).
 
 ```
 python3 scripts/refs_gate.py --root <project> --accept <NAME> --note "<every row checked>"

@@ -8,7 +8,7 @@ Read this only after `VENUES.md` puts the shot on the local lane. Everything her
 ```
 trunk    a Ref2VA pruned int8 FINETUNE (not the stock pruned trunk — see "trunk choice")
 LoRA     the 4-step ref2v turbo distill @ 1.0
-sampling 4 steps · euler · simple · CFG 1 · SigmaShift 12/3
+sampling 4 steps · euler · simple · CFG 1 · SigmaShift 12/3 (video:audio ≈ 4:1 — move both or neither)
 attention  the framework's fast attention backend  +  block-sparse (sol) τ 1.3, start_percent 0.2
 refs     the angle still + the identity still; a SMALL proxy clip if the shot has a move
 prompt   the H3 schema, with every clause about an input the graph does not carry deleted (L31)
@@ -22,6 +22,22 @@ VRAM while it runs.
 schedule → 1088×1920, lock intact, ≈ 410 s all in. Never the strong schedule: measured worse on every
 axis — temporal stability 47.9 vs 51.8 dB with a 26 dB single-frame jump, edges 14 vs 3, and it ends
 up *softer* (detail 298 vs 319) despite doing more denoising work.
+
+**The ×2 pass keeps the audio bit-identical and RE-ANIMATES the mouth** (2026-09-19). On a speaking take its
+mouth motion was uncorrelated with pass 1's (−0.03); on a silent take a barely parted mouth came back open
+(mouth-open ratio 0.21 → 0.67). The 544→768 refine closed one instead (0.23 → 0.08); the LMS pass kept it
+(0.21 → 0.23). By eye the ×2 lip sync read BETTER than pass 1's, because the mouth is legible at 1088 — but it
+is the refine's articulation over pass 1's audio, so review lip sync on the ×2 master itself, never infer it
+from pass 1 (n = 1 speaking take). Hivemind: pushing the denoise "can and will hurt lip sync". The shift pair
+in the recipe stays near 4:1 for the same joint-stream reason: an upstream long-video node documents that the
+audio breaks otherwise (not measured here), and no frame instrument would see it.
+
+**Pinning the soundtrack to digital silence** — a `MiniMaxH3AddGuide` carrying only an audio input of silence
+at frame 0 — returns a silent track (invented sound 2 of 6 → 0 of 6) and a calmer mouth later in the take
+(median ratio 0.112 → 0.069), for −0.01 of frame-0 plate match on 6 of 6 seeds (2026-09-19). It does NOT stop
+the first-second mouth flap; the start still does (`video-prompt-dialects` DIALECTS § MiniMax H3). Reach for it
+where the native audio is discarded and a still mouth matters; for the audio alone, a concrete soundscape does
+the same job at no cost.
 
 **For more fine texture, change the TRUNK before you reach for a second pass.** The two trunks differ by
 27 % in fine detail on an otherwise identical take, at identical cost. There is also a sharpener LoRA, but

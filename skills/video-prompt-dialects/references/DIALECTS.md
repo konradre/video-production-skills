@@ -233,8 +233,25 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
   - `<Audio N>` is a mouth-and-breath scaffold, not a voice: timbre lands ~2 semitones high with a narrower
     range and accent drift — the delivered voice is dubbed.
   - A silent STANDING subject in a presenting pose mouths a silent syllable in the first second on H3 (4 of 6 static
-    takes, 09-10) — "nobody speaks" and "keeps his mouth naturally closed" both failed to stop it; the seated people
-    held shut under "keep their mouths naturally closed". Trim the first second in the edit, or write the line.
+    takes, 09-10). **The cause is the START STILL:** frame 0 copies the picture the prompt calls the whole frame, so a
+    still that catches the subject mid-word opens the take on an open mouth the model then works. Local, 2026-09-19,
+    six paired seeds per arm, first-1.5 s mouth-open ratio (inner-lip gap ÷ mouth width): both stills mid-word 0.31;
+    the same room still with ONLY the mouth closed 0.19 — lower on 6 of 6 seeds, shut through 1.5 s on 5 of 6.
+    Accept a silent subject's start still with the mouth closed (`video-refs-continuity` § 3). What did NOT fix it:
+    "nobody speaks" and "keeps his mouth naturally closed" (09-10), anchoring digital silence as the soundtrack
+    (0.32), deleting every speech word (0.27, a little). The seated people held shut under "keep their mouths
+    naturally closed". With no closed-mouth still to hand, trim the first second in the edit, or write the line.
+    ⚠ One scene, our own measurement; not yet corroborated upstream.
+  - **A quiet shot gets a CONCRETE soundscape, never an absence.** "the room's natural quiet; no speech, no music"
+    left invented sound in 2 of 6 takes; "soft living-room room tone with a low ventilation hum continues
+    throughout" with `non_diegetic_music: N/A` left it in 0 of 6 and calmed the mouth later in the take (median
+    ratio 0.112 → 0.066; local, 2026-09-19). It is the community's standing advice too (hivemind, 2026-09-18/19;
+    r/StableDiffusion "How to make H3 stop talking gibberish?"): H3 fills an empty audio lane with talk, so give it
+    something to hear (L35).
+  - Two pictures of one person did NOT draw him twice on H3: a room still that holds him plus his identity still,
+    0 doubles in 48 local takes, bound in the prompt or not (2026-09-19). The room-ref rule of `video-refs-continuity`
+    § 2 item 6 was measured on stills and Seedance; on H3 the binding sentence ("exactly as he stands in
+    <Picture 1>") stays the house form, not a fix for a failure seen here.
   - Tail: the local model degrades 1.2–1.7 s before the end; two hosted 5 s takes did not (H3A flat to the last
     frame, 2026-09-10). Read every take's last 1.5 s with `video-take-review/scripts/frame_psnr.py` regardless.
   - Verify a beat with PSNR, not the eye: > 45 dB frozen · 30–40 breathing only (a failed beat where one was
