@@ -21,7 +21,8 @@ VRAM while it runs.
 **For a higher-resolution master:** a ×2 tiled latent-upscale second pass on the *light* refine
 schedule → 1088×1920, lock intact, ≈ 410 s all in. Never the strong schedule: measured worse on every
 axis — temporal stability 47.9 vs 51.8 dB with a 26 dB single-frame jump, edges 14 vs 3, and it ends
-up *softer* (detail 298 vs 319) despite doing more denoising work.
+up *softer* (detail 298 vs 319) despite doing more denoising work. A no-turbo 20-step base under the same light
+refine gives a sharper master (face detail +9.5–13 %) at 1.9× the time (§ "Why posted H3 looks better").
 
 **The ×2 pass keeps the audio bit-identical and RE-ANIMATES the mouth** (2026-09-19). On a speaking take its
 mouth motion was uncorrelated with pass 1's (−0.03); on a silent take a barely parted mouth came back open
@@ -48,8 +49,8 @@ native take: see § "Whether a second pass earns its place".
 
 The recipe above was tuned for time per take (14× end to end, § "The four config rules"); quality was held only
 where it was measured. The H3 people post that looks far better is bought differently. Community corpus,
-2026-09-19 — r/StableDiffusion and the Banodoco Discord, several independent posters per lever — and **not yet
-measured here** (the arms below are queued):
+2026-09-19 — r/StableDiffusion and the Banodoco Discord, several independent posters per lever. Two of the levers are
+measured here (below the table); the rest are the community's claim:
 
 | lever | posted quality work | this recipe |
 |---|---|---|
@@ -61,10 +62,20 @@ measured here** (the arms below are queued):
 | curation | cheap previews per seed, re-renders, the best of many posted | every seed is read |
 
 The operator's eye on the ×2 master (2026-09-19): both passes read low-res, and the ×2 reads better because more
-of the mouth is legible — the face-size row, not a sampler setting. Queued on S02 the same day: a 2× punch-in
-start still cut from the 2K plate (framing), and no turbo at 20 and 50 steps with sol on 0.4–0.9 under the same
-×2 refine, against the shipped ×2 route as the control (compute). Until they land, the table is the community's
-claim — and the step arm below is why each one gets an audio read as well as a frame read.
+of the mouth is legible — the face-size row, not a sampler setting. **Measured the same day on S02** (local, three
+seeds each, the closed-mouth start still and the concrete soundscape):
+
+- **Framing is the big lever.** A 2× punch-in start still cut from the 2K plate (native pixels, the face ~2×) under
+  the shipped recipe: face detail at equal size 1.41–1.55× the wide on every seed, at the same compute; the camera
+  held the tighter frame, the mouth stayed shut, no invented sound. A silent take — lip sync at the bigger face is
+  not measured yet.
+- **Compute is a modest lever, and only through the ×2.** No turbo, euler 20 steps, sol on 0.4–0.9, then the same
+  ×2 turbo refine: the master gains 9.5–13 % face detail and up to 14 % whole-frame detail, holds the still and the
+  camera better and runs steadier, 3 of 3 seeds, for 1.9× the time (~11.5 min a master against ~6). The 768 base
+  alone is steadier but SOFTER (face detail lower on 3 of 3) — never judge this lever on pass 1. 50 steps bought
+  nothing over 20 at 3.6× the time. The audio stayed clean at 20 and 50 steps without turbo.
+- The two are independent (stacking them is not tested yet). When the face carries the beat, frame it large first; add the no-turbo base when the master's
+  detail matters and the time is there. Every arm here still got an audio read — the step arm below is why.
 
 ## The four config rules, each measured
 
@@ -131,7 +142,8 @@ handoff that rescales mid-sampling holds the grade from frame 0 — § "Starting
 
 **Keep the 4 steps the recipe ships.** A lower count measures better on every video instrument we own and
 is still the wrong call, and the way that was caught is the point of this section. More steps without the turbo
-LoRA is the community's quality route and is not measured here yet (§ "Why posted H3 looks better").
+LoRA — the community's quality route — measured 2026-09-19: sharper only through the ×2 refine, by ~10 %, at 1.9× the
+time, with clean audio (§ "Why posted H3 looks better").
 
 Measured on one box, one prompt, one trunk, a locked static shot, two seeds, everything else identical:
 
