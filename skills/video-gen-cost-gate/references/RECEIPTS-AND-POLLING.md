@@ -72,6 +72,10 @@ load-bearing fact ("two earlier gens passed with the same words") is usually ask
 - Batch ≤ 5 assets per shell call on the image leg (1–2 min each; a 5-minute tool timeout kills the loop
   mid-flight); ~30 % transient errors in tight loops — retry.
 - A missing completion sentinel is a failure regardless of file size.
+- kie video (`gen_video_kie.py`) writes `receipts/kie-tasks-<key>.json` at task creation, then detaches `kie_poll.py` on
+  that batch's own file (`receipts/kie-batch-<key>-<stamp>.json`), logging to `takes/kie-poll-<key>.log`; its sentinel
+  is `KIE-POLL-END`. A later batch for the same scene numbers its takes after the last one on record, so it never
+  overwrites a paid take.
 
 ## Disk and memory
 

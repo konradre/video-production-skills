@@ -235,6 +235,10 @@ python3 scripts/hf_submit.py --root <project> --scene S02-G4 --prompt prompts/r2
     --mode omni_reference --duration 8 --refs ROOM,W1,PRODUCT-sheet --start-image S02-G4-start --seeds 3 [--go]
 python3 scripts/gen_stills.py --root <project> --only S02-G4-start [--model gpt25|gpt25s|nano|gpt2] [--fresh-scene] [--go]
 python3 scripts/gen_video_fal.py --root <project> --prompt-file … --engine seedance|h3 --mode r2v --refs … [--go]
+python3 scripts/gen_video_kie.py --root <project> --scene S01-H1 --prompt prompts/omni/S01-H1.txt \
+    --mode t2v|i2v|flf|r2v --duration 4|6|8|10 [--refs A,B] [--start-image NAME] [--audio-ids ID] [--go]  # Omni, kie first
+python3 scripts/gen_video_fal.py --root <project> --prompt-file … --engine omni --mode i2v|r2v|t2v \
+    --image … --duration 7 --resolution 720p --aspect-ratio 9:16 [--go]                                 # Omni, the fallback
 python3 scripts/monid_upload.py --root <project> --batch 'references/*.png' --go   # sfs, $0.00, idempotent
 python3 scripts/monid_upload.py --root <project> --verify        # ONE recursive /ls for the whole set
 python3 scripts/monid_upload.py --root <project> --refresh --go  # re-issue lapsed urls, moves no bytes
@@ -320,6 +324,10 @@ never `tail -f | grep`. Mechanics in [`references/RECEIPTS-AND-POLLING.md`](refe
   `COMPLETED` with `providerResponse.httpStatus` 404/500 and is NOT charged**, so `monid_poll.py` reads
   the http status and the run's own `cost.value` before calling a take failed or a failure billed. A
   reply with **no `runId` at all** is a body the gateway rejected: no run exists and nothing was billed.
+- **kie video is create-then-poll** (`gen_video_kie.py` detaches `kie_poll.py`; match `" DONE | FAILED|KIE-POLL-END"`).
+  Billing is at task creation; a create reply without code 200 made no task and billed nothing; `resultJson` is a JSON
+  STRING holding `resultUrls`. Whether kie charges a FAILED video task is unverified: the receipt keeps the task record
+  verbatim, and nothing calls a failure free until kie's own record does.
 - Two 504s in a row is an outage: stop paying to find out; switch venue on the next GO.
 - The billing header on fal is late, not absent: re-fetch the result URL until it appears; never record
   a missing header as zero. Seedance bills actual output seconds; H3 bills the requested integer.

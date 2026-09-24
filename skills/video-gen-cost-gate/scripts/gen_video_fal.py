@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-gen_video_fal.py — fal video runner: Seedance 2.5 (i2v | r2v) and MiniMax H3 (r2v). fal REFUSES any photoreal person
-in a reference or start frame (content_policy_violation, billed 0) — use it for people-free shots only; the
-production route for people is Higgsfield (hf_submit.py). FAL_KEY comes from the environment.
+gen_video_fal.py — fal video runner: Seedance 2.5 (i2v | r2v), MiniMax H3 (r2v) and Gemini Omni Flash 1.1
+(i2v | r2v | t2v — the Omni FALLBACK; kie is the first Omni venue, gen_video_kie.py). fal's SEEDANCE refuses any
+photoreal person in a reference or start frame (content_policy_violation, billed 0) — people-free shots only there;
+Omni took a generated photoreal presenter as its start frame (a talking-head job, 2026-09-16/17). FAL_KEY comes from
+the environment.
 
-Dry by default: prints the compiled body and the estimate, then stops. `--go` spends.
+Dry by default: prints the compiled body and the estimate, then stops. `--go` spends. One request per run: a second
+seed is a second run under its own --name.
 
-THREE ENGINES, THREE PROMPT DIALECTS. They are not interchangeable:
+FOUR ENGINES, FOUR PROMPT DIALECTS. They are not interchangeable:
     Create a Meme (Seedance)  @ref1        start+end frames AND refs together
     fal Seedance 2.5          @Image1      i2v OR r2v — never both
     fal MiniMax H3            Image 1      refs + video refs, 5-15s only
+    fal Omni Flash 1.1        list order   i2v (+ end frame) | r2v | t2v, integer 3-10 s, 720p native, NO audio
+                                           input on any endpoint — the model voices the line itself
 
 Wire facts learned live — do not rediscover them:
 
@@ -61,6 +66,20 @@ ENGINES = {
         # through our gate for fal to reject.
         "ref_caps": {"image": 9, "video": 3, "audio": 3, "total": 12},
     },
+    "omni": {
+        # Gemini Omni Flash 1.1 — the Omni FALLBACK (kie first since 2026-09-25). fal's own schema,
+        # read free 2026-09-25: integer duration 3-10, 360p / 720p / 1080p / 4k (720p is native — 1080p and 4k are
+        # Google's upscale), 16:9 or 9:16 only, prompt <= 20000 chars; r2v image_urls maxItems 10 and
+        # reference_video_urls maxItems 3, each video <= 3 s. No endpoint takes audio. The i2v take was proven live
+        # with a fal-storage url; this script sends data URIs, as for every other fal engine.
+        "i2v": "google/gemini-omni-flash/v1.1/image-to-video",
+        "r2v": "google/gemini-omni-flash/v1.1/reference-to-video",
+        "t2v": "google/gemini-omni-flash/v1.1/text-to-video",
+        "rates": {"360p": 0.03, "720p": 0.10, "1080p": 0.15, "4k": 0.30},
+        "res_default": "720p",
+        "duration_range": (3, 10),
+        "ref_caps": {"image": 10, "video": 3, "audio": 0, "total": 13},
+    },
 }
 
 
@@ -99,11 +118,11 @@ def main():
     ap.add_argument("--root", default=".")
     ap.add_argument("--prompt-file", required=True)
     ap.add_argument("--engine", default="h3", choices=list(ENGINES))
-    ap.add_argument("--mode", default="r2v", choices=["i2v", "r2v"])
-    ap.add_argument("--image", help="seedance i2v: start frame")
-    ap.add_argument("--end-image", help="seedance i2v: optional end frame")
+    ap.add_argument("--mode", default="r2v", choices=["i2v", "r2v", "t2v"], help="t2v: omni only")
+    ap.add_argument("--image", help="seedance / omni i2v: start frame")
+    ap.add_argument("--end-image", help="seedance / omni i2v: optional end frame")
     ap.add_argument("--refs", help="r2v: comma-separated paths, in prompt-citation order")
-    ap.add_argument("--ref-videos", help="h3 only: comma-separated video paths (2-15s each)")
+    ap.add_argument("--ref-videos", help="h3 / omni r2v: comma-separated video paths (h3 2-15s each, omni <= 3s each)")
     ap.add_argument("--aspect-ratio", default="16:9")
     ap.add_argument("--duration", default="auto")
     ap.add_argument("--resolution")
@@ -133,8 +152,13 @@ def main():
     if a.duration != "auto":
         if not lo <= int(a.duration) <= hi:
             sys.exit(f"{a.engine} duration must be {lo}-{hi}s; got {a.duration}")
-    elif a.engine == "h3":
-        sys.exit("h3 has no 'auto' duration — pass --duration 5..15")
+    elif a.engine in ("h3", "omni"):
+        sys.exit(f"{a.engine} has no 'auto' duration — pass --duration {lo}..{hi}")
+    if a.engine == "omni":
+        if a.aspect_ratio not in ("16:9", "9:16"):
+            sys.exit(f"omni takes 16:9 or 9:16 only (fal's schema); got {a.aspect_ratio}")
+        if len(prompt) > 20000:
+            sys.exit(f"omni prompt is {len(prompt)} chars; fal's schema caps it at 20000")
 
     start = end = None
     srcs, vids = [], []
@@ -144,6 +168,9 @@ def main():
         start = Path(a.image)
         end = Path(a.end_image) if a.end_image else None
         srcs = [start] + ([end] if end else [])
+    elif a.mode == "t2v":
+        if a.refs or a.ref_videos or a.image or a.end_image:
+            sys.exit("--mode t2v takes no references and no start frame — use i2v or r2v")
     else:
         if not a.refs:
             sys.exit("--mode r2v needs --refs")
@@ -175,6 +202,17 @@ def main():
         }
         if vids:
             body["reference_video_urls"] = [data_uri(p) for p in vids]
+    elif a.engine == "omni":
+        # ONLY the fields fal's Omni schema lists: the queue accepts any body and the runner rejects it later
+        body = {"prompt": prompt, "duration": int(a.duration), "resolution": res, "aspect_ratio": a.aspect_ratio}
+        if a.mode == "i2v":
+            body["image_url"] = data_uri(start)
+            if end:
+                body["end_image_url"] = data_uri(end)
+        elif a.mode == "r2v":
+            body["image_urls"] = [data_uri(p) for p in srcs]
+            if vids:
+                body["reference_video_urls"] = [data_uri(p) for p in vids]
     else:
         body = {
             "prompt": prompt,
@@ -213,6 +251,8 @@ def main():
     print(f"prompt      {len(prompt)} chars")
     if a.mode == "i2v":
         print(f"start       {start.name}\nend         {end.name if end else '—'}")
+    elif a.mode == "t2v":
+        print(f"text only   aspect {a.aspect_ratio}")
     else:
         print(f"refs        {len(srcs)} images, {len(vids)} videos · aspect {a.aspect_ratio}")
     print(f"estimate    {res} x {a.duration}s = ${est:.2f}" if secs else
