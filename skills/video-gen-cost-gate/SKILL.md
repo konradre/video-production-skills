@@ -113,6 +113,10 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   is $0.0715/s there, 45 % under fal. ⚠ The API has **no cost cap** (treg takes `X-Treg-Max-Cost`), returns **no
   estimate number** for Seedance, and its `video-extend` takes a `video_url`, **not the CLI's job id** — feed the
   keeper's own output URL back (outputs live ≥ 7 days; untested, one receipt settles it).
+- **A person or object swapped into an EXISTING clip → the Higgsfield API's Genjutsu** (`--model genjutsu --mode
+  object-swap`, or `motion-transfer` to drive a reference with the clip's motion) — the one route that re-casts
+  footage we already hold. Priced per second of INPUT, rounded up ($0.318 @480p, list); the source is the gate's
+  start image and its length is probed, never typed (`references/VENUES.md` § Video).
 - **A prompt for an audio-driven take carries the VO's own speech windows as numeric beats** — it fixes the ENDPOINT
   (end-of-line error 0.83 s → 0.06 s, measured) but not the interior: the model buys the ending by elongating one word.
   🔴 **Do NOT repair the residue by retiming in post on the strength of a metric** — two repairs measured better and were
@@ -140,7 +144,10 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
 - A new venue or model is proven on the HARDEST shot first (a lipsync line, the product close-up),
   never the easiest — passing the easy spot proves the chain runs, not that the hard parts work.
 - **A creator-style talking head** (a UGC spot) routes by SHOT TYPE: a simple talking head or a hook sweep → Gemini Omni
-  Flash 1.1 on fal (720p native, 3–10 s, no audio input, ~15 % of takes stutter → regenerate); product-in-hand, a 30 s
+  Flash 1.1, **kie first, fal the fallback** (since 2026-09-25: kie `google/gemini-omni-flash-1-1` is $0.525 per
+  8 s at 720p or 1080p against fal's $0.80 / $1.20, sold in fixed 4 / 6 / 8 / 10 s steps — fal takes any whole second
+  3–10 s, and a 360p draft or a 3 s take is cheaper there, so the cost line quotes both; 720p native, no uploaded audio,
+  ~15 % of takes stutter → regenerate); product-in-hand, a 30 s
   story or a pinned voice → Seedance 2.5; a defined handheld move ≤ 8 s → Kling 3.0; the words that must land exactly →
   an audio-driven model or a lipsync pass, never a prompt. The cost line quotes the price per USABLE take with its assumed
   keep rate (3:1–6:1 across models), and a cheap take is regenerated where an expensive one is repaired
@@ -243,6 +250,8 @@ python3 scripts/hf_api_upload.py --root <project> --verify       # free HEAD per
 python3 scripts/hf_api_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \
     --mode t2v|i2v|r2v|edit|extend --duration 8 --refs ROOM,W1 [--audio VO] [--video-refs ORBIT] \
     [--source <keeper URL>] [--input-seconds N] --resolution 480p|720p [--model h3] [--go]
+python3 scripts/hf_api_submit.py --root <project> --scene G1 --prompt prompts/v2v/G1.txt \
+    --model genjutsu --mode object-swap|motion-transfer --source <clip NAME> --refs A,B [--go]
 ```
 
 **The Higgsfield API is the one venue that hands back NO price, so the gate computes one.** `/estimate`

@@ -11,6 +11,9 @@ gate-ledger record and a WALLET-ledger spend per seed BEFORE polling, then hf_ap
       [--video-refs NAME] [--start-image NAME] [--end-image NAME] [--source NAME|URL]
       [--input-seconds N] [--seeds 1] [--resolution 480p|720p] [--ratio 9:16] [--model seedance|h3]
       [--births R,R] [--prose X,Y] [--fresh-scene] [--despite-gate] [--go]
+  hf_api_submit.py --root <project> --scene G1 --prompt prompts/v2v/G1.txt --model genjutsu
+      --mode object-swap|motion-transfer --source <clip NAME> --refs NAME[,NAME…] [--resolution 480p]
+      [--input-seconds N] [--seeds 1] [--go]
 
 Reference NAMES resolve through <root>/hf-api-urls.json (hf_api_upload.py, free); a raw URL is
 refused for a reference, because the gate must see a name.
@@ -32,6 +35,12 @@ WIRE FACTS (VENUES.md § Higgsfield API) — every one bills or misleads silentl
      poller starts, because the wallet has no balance endpoint and an unrecorded spend is LOST.
   8. `failed` / `nsfw` / a cancelled `queued` request are NOT charged — hf_api_poll.py writes the
      matching REFUND into the wallet ledger, or the balance drifts low on every refusal.
+  9. GENJUTSU (`higgsfiled/genjutsu/{object-swap,motion-transfer}/v1.0` — the vendor's own spelling, copied
+     verbatim) re-casts an EXISTING clip. Its validator knows FOUR fields — `video_url`, `image_urls` (1-8),
+     `prompt`, `resolution` — and ACCEPTS ANY OTHER FIELD SILENTLY, so a duration, a ratio or a typo would
+     look sent and do nothing. Only those four are sent.
+ 10. Genjutsu bills per second of INPUT video, rounded up, and /estimate never returns the number — so the
+     length is READ from the local file the upload ledger records for --source (ffprobe), never typed.
 """
 import argparse, importlib.util, json, os, subprocess, sys, time
 
@@ -55,9 +64,13 @@ ENDPOINT = {
     ('minimax-h3', 't2v'): 'minimax/h3/text-to-video',
     ('minimax-h3', 'i2v'): 'minimax/h3/image-to-video',
     ('minimax-h3', 'r2v'): 'minimax/h3/reference-to-video',
+    # Genjutsu, read from GET /models 2026-09-24 — `higgsfiled` IS the vendor's slug; copy it verbatim.
+    ('genjutsu', 'object-swap'): 'higgsfiled/genjutsu/object-swap/v1.0',
+    ('genjutsu', 'motion-transfer'): 'higgsfiled/genjutsu/motion-transfer/v1.0',
 }
 DUR_MIN, DUR_MAX = 4, 30
 H3_DUR = (5, 15)
+GENJUTSU_REFS = (1, 8)                # its validator, 2026-09-24: [] → "should be non-empty", 9 → "too long"
 PROMPT_WARN = 5000                    # 6629 worked once; 7840 was trimmed. No hard cap is documented.
 MAX_CONCURRENT_RETRIES = 40           # the limit is 4 in flight; a seed clears in minutes, not hours
 
@@ -71,6 +84,23 @@ def load_gate(path):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def probe_source_seconds(root, urls, name):
+    """Genjutsu bills per second of INPUT video and /estimate never returns the number, so the length is
+    READ from the local file the upload ledger recorded for this NAME — never typed from memory."""
+    meta = (urls.get('_meta') or {}).get(name) or {}
+    src = meta.get('source')
+    if not src:
+        sys.exit(f'cannot price {name}: hf-api-urls.json records no local source for it — '
+                 f'pass --input-seconds <the clip length>')
+    p = src if os.path.isabs(src) else os.path.join(root, src)
+    r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', p],
+                       capture_output=True, text=True)
+    try:
+        return float(r.stdout.strip())
+    except ValueError:
+        sys.exit(f'ffprobe could not read the length of {p} — pass --input-seconds')
 
 
 def submit_one(endpoint, body, label):
@@ -94,17 +124,19 @@ def main():
     ap.add_argument('--root', default='.')
     ap.add_argument('--scene', required=True)
     ap.add_argument('--prompt', required=True)
-    ap.add_argument('--mode', required=True, choices=['t2v', 'i2v', 'r2v', 'edit', 'extend'])
-    ap.add_argument('--model', default='seedance', help='seedance (2.5) or h3')
+    ap.add_argument('--mode', required=True,
+                    choices=['t2v', 'i2v', 'r2v', 'edit', 'extend', 'object-swap', 'motion-transfer'])
+    ap.add_argument('--model', default='seedance', help='seedance (2.5), h3, or genjutsu')
     ap.add_argument('--duration', type=int, help='generated seconds; OMIT for --mode edit')
     ap.add_argument('--input-seconds', type=float, default=0,
-                    help='source seconds for edit/extend or a video ref — THEY BILL on the 0.6x tier')
+                    help='source seconds for edit/extend or a video ref (0.6x tier), or a Genjutsu '
+                         'source (probed from the upload ledger when omitted) — THEY BILL')
     ap.add_argument('--refs', default='', help='comma-separated image reference NAMES')
     ap.add_argument('--video-refs', default='', help='comma-separated video reference NAMES → 0.6x tier')
     ap.add_argument('--audio', default='', help='comma-separated audio reference NAMES (WAV; no mp3)')
     ap.add_argument('--start-image', help='i2v first frame')
     ap.add_argument('--end-image', help='i2v last frame (only with --start-image)')
-    ap.add_argument('--source', help='edit/extend: a hosted NAME, or the keeper\'s own output URL')
+    ap.add_argument('--source', help='edit/extend/genjutsu: a hosted NAME, or the keeper\'s own output URL')
     ap.add_argument('--seeds', type=int, default=1)
     ap.add_argument('--resolution', default='480p', choices=list(hf.RASTER),
                     help='NO 1080p exists on this API; 720p is 2.25x 480p')
@@ -132,7 +164,20 @@ def main():
                  f'  read the catalog yourself: hf_api.py models --grep {model.split("-")[0]}')
 
     # ── shape rules, each one a vendor fact rather than a preference ───────────────────────────────
-    if a.mode == 'edit':
+    genjutsu = model == 'genjutsu'
+    if genjutsu:
+        if a.duration is not None:
+            sys.exit('Genjutsu takes NO duration: the source clip decides it — and this endpoint ACCEPTS '
+                     'unknown fields silently, so a duration would look sent and do nothing')
+        if not a.source:
+            sys.exit('--model genjutsu needs --source: the clip being re-cast (a hosted NAME, or a URL)')
+        if not GENJUTSU_REFS[0] <= len(refs) <= GENJUTSU_REFS[1]:
+            sys.exit(f'--refs must carry {GENJUTSU_REFS[0]}-{GENJUTSU_REFS[1]} images for Genjutsu (read '
+                     f'from its own validator 2026-09-24); got {len(refs)}')
+        if vrefs or auds or a.start_image or a.end_image:
+            sys.exit('Genjutsu takes image references only — no --video-refs / --audio / --start-image / '
+                     '--end-image: --source IS the video')
+    elif a.mode == 'edit':
         if a.duration is not None:
             sys.exit('--mode edit takes NO duration: the SOURCE decides it, and sending one is an error')
         if not a.source:
@@ -165,7 +210,10 @@ def main():
     m = g.spot_re.search(os.path.basename(prompt_path))
     spot = m.group(1) if m else None
     gate_refs = refs + vrefs + auds
-    ok, rows, roles = g.check(text, gate_refs, TARGET, a.start_image, csv(a.births), csv(a.prose),
+    # A Genjutsu source is the thing being EDITED — the gate's start image, exactly as ref 1 of an
+    # image-to-image still is (gen_stills.py): its lineage must reach a keeper or a client import.
+    gate_start = a.source if (genjutsu and not a.source.startswith('http')) else a.start_image
+    ok, rows, roles = g.check(text, gate_refs, TARGET, gate_start, csv(a.births), csv(a.prose),
                               spot, fresh=a.fresh_scene)
 
     urls = {}
@@ -186,17 +234,22 @@ def main():
                      f'hf_api_upload.py --root {root} <file> --name {name}')
         return u
 
+    in_s = float(a.input_seconds or 0)
+    if genjutsu and not in_s:
+        in_s = probe_source_seconds(root, urls, a.source)
+
     # ── the cost line ──────────────────────────────────────────────────────────────────────────────
-    print(f"REFS-GATE {a.prompt}  refs: {', '.join(gate_refs) or '-'}  start: {a.start_image or '-'}")
+    print(f"REFS-GATE {a.prompt}  refs: {', '.join(gate_refs) or '-'}  start: {gate_start or '-'}")
     print(gate.fmt(rows))
     n_fail = sum(1 for r in rows if r[1] == 'FAIL')
     print('REFS-GATE PASS' if ok else f'REFS-GATE FAIL ({n_fail} row(s))')
 
-    dur = a.duration if a.duration is not None else float(a.input_seconds or 0)
+    dur = a.duration if a.duration is not None else in_s
     has_video_ref = bool(vrefs) or a.mode in ('edit', 'extend')
-    Q = hf.quote(model, a.resolution, dur, a.input_seconds, a.seeds, ep, has_video_ref, len(refs))
+    Q = hf.quote(model, a.resolution, dur, in_s, a.seeds, ep, has_video_ref, len(refs))
     bal = hf.balance()
-    print(f'venue: Higgsfield API · {ep} · {a.resolution} · ratio {a.ratio}')
+    print(f'venue: Higgsfield API · {ep} · {a.resolution} · '
+          + ("aspect: the source's own" if genjutsu else f'ratio {a.ratio}'))
     print(hf.cost_line(Q, bal if bal['entries'] else None))
 
     # The extend arithmetic, stated as a priced comparison rather than a rule (SKILL.md § 0).
@@ -218,10 +271,15 @@ def main():
 
     # ── the body ───────────────────────────────────────────────────────────────────────────────────
     body = {'prompt': text}
-    if a.mode != 'edit':
+    if genjutsu:
+        # ONLY the four fields its validator knows: it ACCEPTS anything else silently (measured
+        # 2026-09-24), so a stray field would look sent and do nothing.
+        body.update({'video_url': url_of(a.source, allow_raw=True),
+                     'image_urls': [url_of(r) for r in refs], 'resolution': a.resolution})
+    elif a.mode != 'edit':
         body['duration'] = a.duration
         body['aspect_ratio'] = a.ratio          # explicit or the venue picks for you
-    if model != 'minimax-h3':
+    if model not in ('minimax-h3', 'genjutsu'):
         body['resolution'] = a.resolution
         body['generate_audio'] = not a.no_audio
         body['output_format'] = a.output_format
@@ -278,7 +336,7 @@ def main():
             continue
         rec = {'name': name, 'request_id': rid, 'status_url': status_url,
                'cancel_url': out.get('cancel_url'), 'endpoint': ep, 'model': model, 'mode': a.mode,
-               'resolution': a.resolution, 'duration': a.duration, 'input_seconds': a.input_seconds,
+               'resolution': a.resolution, 'duration': a.duration, 'input_seconds': in_s,
                'tier': Q.get('tier'), 'est_tokens': Q.get('tokens'),
                'estimate_usd': Q['usd_each'], 'estimate_usd_list': Q['usd_each_list'],
                'estimate_credits': round(Q['usd_each'] / hf.CREDIT_USD, 4),
@@ -289,10 +347,11 @@ def main():
         with open(rp, 'w', encoding='utf-8') as f:
             json.dump(R, f, indent=1)
         hf.spend(Q['usd_each'], rec['estimate_credits'], take=name, request_id=rid, endpoint=ep,
-                 resolution=a.resolution, duration=a.duration, root=root,
-                 note='ESTIMATE at acceptance — Seedance returns no number')
+                 resolution=a.resolution, duration=(in_s if genjutsu else a.duration), root=root,
+                 note=('ESTIMATE at acceptance — per INPUT second; /estimate returns no number' if genjutsu
+                       else 'ESTIMATE at acceptance — Seedance returns no number'))
         g.record(name, TARGET, os.path.relpath(prompt_path, root),
-                 gate_refs + ([a.start_image] if a.start_image else []), csv(a.births), roles)
+                 gate_refs + ([gate_start] if gate_start else []), csv(a.births), roles)
         print(f'{name} request {rid}  (BILLED at acceptance, est ${Q["usd_each"]:.4f})', flush=True)
 
     with open(rp, 'w', encoding='utf-8') as f:

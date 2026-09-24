@@ -4,6 +4,7 @@ API wallet's only ledger. Imported by hf_api_upload.py / hf_api_submit.py / hf_a
 alone for a quote, a balance, a load, or the free vendor estimate.
 
   hf_api.py quote  --model seedance --resolution 720p --duration 8 --seeds 3 [--input-seconds 5]
+  hf_api.py quote  --model genjutsu --resolution 480p --input-seconds 17.8   # per INPUT second, rounded up
   hf_api.py balance                                   # the wallet, from the local ledger
   hf_api.py load --usd 115 --credits 1840 [--note ..] # record a purchase
   hf_api.py estimate --endpoint bytedance/seedance-2.5/reference-to-video --body '{...}'
@@ -64,6 +65,14 @@ DISCOUNT_AS_OF = '2026-09-18'
 FIXED_PER_S = {'minimax-h3': {'usd_per_s_list': 0.13, 'raster': '2K', 'dur': (5, 15),
                               'extra_ref_usd': 0.08, 'free_refs': 5}}
 
+# Genjutsu (video → video on an EXISTING clip: object-swap / motion-transfer) is priced PER SECOND OF INPUT
+# VIDEO, rounded UP — verbatim from its own /estimate description, read 2026-09-24: "Each second of input video
+# costs $0.318 at 480p or $0.681 at 720p. Input duration is rounded up to the nearest whole second. Rates shown
+# are before any applicable customer discount." /estimate returns that sentence and NO NUMBER even for a real
+# hosted video (measured), so the length is PROBED and the cost computed here. No discount is recorded, so it
+# is quoted at list — over-quoting is the only direction a cost gate may err in.
+PER_INPUT_S = {'genjutsu': {'480p': 0.318, '720p': 0.681}}
+
 # YOUR wallet's load rate: what you paid divided by the credits you received. Billing is in CREDITS
 # (they expire ONE YEAR after they are added) while the rate table above is in USD, so one of the two
 # is always derived — this is the derivation, and a settled receipt is what would replace it.
@@ -72,7 +81,8 @@ FIXED_PER_S = {'minimax-h3': {'usd_per_s_list': 0.13, 'raster': '2K', 'dur': (5,
 CREDIT_USD = 0.0625
 
 MODEL_ALIAS = {'seedance': 'seedance-2.5', 'seedance-2.5': 'seedance-2.5', 'seedance25': 'seedance-2.5',
-               'h3': 'minimax-h3', 'minimax-h3': 'minimax-h3', 'minimax_h3': 'minimax-h3'}
+               'h3': 'minimax-h3', 'minimax-h3': 'minimax-h3', 'minimax_h3': 'minimax-h3',
+               'genjutsu': 'genjutsu'}
 
 # reference-to-video is BOTH tiers — it bills standard with image/audio refs and 0.6× the moment a
 # VIDEO ref rides along. That is decided per CALL, never per endpoint, so it is not in this map.
@@ -173,6 +183,8 @@ def quote(model='seedance-2.5', resolution='480p', gen_s=5, in_s=0.0, seeds=1,
           endpoint='reference-to-video', has_video_ref=False, n_refs=0):
     """Everything the cost line needs, LIST and NET both, per seed and per batch."""
     model = MODEL_ALIAS.get(str(model).lower(), str(model).lower())
+    if model in PER_INPUT_S:
+        gen_s = float(in_s)                    # video → video: the output is the source's own length
     disc = DISCOUNT.get(model, 0.0)
     q = {'model': model, 'resolution': resolution, 'gen_s': gen_s, 'in_s': float(in_s),
          'seeds': seeds, 'discount': disc, 'discount_as_of': DISCOUNT_AS_OF}
@@ -187,6 +199,16 @@ def quote(model='seedance-2.5', resolution='480p', gen_s=5, in_s=0.0, seeds=1,
         each_list = f['usd_per_s_list'] * float(gen_s)
         q.update({'metered': False, 'raster': f['raster'], 'extra_ref_usd': surcharge,
                   'note': 'fixed per-second — /estimate returns a NUMBER for this one; prefer it'})
+    elif model in PER_INPUT_S:
+        if float(in_s) <= 0:
+            raise ValueError(f'{model} is priced per second of INPUT video — pass the source length '
+                             f'(--input-seconds), or host the clip with hf_api_upload.py so it can be probed')
+        rate = PER_INPUT_S[model][resolution]
+        billed = math.ceil(float(in_s))
+        each_list = billed * rate
+        q.update({'metered': False, 'per_input_s': True, 'raster': resolution, 'billed_s': billed,
+                  'usd_per_input_s_list': rate,
+                  'note': 'per INPUT second, rounded up — /estimate returns the sentence, never a number'})
     else:
         tier = tier_for(endpoint, has_video_ref)
         tok = tokens(resolution, gen_s, in_s)
@@ -214,15 +236,22 @@ def cost_line(q, balance=None):
     if q['metered']:
         head = (f"{q['seeds']} × {q['gen_s']} s" + (f" (+{q['in_s']:g} s input, BILLED)" if q['in_s'] else '')
                 + f" × {q['resolution']} = {q['tokens']:,} tok × ${q['rate_per_ktok']}/1K [{q['tier']}]")
+    elif q.get('per_input_s'):
+        head = (f"{q['seeds']} × ceil({q['in_s']:g} s of INPUT) = {q['billed_s']} s × "
+                f"${q['usd_per_input_s_list']}/s at {q['raster']}")
     else:
         head = f"{q['seeds']} × {q['gen_s']} s × {q['raster']}" + (
             f" + ${q['extra_ref_usd']:.2f} refs past 5" if q.get('extra_ref_usd') else '')
     L.append(f"cost: {head} = ${q['usd_each']:.4f} each → ${q['usd_total']:.4f}"
              f"  ({q['credits_total']:.1f} cr @ ${CREDIT_USD}/cr"
              + (f", ${q['usd_per_s']:.4f}/s" if q['usd_per_s'] else '') + ')')
-    L.append(f"  list ${q['usd_total_list']:.4f} — the ${q['usd_total']:.4f} above assumes the "
-             f"{q['discount']:.0%} discount recorded {q['discount_as_of']} is STILL LIVE; if it has "
-             f"lapsed the batch costs the list figure.")
+    if q['discount']:
+        L.append(f"  list ${q['usd_total_list']:.4f} — the ${q['usd_total']:.4f} above assumes the "
+                 f"{q['discount']:.0%} discount recorded {q['discount_as_of']} is STILL LIVE; if it has "
+                 f"lapsed the batch costs the list figure.")
+    else:
+        L.append(f"  quoted at LIST: no discount is recorded for {q['model']} (the vendor's rates are "
+                 f"'before any applicable customer discount'), so a live discount can only lower this.")
     if q['metered'] and q['tokens_ceiling'] != q['tokens']:
         L.append(f"  ceiling ${q['usd_ceiling_each_list'] * (1 - q['discount']) * q['seeds']:.4f} — the "
                  f"vendor formula carries no extra frame, but ByteDance's did on monid (measured, "
@@ -299,7 +328,7 @@ def main():
     q.add_argument('--resolution', default='480p', choices=list(RASTER))
     q.add_argument('--duration', type=float, default=5, help='generated seconds')
     q.add_argument('--input-seconds', type=float, default=0,
-                   help='source seconds for video-edit / video-extend / a video ref — THEY BILL')
+                   help='source seconds for video-edit / video-extend / a video ref / Genjutsu — THEY BILL')
     q.add_argument('--seeds', type=int, default=1)
     q.add_argument('--endpoint', default='reference-to-video')
     q.add_argument('--video-ref', action='store_true', help='a VIDEO reference rides along → 0.6× tier')
@@ -322,8 +351,11 @@ def main():
     a = ap.parse_args()
 
     if a.cmd == 'quote':
-        Q = quote(a.model, a.resolution, a.duration, a.input_seconds, a.seeds,
-                  a.endpoint, a.video_ref, a.refs)
+        try:
+            Q = quote(a.model, a.resolution, a.duration, a.input_seconds, a.seeds,
+                      a.endpoint, a.video_ref, a.refs)
+        except ValueError as e:
+            sys.exit(str(e))
         bal = balance()
         print(cost_line(Q, bal if bal['entries'] else None))
         if not bal['entries']:
