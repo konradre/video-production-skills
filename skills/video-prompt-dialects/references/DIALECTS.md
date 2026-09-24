@@ -22,7 +22,7 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
 - **Point, never describe**: a cited reference gets one narrow job and an exclusion, never adjectives
   (the most expensive lesson: the words beat the picture every time).
 - **A genre dialect layers on the model's.** A creator-style / UGC spot swaps the style prefix, the camera clause, the
-  light, the motion and the sound words for the phone-native dialect — the camera attributed, never named as a device;
+  light, the motion and the sound words for the phone-native dialect — the device named as the camera, never as a prop;
   positive-spec only; the video-call register — and touches nothing about the addressing, the caps or the tail:
   [PHONE-NATIVE.md](PHONE-NATIVE.md).
 - **A held vendor spec is indexed by FEATURE, not only by the rules you came for.** Six consensus rules

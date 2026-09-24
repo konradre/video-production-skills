@@ -86,9 +86,10 @@ of an accepted still › a fresh still. Build in this order:
 4. **Character refs cut from the first accepted take** — a frame of its upscale, the subject isolated,
    occluders painted out (the model copies whatever else sits in the crop); one ref per recurring
    character, in every later gen. On a creator-style spot the first keeper IS the presenter's identity for the
-   campaign's life (product and person morphing across shots is the tell practitioners name first); a real arm's-length
-   reference photo, upscaled first, is the community's heuristic for less morphing, and "generate the first take with no
-   reference, then lock its frame 1 as the reference" is an UNVERIFIED heuristic (one account; mechanically plausible,
+   campaign's life (product and person morphing across shots is the tell practitioners name first). The presenter's first still is
+   GENERATED (house rule, 2026-09-25) — an authored persona, one image pass, accepted on the persona reads in
+   REFERENCE-CONTRACT.md; building it on a real person's photograph is the practitioner route, and the house does not use
+   it. "Generate the first take with no reference, then lock its frame 1 as the reference" is an UNVERIFIED heuristic (one account; mechanically plausible,
    since Seedance re-renders frame 0) — test it on one shot before a shot list relies on it. **A recurring
    character with no keeper and no client photo is the one reference that must be AUTHORED**, and an authored
    identity is a lineage root: write it as a locked JSON prompt, save that JSON beside the frame it produced, and
@@ -209,7 +210,8 @@ what has lapsed.
 Rules live in `<project>/prompts/refs-required.json`
 ([template](references/refs-required.example.json)): each element the prompt matches needs its reference
 ROLES present AND uploaded for the target; every capitalised subject is ruled, born in this gen
-(`--births`) or a conscious prose-only decision (`--prose`); a start image needs its own accepted record;
+(`--births`) or a conscious prose-only decision (`--prose`) — a capital inside a quoted or braced line is a spoken stress
+mark (house rule, 2026-09-25), never a subject; a start image needs its own accepted record;
 negated clauses are not elements. The gate opens the files, not only the names: every cited reference is
 re-hashed against its registration (a file changed after acceptance FAILS), decoded and sized; light or grade
 language in the prose with no look plate cited FAILS when the rules list `look_plates` (`--prose LOOK` keeps a

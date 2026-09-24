@@ -352,13 +352,15 @@ the two levers. So the layer carries a denoise arm beside the noise arm, and the
 per pair. On another generator, another raster or another set of real clips the direction can reverse; we
 have measured one generator so far. The full table is in `skills/video-finish/references/EVIDENCE.md`.
 
-The prompt side lives in `skills/video-prompt-dialects/references/PHONE-NATIVE.md`. The dialect attributes
-the camera ("shot on a front camera, handheld, at arm's length") and never names the device, because a
-video model tends to draw the noun you hand it. `camera_clause.py --phone`, in the same skill, prints the
-clause. That rule reads more certain than its evidence. We have watched generators draw a negated noun, one
-burning in captions it was told to leave off and another drawing a grid it was told to omit, while the
-device name case comes from other practitioners' skills and we have not yet checked it against a control on
-the same seed. The creative grammar for the sub-genre, hooks, structures, beats by duration, the variant
+The prompt side lives in `skills/video-prompt-dialects/references/PHONE-NATIVE.md`. The dialect names the phone as
+the camera that shot the footage ("handheld iPhone shot, the front camera held at arm's length") and keeps it out of the
+scene, because a video model draws the nouns it is handed. A phone written into her hand appears there, and we have
+watched one generator burn in captions it was told to leave off. `camera_clause.py --phone`, in the same skill, prints
+the clause. We used to forbid naming the device at all. That rule came from other practitioners' skills and was never
+tested against a control, and the creators whose workflows we have read since name the phone as a matter of course, so
+we dropped it. The take review still fails a phone or a camera's on-screen controls drawn into the frame. For a line the
+model voices itself, one or two words written in capitals carry the stress, and the prompt is locked after the first
+line so that only the words change from one clip to the next. The creative grammar for the sub-genre, hooks, structures, beats by duration, the variant
 matrix and the four artifacts a spot ships with, is in `skills/ad-spot-preprod/references/UGC-GRAMMAR.md`.
 The disclosure rules for creator-style ads on the large platforms and under the FTC endorsement guides are
 in that skill's `references/RISKS.md`, written from the primary sources; three claims that circulate in the

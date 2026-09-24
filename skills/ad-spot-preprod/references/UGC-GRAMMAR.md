@@ -30,6 +30,18 @@ faked (S, high tier) — 100 % synthetic faces with no real-testimonial backbone
 vendor's own data (C). The magnitude of the UGC advantage is unsettled (1.3× to 6.7× by source) and part of it may be
 variant VOLUME rather than format — attribute wins honestly.
 
+## The persona — who is on camera, and what they carry
+
+- **Cast someone who has already solved the problem**, matched to the product and the angle: the presenter carries a
+  quiet authority because they have been where the viewer is and came out the other side; someone still struggling
+  carries none (P, 2026-09-25). A synthetic persona still presents a demo — what they use and how — never a personal
+  testimonial (below).
+- **The persona brief fixes what the presenter carries**, decided here and locked into the still, never added in a video
+  prompt: the accessories a real person has (one earbud in one ear, a particular piece of jewellery — left alone, the
+  model draws the average person) and the capture device the sound needs (a clip-on, wireless or headphone mic for a
+  clean voice, none for the phone-mic register). The still itself is generated in one pass and accepted on the persona
+  reads (`video-refs-continuity` REFERENCE-CONTRACT.md § Generating an identity reference; house rules, 2026-09-25).
+
 ## The hook
 
 - **Layers** (single source): a visual disruption + a verbal promise + a rhythm.

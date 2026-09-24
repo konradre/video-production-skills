@@ -51,7 +51,13 @@ prompted against again: choose a framing where the element cannot be in the fram
 filter refuses it; never the back of the head), cut on the frame the state
 changes, or drop the shot.
 
-## The two structural rules above the ladder
+## The structural rules above the ladder
+
+- **Replace the reference, not the seed.** When several seeds from one accepted reference all fail the same realism read
+  — waxy skin, a dead mouth, a face that reads fake — the reference is the defect: rebuild it, re-accept it, and only
+  then generate again; never re-roll or re-prompt the video against it. A practitioner puts it at about one reference in
+  ten that will not animate however it is prompted (2026-09-25), and a still costs cents where a seed that breaks after
+  two seconds costs the take.
 
 - **One continuous action is ONE generation.** Four gens chained frame-to-frame held geometry at every join
   and the scene-change detector found no cut, yet the cut reads as disjointed, stitched

@@ -45,7 +45,7 @@ light>. Nobody holds anything but <what the ledger says>. Nothing <transformed> 
 the start = the previous shot's last state>. Cut 2 (2.0–3.5 s): <framing>: <t–t s: action; t–t s: action;
 the hit named with its sound in < >; every eyeline a target; every hand placed>. … <the last frame keeps
 the subject in it, small>.
-【Audio】<Room tone; the named sounds; {line} per speaker in sentence case — "no other words from anyone";
+【Audio】<Room tone; the named sounds; {line} per speaker in sentence case, a stressed word in capitals — "no other words from anyone";
 "no music" unless scored>.
 【Camera and Light】<N> shots with hard cuts at <t, t, t> seconds; slow push-ins on a steady gimbal; the
 same <light> throughout; <camera height>.

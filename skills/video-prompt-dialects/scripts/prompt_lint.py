@@ -4,10 +4,16 @@ references/LINT.md). FAIL rows (slots, char cap) exit 1; WARN rows are printed a
 prompt or in the GO ask.
 
   prompt_lint.py [--dialect seedance-2.5|seedance-2.0|minimax-h3|create-a-meme|kie] [--refs A,B,C]
-                 [--cap N] [--caps-stoplist WORD,WORD] [--strict] <prompt.txt>
+                 [--cap N] [--caps-stoplist WORD,WORD] [--locked <first-line prompt>] [--strict] <prompt.txt>
 
 --refs   the reference NAMES in slot order (their count is the slot maximum the prompt may cite)
+--locked the prompt a model-voiced series was calibrated on (its first line): any sentence that differs outside the
+         quoted line WARNs (L36) — only the words change between lines
 --strict promote every WARN to FAIL
+
+A quoted or braced line is DIALOGUE: its words are spoken, never subjects and never prohibitions. The negation scan (L3)
+and the caps scan (L4) skip it; a capitalised word inside it is the stress mark (house rule, 2026-09-25), and only a
+shouted line — more than two capitalised words — warns.
 """
 import argparse, re, sys
 
@@ -30,6 +36,8 @@ SHOT_SIZE = re.compile(r'\b(wide|medium|close-up|close up|macro|insert|two-shot|
 PARAMS = re.compile(r'\b(480p|720p|1080p|2160p|4k|2k|\d+\s?fps|seedance|minimax|veo|kling|\d{1,2}\s?seconds? long|\d{1,2}-second video|aspect ratio)\b', re.I)
 NEG = re.compile(r'\b(no|never|not|nothing|nobody|without|nor|cannot|can\'t|doesn\'t|does not|don\'t)\b', re.I)
 ACTION_VERB = re.compile(r'\b(\w+?(?:s|es))\b', re.I)  # crude: third-person verbs; used only for density
+QUOTED = re.compile(r'"[^"\n]*"|“[^”\n]*”|\{[^{}\n]*\}|<d>.*?</d>', re.S)   # dialogue spans: straight/curly quotes, {braces}, H3 <d>
+CAPWORD = re.compile(r"\b[A-Z][A-Z']{1,}\b")
 CUT = re.compile(r'(?:Cut|Shot|Stage)\s*(\d+)\s*\((\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)\s*s\)\s*:\s*(.*?)(?=(?:Cut|Shot|Stage)\s*\d+\s*\(|【|$)', re.S)
 
 
@@ -43,6 +51,7 @@ def main():
     ap.add_argument('--rules', help='refs-required.json — its ruled names and caps_stoplist join the ALL-CAPS stoplist')
     ap.add_argument('--strict', action='store_true')
     ap.add_argument('--duration', type=float, help='the call duration in seconds (it rides on the call, never in the prose) — scopes L34')
+    ap.add_argument('--locked', help='the first-line prompt this series was calibrated on — any sentence that differs outside the quoted line WARNs (L36)')
     a = ap.parse_args()
     text = open(a.prompt, encoding='utf-8').read()
     refs = [r for r in a.refs.split(',') if r]
@@ -101,7 +110,7 @@ def main():
     # L3 negation in the body (outside the audio line's sanctioned "no music/no words")
     ev_keys = [k for k in sections if re.search(r'event|script|timeline', k, re.I)]
     ev = ' '.join(sections[k] for k in ev_keys) if ev_keys else body
-    negs = [m.group(0) for m in re.finditer(r'[^.;:]*\b(?:no|never|not|nothing|nobody|without)\b[^.;:]*', ev)]
+    negs = [m.group(0) for m in re.finditer(r'[^.;:]*\b(?:no|never|not|nothing|nobody|without)\b[^.;:]*', QUOTED.sub(' ', ev))]
     negs = [s.strip() for s in negs if not re.search(r'no music|no words|no other|no narration|nobody shouts|no dialogue|no subtitles|no lettering|no text|no cut|no change of angle|without any cut|nothing happens|nobody moves|no bang|never seen|heard only|at nothing|into nothing|\bonly\b|\bstill\b|no longer|does not reframe|never pulls', s, re.I)]
     for s in negs[:8]: rows.append(('WARN', 'L3', f'negation in the body: "{s[:90]}" — state the positive; prohibitions go in the tail'))
 
@@ -113,8 +122,12 @@ def main():
         for rule in rj.get('rules', []):
             stop |= {t.upper() for t in re.findall(r'[A-Za-z][A-Za-z0-9]{1,}', re.sub(r'\\[bBwWdDsS]|\(\?<!|\(\?!', ' ', rule['regex']))}
             stop |= {k.upper() for k in rule.get('roles', {})}
-    caps = sorted(set(re.findall(r'\b[A-Z][A-Z0-9]{2,}\b', text)) - stop)
-    if caps: rows.append(('WARN', 'L4', f'ALL-CAPS tokens: {caps} — role names must be gate-ruled; quoted lines in sentence case'))
+    caps = sorted(set(re.findall(r'\b[A-Z][A-Z0-9]{2,}\b', QUOTED.sub(' ', text))) - stop)
+    if caps: rows.append(('WARN', 'L4', f'ALL-CAPS tokens: {caps} — role names must be gate-ruled; a capital inside a quoted line is a stress mark and is not counted'))
+    for m in QUOTED.finditer(text):
+        shouted = [w for w in CAPWORD.findall(m.group(0)) if w not in {'OK', 'TV', 'AM', 'PM', 'VO'}]
+        if len(shouted) > 2:
+            rows.append(('WARN', 'L4', f'a shouted line: {m.group(0)[:70]!r} — capitalise one or two stressed words, never the line'))
 
     # L5 moderation words
     low = ' ' + text.lower() + ' '
@@ -224,6 +237,17 @@ def main():
             rows.append(('WARN', 'L33', f'beauty-adjective phrasing beside an identity reference: {hits} — '
                                         'reported to overwrite the reference face with the model\'s beauty prior; '
                                         'write biometric traits (nose, jaw, eye colour and spacing, hairline, marks, age)'))
+
+    # L36 a per-line prompt that drifted from the prompt its series was locked on (only the quoted line may change)
+    if a.locked:
+        def frame_of(t):
+            t = re.sub(r'[ \t]+', ' ', QUOTED.sub('"…"', t))
+            return [s.strip() for s in re.split(r'(?<=[.;!?])\s+|\n+', t) if s.strip()]
+        lock, cur = frame_of(open(a.locked, encoding='utf-8').read()), frame_of(text)
+        if lock != cur:
+            gone = [s for s in lock if s not in cur]; new = [s for s in cur if s not in lock]
+            what = '; '.join([f'- "{s[:60]}"' for s in gone[:2]] + [f'+ "{s[:60]}"' for s in new[:2]]) or 'the same sentences in a different order'
+            rows.append(('WARN', 'L36', f'drifted from the locked prompt {a.locked}: {what} — only the quoted line changes between lines; re-lock on purpose'))
 
     # report
     order = {'FAIL': 0, 'WARN': 1}

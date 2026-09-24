@@ -112,8 +112,18 @@ dynamic, never a level. Disfluencies are PLACED, not cleaned — 2–4 per 30 s 
 (`ad-spot-preprod` UGC-GRAMMAR.md § Delivery) — and a breath before a line stays. `video-finish/scripts/phone_native.py
 --audio phone` applies the band and the compressor to a picture render; the stem, the placement and the loudness pass stay here.
 
-**A generator that speaks on its own clock is dubbed and RETIMED, always.** Gemini Omni Flash 1.1 and MiniMax H3 voice
-the line themselves and take no audio input, so the delivered voice is the VO take. Whisper both at word level, fit
+**The register follows the capture device the frame shows** (house rule, 2026-09-25, from a practitioner's AI-UGC
+workflow). A clip-on, wireless or headphone mic in the picture — most creators now wear one — earns a clean, close, dry
+voice with the room kept low: no phone band and no auto-gain lift, so `phone_native.py --audio phone` is skipped. A bare
+phone at arm's length earns the register above. A generator voices every line clean, so the device is chosen with the
+persona and drawn into its still (`video-refs-continuity` REFERENCE-CONTRACT.md § Generating an identity reference);
+the sound then agrees with a picture that explains it.
+
+**A generator that speaks on its own clock is dubbed and RETIMED whenever a voice-over is locked.** Gemini Omni Flash 1.1
+and MiniMax H3 voice the line themselves and take no audio input, so where a VO is locked the delivered voice is the VO
+take; where none is, the model's own voice can ship (`video-prompt-dialects` PHONE-NATIVE.md § Dialogue), and because
+every line is a fresh render of that voice, the lines are heard side by side for timbre, energy and pace before the cut.
+To dub, whisper both at word level, fit
 `native_t ≈ a × vo_t + b` on the matched words, then `atempo 1/a` + `adelay b` (pitch-preserving). Measured: H3's mouth
 ran ≈ 1.09–1.13× slower and started ~0.75 s late against the same ElevenLabs take, and the fit left ~160–170 ms rms per
 word with the placement at 0 ms (envelope NCC 0.99 on the delivered file) — fine at chest-up framing, loose for a close

@@ -95,6 +95,9 @@ freedom it leaves. **Write it as JSON, save it beside the frame it produced, and
 the JSON as its provenance.** A frame whose prompt was prose cannot be regenerated; it can only be
 re-rolled, which is a new character.
 
+**A creator-style spot's presenter is this case by house rule (2026-09-25).** The persona is generated, never built on a
+real person's photograph edited until it is someone else — that is a practitioner route the house does not use.
+
 **Lock every variable, because an unlocked one is a variable the model chooses.** One concrete value per
 attribute — never "or", never a range ("20–30"), never "natural-looking" without the specifics. Quantify
 what can be quantified: degrees for head turn and tilt, cm for distances, mm for small detail (liner
@@ -115,7 +118,10 @@ person toward a default attractive face, and any trait that differs from it is q
 it is escalated in all three places at once: described geometrically in its own field, restated as a
 one-line imperative constraint, and its default-prior version added to the negative list. The axes worth
 walking every time are eye shape and lid, face shape and symmetry, build, clothing COVERAGE, hair volume
-and gloss, skin texture, stance, overall "look", background saturation, and unrequested additions.
+and gloss, skin texture, stance, overall "look", background saturation, unrequested additions, and the accessories a real
+person carries — one earbud in one ear, a particular piece of jewellery, a specific laptop, each located and specific:
+the model defaults to the average person, and a located accessory reads as a life (practitioner, 2026-09-25). An
+accessory is a continuity element from then on; it enters the ledger with the still.
 Counter-steer toward the reference's own features, never toward plainness: a glamorous reference is
 described faithfully, not flattened.
 
@@ -132,7 +138,19 @@ reference across the WHOLE list, not only the trait that was named: every differ
 was under-locked, and the fix is to split that field into finer sub-fields with more geometry, strengthen
 its constraint line, and add the drifted appearance to the negatives. Output the complete JSON with its
 version bumped, even for a one-field change — a patch that lives only in the conversation is lost the
-moment the session ends, and the frame it produced then has no provenance.
+moment the session ends, and the frame it produced then has no provenance. **Every change goes into ONE generation from
+the full JSON; an image-to-image edit is never stacked on the persona still.** A practitioner's reason: each stacked edit
+composites and softens its patch, and the video model animates those seams (2026-09-25). Re-roll the whole pass instead.
+
+**Accept a persona still on five reads before it animates** (house rule, 2026-09-25, from a practitioner's AI-UGC
+workflow; each names a failure that shows only in motion). The framing is committed: body position, lean, the camera's
+height and angle, chosen on purpose. **No clipped highlight on the skin**: crop the face at 1:1; skin that reads pure
+white (luma ≥ 250, the clip threshold `video-take-review` `window_metrics.py` uses) holds no texture to animate and comes
+back waxy, so re-roll — a shine that keeps its detail is fine. A background with a life in it and some depth behind the
+subject: a blank wall reads as a set, a busy one competes. Both hands natural and in frame. No text over the face. And
+the capture device the sound will need is in the picture — a clip-on, wireless or headphone mic for a clean voice, none
+for the phone-mic register (`spot-audio-assembly` MIX-AND-QC.md § The phone-mic register). When several seeds from one
+accepted persona all read fake, the still is the defect — REPAIR-LADDER.md § Replace the reference, not the seed.
 
 **Two boundaries.** Never put a real person's name, a celebrity comparison or "looks like X" in the JSON —
 appearance descriptors only, and never an inferred nationality or religion. And an authored JSON locks a

@@ -25,7 +25,8 @@ Rules: each rule = an element (a regex over the prompt body, negated clauses rem
 a role is met by any listed reference NAME that is in --refs AND uploaded for --target, or inherited from the START
 IMAGE's own accepted record. A start image with no record FAILS; one not --accept'ed FAILS; one whose lineage reaches
 neither a KEEPER take nor a CLIENT-SUPPLIED import FAILS unless --fresh-scene is declared. Every capitalised subject in
-the prompt without a rule FAILS as UNRULED unless declared --births (born in this gen) or --prose (prose-only on purpose).
+the prompt without a rule FAILS as UNRULED unless declared --births (born in this gen) or --prose (prose-only on purpose);
+a capital inside a quoted or braced line is a spoken stress mark (house rule 2026-09-25), never a subject.
 CONTENT: every cited reference's file is re-hashed against its registration (a changed file FAILS), decoded, and sized
 (a short side under min_side FAILS). An unregistered or unaccepted reference is a WARN — a FAIL when the rules set
 require_ref_files / require_ref_acceptance. The gate proves the file is the one that was ACCEPTED; what it shows is the
@@ -58,6 +59,7 @@ REFRESH = {'monid': 'monid_upload.py', 'treg': 'treg_host.py',
            'hfapi': 'hf_api_upload.py'}                         # the free fix, named in the FAIL row
 
 CAPS = re.compile(r'\b[A-Z][A-Z0-9]{1,}\b')
+QUOTED = re.compile(r'"[^"\n]*"|“[^”\n]*”|\{[^{}\n]*\}|<d>.*?</d>', re.S)   # dialogue: its capitals are stress, never subjects
 DEFAULT_TAKE_RE = r'^S\d\d-[A-Z0-9]+(-v\d+)?-s\d+$'   # a generated take id — a root that continues a scene
 DEFAULT_SPOT_RE = r'(S\d\d)'
 DEFAULT_LOOK = (r'\b(?:day ?light|sun ?light|lamp ?light|lighting|golden hour|blue hour|dusk|dawn|tungsten|fluorescent|overcast|'
@@ -338,7 +340,9 @@ class Gate:
             listed = any(r in names for rule in self.rules for names in rule['roles'].values()) or (self.look_plates and r in self.look_plates)
             rows.append((f'ref {r}', 'WARN', 'COMPETING — nothing in this prompt depends on it; a reference the prompt does not need competes with the ones it does (drop it, or rule what it carries)'
                          if listed else 'UNRULED reference — no rule names it, so nothing checks what it is for'))
-        caps = set(CAPS.findall(body)) - self.stop - ruled_caps
+        # a quoted or braced line is DIALOGUE — strip it BEFORE the negation strip, which would otherwise cut through a quote
+        unspoken = re.sub(r'\b(?:no|never|without|nor|not)\b[^.;,]*', ' ', QUOTED.sub(' ', prompt_text))
+        caps = set(CAPS.findall(unspoken)) - self.stop - ruled_caps
         for c in sorted(caps):
             if c in prose:
                 rows.append((f'subject {c}', 'PROSE', 'declared prose-only'))
@@ -386,6 +390,12 @@ def selftest():
             g.append({'asset': n, **g.file_facts(f'refs/{n}.png'), 'accepted': True, 'note': 'selftest', **extra})
         P = 'The visitor waits in warm lamp light by the door.'
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm']); cases.append(('a clean reference set PASSES', ok))
+        ok, rows, _ = g.check(P + ' The visitor says "it is not just genetics, so weak FOLLICLES wake back up."', ['VISITOR-ref', 'LOOK-warm'])
+        cases.append(('a capitalised stress word inside a quoted line is not a subject', ok))
+        ok, rows, _ = g.check(P + ' {so weak FOLLICLES wake back up}', ['VISITOR-ref', 'LOOK-warm'])
+        cases.append(('a capitalised stress word inside a braced line is not a subject', ok))
+        ok, rows, _ = g.check(P + ' The FOLLICLES glow on the table.', ['VISITOR-ref', 'LOOK-warm'])
+        cases.append(('the same word OUTSIDE the quotes still FAILS as UNRULED', not ok and any(r[0] == 'subject FOLLICLES' and r[1] == 'FAIL' for r in rows)))
         ok, rows, _ = g.check(P, ['VISITOR-ref']); cases.append(('light in the prose with no look plate FAILS', not ok and any(r[0] == 'look' and r[1] == 'FAIL' for r in rows)))
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm', 'SPARE-ref']); cases.append(('a reference nothing depends on WARNs (COMPETING / UNRULED), still PASSES', ok and any(r[0] == 'ref SPARE-ref' and r[1] == 'WARN' for r in rows)))
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], start_image='CLIENT-photo'); cases.append(('a client-supplied start image roots the lineage', ok and any('client-supplied' in r[2] for r in rows)))
