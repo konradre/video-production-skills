@@ -44,7 +44,16 @@ Source is AI-generated, heavily compressed, or below 720p?
         Topaz Starlight (Fast 2 / Precise 2.6 / HQ / Mini / Sharp) · Topaz Astra · Topaz Rhea
   NO (clean capture, already ≥1080p) → FAITHFUL tier is fine and far cheaper
         Topaz Proteus · Topaz Gaia · ByteDance Video Upscaler
+        — and when the capture already sits at the delivery raster and the deliverable carries no grain (§ 4, § 6):
+          NO upscaler at all — a lanczos resample to the display shape; nothing is redrawn
 ```
+
+**Real footage at the delivery raster is not upscaled.** A 1080p capture for a 1080p ad on the clean pair has no detail to
+reconstruct and no grain for an above-delivery mezzanine to protect, so the faithful tier there is a mathematical resample
+to the true display shape (the SAR honoured: an anamorphic 9:16 clip stored 1920×1080 becomes 1080×1920), never a model —
+a model redraws. The operator's standing ask for real footage is that nothing is warped (2026-09-26): prove it, shot by
+shot, with a (0, 0) phase correlation between the resampled flat and the graded hero (`video-finish-qc/scripts/
+normalise_shots.py verify`) and on the finished spot against the pre-finish one (`qc_deliverable.py --prev`).
 
 **A faithful upscaler applied to 480p produces enlarged 480p.** It does not deliver the softness that
 makes reconstructed footage read as filmic rather than as a render — at any price. Picking Proteus
@@ -135,8 +144,13 @@ rendition from an above-delivery mezzanine, versus 28% from a 1:1 one.**
 So: **do not post-scale in the upscale pass.** Upscale to the mezzanine, grade there, and let the
 deliver leg do the downscale. Never grade on a 1080 timeline when a larger mezzanine exists.
 
+**The mezzanine is for grain.** With no grain on the deliverable — an ad on the clean pair, a 2.5–5 Mbps rendition (§ 6) —
+an above-delivery mezzanine protects nothing, and a real source already at the delivery raster goes to the grade at that
+raster (§ 1): normalised per shot, then the look.
+
 **Done when:** the upscaled file is larger than the intended deliverable, and no downscale has
-happened yet.
+happened yet — or, for real footage at the delivery raster with no grain, no upscale ran at all and the graded input sits
+at the display shape.
 
 ## 5. Grade at mezzanine resolution
 

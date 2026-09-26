@@ -22,6 +22,15 @@
   near-black   EVERY event's window sampled at three points (10 / 50 / 90 %): a window whose samples all read under
                --black-luma (16/255) FAILS unless the event declares `accepted_black: true` — a 10-bit source once rendered
                black through a grade while every other row passed (2026-09-15)
+  vs previous  with --prev <the previous version's deliverable>: every footage event's middle frame against the same frame of
+               the previous version — mean |dY| (regraded or not), phase correlation of the luma (moved: a crop, scale or warp),
+               and the frame alignment m-1/m/m+1 (retimed) — as INFO per event; --prev-expect turns it into a verdict:
+               `finish` = every footage event regraded, none moved, none retimed (a finish changes the look and nothing else —
+               it caught four aerial shots one frame late, 2026-09-26); `changed:<id,…>` = each named event differs from the
+               previous version (a changed crop reached the picture — a builder cache keyed by event id once shipped the stale
+               render and every other row passed)
+  contract     INFO: the colour range tag, the keyframe spacing and the edit lists — the platform-contract encode wants `tv`, a
+               closed 2 s GOP and no edit lists (look-library GUIDE § 7)
   phone band   INFO, with --phone-ref <real phone clips>: the delivered file's phone-texture band (phone_texture_probe.py —
                dead-flat 8×8 share, noise floor, median block sd) against the RANGE over every reference frame; a
                creator-style spot's read, never a failure — the operator judges the phone render beside the clean one
@@ -31,7 +40,8 @@ at the right frame); `judgement` rows change the content (duration, loudness, cu
 Exit 1 on any FAIL; the summary names the failures by kind.
 
   qc_deliverable.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--placement <qc_vo_placement.py>] [--no-card] [--tp-ceiling] [--max-still-s]
-  qc_deliverable.py --selftest        # the near-black instrument against a synthetic clip: a black event FAILS, a declared one passes
+                    [--prev deliver/<previous version>.mp4 [--prev-expect finish|changed:<id,…>]]
+  qc_deliverable.py --selftest        # near-black: a black event FAILS, a declared one passes · vs previous: regraded / moved / retimed read back
 """
 import argparse, json, os, re, subprocess, sys
 import numpy as np
@@ -59,6 +69,48 @@ def near_black_events(D, events, thr=16.0):
     return bad
 
 
+def luma_at(p, t, W=None, H=None):
+    vf = (f'scale={W}:{H},' if W else '') + 'format=gray16le'
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-ss', f'{t:.4f}', '-i', p, '-frames:v', '1', '-vf', vf, '-f', 'rawvideo', '-'], capture_output=True).stdout
+    if not W:
+        pr = json.loads(sh(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', p]).stdout)['streams'][0]; W, H = pr['width'], pr['height']
+    return np.frombuffer(raw, np.uint16).reshape(H, W).astype(np.float64) / 65535 if len(raw) == W * H * 2 else None
+
+
+
+def _shift(x, y):
+    F = np.fft.fft2(x - x.mean()) * np.conj(np.fft.fft2(y - y.mean())); F /= np.abs(F) + 1e-9
+    c = np.abs(np.fft.ifft2(F)); iy, ix = np.unravel_index(np.argmax(c), c.shape)
+    return (int(iy if iy < c.shape[0] // 2 else iy - c.shape[0]), int(ix if ix < c.shape[1] // 2 else ix - c.shape[1]))
+
+
+def prev_compare(D, P, events, fps):
+    """Each footage event's middle frame of D against the same timeline frame of P and its two neighbours: (id, mean |dY| /255,
+    the phase shift at the same frame, the frame offset or None). A grade changes dY and nothing else; a one-frame slip matches a
+    NEIGHBOUR best in structure (gradient NCC, blind to a grade) and at a (0, 0) phase shift; a crop, scale or warp moves the
+    phase peak at every one of the three."""
+    rows = []
+    g = lambda z: np.hypot(*np.gradient(z))
+    ncc = lambda x, y: float(((x - x.mean()) * (y - y.mean())).sum() / (np.sqrt(((x - x.mean()) ** 2).sum() * ((y - y.mean()) ** 2).sum()) + 1e-12))
+    for x in events:
+        if x.get('role') == 'endcard' or x.get('source') == 'designed' or len(x.get('tl', [])) < 2: continue
+        k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps); m = (k0 + k1) // 2
+        a = luma_at(D, (m + 0.5) / fps)
+        if a is None: continue
+        H, W = a.shape; b = {d: luma_at(P, (m + d + 0.5) / fps, W, H) for d in (-1, 0, 1)}
+        if b[0] is None: rows.append((x.get('id', '?'), None, None, None)); continue
+        ga = g(a); best = max((d for d in (-1, 0, 1) if b[d] is not None), key=lambda d: ncc(ga, g(b[d])))
+        sh0 = _shift(a, b[0]); off = best if best and _shift(a, b[best]) == (0, 0) else (0 if sh0 == (0, 0) else None)
+        rows.append((x.get('id', '?'), float(np.mean(np.abs(a - b[0])) * 255), sh0, off))
+    return rows
+
+
+def classify(row):
+    id_, dy, sh_, off = row
+    if dy is None: return 'unreadable'
+    return 'moved' if off is None else 'retimed' if off else 'regraded' if dy > 1.0 else 'same'
+
+
 def selftest():
     import tempfile
     d = tempfile.mkdtemp(); clip = os.path.join(d, 'clip.mp4')
@@ -68,7 +120,17 @@ def selftest():
     bad = near_black_events(clip, ev); ok1 = [b[0] for b in bad] == ['b']
     ev[1]['accepted_black'] = True; ok2 = near_black_events(clip, ev) == []
     print(f"SELFTEST {'PASS' if ok1 and ok2 else 'FAIL'}: black event flagged={ok1} (found {bad}), declared event passes={ok2}")
-    sys.exit(0 if ok1 and ok2 else 1)
+    base = os.path.join(d, 'prev.mp4')   # a moving picture; four "new versions" of it, one per verdict
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=s=192x320:d=2:r=24', '-pix_fmt', 'yuv420p', '-crf', '12', base], check=True)
+    vfs = {'same': 'null', 'regraded': 'eq=contrast=1.2:brightness=0.04', 'moved': 'crop=192:316:0:4,pad=192:320:0:0',
+           'retimed': 'trim=start_frame=1,setpts=PTS-STARTPTS,tpad=stop=1:stop_mode=clone'}
+    got = {}
+    for k, vf in vfs.items():
+        o = os.path.join(d, f'{k}.mp4'); subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', base, '-vf', vf, '-pix_fmt', 'yuv420p', '-crf', '12', o], check=True)
+        got[k] = classify(prev_compare(o, base, [{'id': k, 'tl': [0.0, 2.0]}], 24)[0])
+    ok3 = all(got[k] == k for k in vfs)
+    print(f"SELFTEST {'PASS' if ok3 else 'FAIL'}: vs previous — {got} (each must read as its own name)")
+    sys.exit(0 if ok1 and ok2 and ok3 else 1)
 
 
 def last_frame_thumb(p):
@@ -84,6 +146,8 @@ def main():
     ap.add_argument('--max-still-s', type=float, default=None, help='the longest still run allowed inside the footage span; default = the EDL qc.max_still_s, else 0.5')
     ap.add_argument('--black-luma', type=float, default=16.0, help='an event whose three sampled frames all read under this mean luma (0–255) fails unless it declares accepted_black')
     ap.add_argument('--phone-ref', nargs='*', default=[], help="the project's real phone clips: prints the delivered file's phone-texture band against theirs as INFO (a creator-style spot)")
+    ap.add_argument('--prev', default=None, help="the previous version's deliverable: every footage event's middle frame compared (regraded / moved / retimed), INFO")
+    ap.add_argument('--prev-expect', default=None, help="finish = every footage event regraded, none moved or retimed; changed:<id,…> = those events differ from --prev")
     ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
     if a.selftest: selftest()
@@ -181,6 +245,21 @@ def main():
             verdict(ncc >= 0.9, 'end card', f"last frame vs {os.path.basename(card[0]['take'])} NCC {ncc:.3f}")
     r = sh([sys.executable, os.path.expanduser(a.placement), '--root', '.', '--edl', a.edl, '--deliv', D]); out = r.stdout.strip()
     print('      ' + out.replace('\n', '\n      ')[-900:]); verdict(r.returncode == 0 and 'PLACEMENT OK' in out, 'VO placement', 'see the lines above')
+    # ---- the platform contract (INFO): range tag, keyframe spacing, edit lists (look-library GUIDE § 7) ----
+    rng = sh(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_range', '-of', 'csv=p=0', D]).stdout.strip()
+    kf = [i for i, l in enumerate(sh(['ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries', 'packet=flags', '-of', 'csv=p=0', D]).stdout.split()) if 'K' in l]
+    gaps = sorted({b - a_ for a_, b in zip(kf, kf[1:])}); mv = open(D, 'rb').read(); mi = mv.find(b'moov'); elst = mv.count(b'elst', max(mi, 0))
+    print(f"INFO contract: colour range {rng or 'untagged'} (want tv) · keyframes every {gaps[:4]}{'…' if len(gaps) > 4 else ''} frames (a closed 2 s GOP = [{2 * int(efps)}]) · edit lists {elst} (want 0)")
+    # ---- against the previous version (INFO; a verdict with --prev-expect) ----
+    if a.prev:
+        rows = prev_compare(D, a.prev, e['events'], efps); cls = {r[0]: classify(r) for r in rows}
+        print(f"INFO vs previous ({a.prev}): " + ' · '.join(f"{r[0]} {cls[r[0]]}" + (f" dY {r[1]:.1f}" if r[1] is not None else '') + (f" shift {r[2]}" if r[2] not in (None, (0, 0)) else '') + (f" off {r[3]:+d} frame" if r[3] else '') for r in rows))
+        if a.prev_expect == 'finish':
+            off = [f"{i} {c}" for i, c in cls.items() if c != 'regraded']
+            verdict(not off, 'finish vs previous', f"{len(rows) - len(off)}/{len(rows)} footage events regraded with no move and no retime" + (f"; not: {off}" if off else ''))
+        elif a.prev_expect and a.prev_expect.startswith('changed:'):
+            want = [i for i in a.prev_expect.split(':', 1)[1].split(',') if i]; same = [i for i in want if cls.get(i, 'missing') in ('same', 'missing', 'unreadable')]
+            verdict(not same, 'changes reached the picture', f"{len(want) - len(same)}/{len(want)} named events differ from the previous version" + (f"; unchanged: {same} — a stale cache?" if same else ''))
     # ---- the phone-texture band (INFO, a creator-style spot: a comparison against the project's real phone clips, never a threshold) ----
     if a.phone_ref:
         pr_ = sh([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phone_texture_probe.py'), '--json', D] + a.phone_ref)

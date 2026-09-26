@@ -210,7 +210,10 @@ gradeMode, [items])`, gradeMode 0 = no keyframes, and that is the only call the 
    General → External scripting = Local. A Studio feature. It works for a Resolve the human launched; on
    our box it **refused every instance a script or agent had launched** (headless or GUI, Studio title
    correct, scripting mode on, the TCP port accepting, the handshake returning nothing). Do not read a
-   refusal as a licence problem — `Resolve.GetProductName()` answers that question.
+   refusal as a licence problem — `Resolve.GetProductName()` answers that question. "Who launched it" is not
+   the whole story either: a portable Resolve started directly from its `Resolve.exe`, without its own launcher
+   and the sandbox junctions that launcher installs, refused Local while the bridge answered. Start a portable
+   build through its launcher.
 2. **The in-app bridge** from `samuelgursky/davinci-resolve-mcp` (MIT) — a script started inside Resolve
    (`Workspace ▸ Scripts ▸ resolve_bridge`) re-exports the live `resolve` object over an HMAC-signed
    loopback socket (default `127.0.0.1:49632`). It does not care who launched Resolve or which edition it
@@ -224,11 +227,13 @@ Install the bridge once: clone the repository on the Windows box, create its Pyt
 Resolve\Support\Fusion\Scripts\Utility` and the `%PROGRAMDATA%` twin, a runtime under `Fusion\`, and a
 config with the port, the HMAC token, the media roots your clips live under and the output roots). The
 same repository is an MCP server, useful for ad-hoc control from an agent. **Every session:** the human
-launches Resolve, opens a project, clicks the bridge script; the pass then connects deterministically
-(three 5-second renders in 32 s cold, 13 s warm, measured). Never have a script launch Resolve for a job
-that needs the GUI project open. The pass should try external scripting first and fall through to the
-bridge, polling for up to a minute (Resolve takes ~40 s to boot and answers only once a project manager is
-up).
+launches Resolve and opens a project; the pass tries external scripting first and falls through to the bridge,
+polling for up to a minute (Resolve takes ~40 s to boot and answers only once a project manager is up), so the
+bridge click is needed only when Local refuses — and when it is needed, it connects deterministically (three
+5-second renders in 32 s cold, 13 s warm, measured). Never have a script launch Resolve for a job that needs the
+GUI project open. **Before asking the human to launch, open or click anything, check**: a scripting probe (this
+MCP's `runtime_mode` and `get_current`) and the port-49632 listener answer all of it for free. A wrapper that
+pins `--transport bridge` defeats the ladder.
 
 ### 5c. Authoring a look and exporting the `.drx` — once per look, by hand
 
@@ -306,7 +311,22 @@ for clip in clips:
 ```
 
 Output: `<clip>__<look>.mov`, DNxHR HQX 10-bit 4:2:2, at the mezzanine's own resolution and rate; about
-7 s of render per 7-second 2160×3840 clip, 228 s for an 89-second 3416×1920 piece.
+7 s of render per 7-second 2160×3840 clip, 228 s for an 89-second 3416×1920 piece. **Feed it input that
+starts at pts 0**: a clip whose first frame sat at 0.041 s came back with one extra leading frame. And cut
+the hero into the edit at the frame nearest the in-time, seeking to that frame's own start: a seek between
+frames ahead of an `fps` filter doubles the first frame whenever the next frame starts more than half a frame
+later, and the render's 1/12288 s timebase turns a half-frame in-point into exactly that tie.
+
+**Normalise before the look.** A cube or a `.drx` assumes normalised input. On flat footage — overcast
+light, full-range phone clips, a re-encode — level each shot first (the 0.5/99.5 luma percentiles to
+0.02/0.88, leaving headroom for the look's own gain: mapping to 0/1 clipped 7–30 % of the brightest shots)
+and bring its saturation to a target measured on footage the client approved; `ads-clean.drx` then lands
+~27 % less saturated than the cube's estimate, so aim the normalise at 0.91× the approved median for a
+Dehancer hero, 0.75× for the cube alone. Without the step the library look read pale beside a
+hand-written level chain on one spot; with it the finished client shots matched the approved grade's
+saturation to 1 % (median chroma 0.0301 against 0.0302) at ≤ 0.01 % clipping. The kit's
+`video-finish-qc/scripts/normalise_shots.py` does it, writes the 10-bit flats the pass grades, and reads
+each hero back against its flat (look applied, no geometric shift, the frame alignment).
 
 Codec facts that are not what the UI suggests (measured on Studio 18.5):
 - `GetRenderCodecs()` and `SetCurrentRenderFormatAndCodec()` take the format's **extension** (`mov`),
@@ -381,6 +401,8 @@ cut-dense edit gives them many chances.
 ### Commercial — seven 9:16 social ads, 1080×1920
 
 - upscale: local Rhea ×4 on every take; Starlight ×4 on two wides of one spot
+- normalise (real footage, flat light): per shot before the look — levels to 0.02/0.88 and a measured
+  saturation target, 10-bit flats starting at pts 0 (§ 6a)
 - grade: `ads-clean.drx` hero pass → 10-bit 4:2:2 heroes (ProRes 422 HQ where the install writes it,
   DNxHR HQX where it does not — ours) → cut → ProRes 422 HQ 2160×3840 master (probe it for `yuv422p10le`)
 - grain: none — social-class delivery; the platform re-encode discards it anyway
@@ -475,8 +497,10 @@ pattern source), plus the Resolve and Topaz automation donors and the vendor doc
 - A `.drx` cannot be inspected by text search. Render it and look, at 1:1, on a fresh clip.
 - A `.drx` is pinned to its Dehancer major version; a major update installs as a different plugin and the
   presets stop matching.
-- Resolve may refuse external scripting from any instance a script launched; the human launches it and
-  clicks the bridge, which is silent — check the port.
+- Resolve may refuse external scripting from an instance a script launched, or one started without a
+  portable build's launcher; the pass then falls through to the bridge, which is silent — check the port,
+  and check (a scripting probe, the port) before asking the human to start anything.
+- A cube or a `.drx` is the grade, never the normalise: level and saturate each flat shot first.
 - Render codecs are addressed by extension, not display name; ProRes may be listed and refused; CineForm
   pads width; probe for 10-bit rather than trusting a codec name.
 - One render job at a time; fresh timeline names; a re-imported path returns an empty list.

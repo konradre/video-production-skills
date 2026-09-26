@@ -33,11 +33,13 @@ Per clip: import → its own timeline → `ApplyGradeFromDRX(<look>.drx)` → a 
 Runs under the **Windows** Python that can import `DaVinciResolveScript` (a venv beside the bridge repo works).
 `video-finish-qc/scripts/hero_pass.sh` wraps it. Install the in-app bridge from
 [samuelgursky/davinci-resolve-mcp](https://github.com/samuelgursky/davinci-resolve-mcp) once; every session the
-human launches Resolve, opens a project and starts `Workspace ▸ Scripts ▸ resolve_bridge`.
+human launches Resolve and opens a project. `--transport auto` tries Local external scripting (Studio) first and
+falls through to the bridge, so starting `Workspace ▸ Scripts ▸ resolve_bridge` is needed only when Local refuses —
+check the bridge's port (49632) and a scripting probe before asking anyone to start either.
 
 ```bash
 <windows venv python> tools/resolve-pass/resolve_pass.py --look ads-clean --in "C:\renders\A__rhea-1x4.mp4" \
-    --out-dir "C:\hero-pass\renders" --format mov --codec DNxHR_HQX --transport bridge --wait 60
+    --out-dir "C:\hero-pass\renders" --format mov --codec DNxHR_HQX --transport auto --wait 60
 <windows venv python> tools/resolve-pass/resolve_pass.py --list-codecs      # what this install offers, BY EXTENSION
 ```
 

@@ -96,11 +96,17 @@ the scaffold's `--spot-type ugc` drops the rest. [`references/GLOBAL-SPEC.md`](r
 
 The grade is named here, once, and it starts from the look library's cube for the genre (`ads-clean` for an ad) — also when
 the footage is the client's own: the operator picks it from a frame sheet of the project's frames
-(`video-finish-qc/scripts/look_sheet.py`) before the first delivered version. A hand-written level chain is a deviation that
-needs a reason; two of them stood for ten hours on a documentary spot before the operator asked (2026-09-15).
+(`video-finish-qc/scripts/look_sheet.py --normalise auto`) before the first delivered version, or hands the pick over and
+the agent picks on the sheet, provisionally. A hand-written level chain is a deviation that needs a reason; two of them
+stood for ten hours on a documentary spot before the operator asked (2026-09-15). **The grade names its normalise step**: a
+cube is the grade, never the normalise — flat sources (overcast light, full-range phone clips, a re-encode) are levelled and
+brought to a measured saturation per shot first (`video-finish-qc/scripts/normalise_shots.py`), and the sheet renders every
+cube on the normalised frame; on the cube alone an auction spot read pale beside a hand-normalised chain (2026-09-16). A
+sheet pick is provisional until one delivered spot has been watched in motion at full size. And the finish is part of the
+job: every render a project builder makes before `video-finish-qc` has run is PRE-FINISH, and says so.
 
-**Done when:** the global spec section is written once for the campaign, names the look the operator picked from the sheet,
-and every later spot cites it.
+**Done when:** the global spec section is written once for the campaign, names the look picked from the sheet and its
+normalise step, and every later spot cites it.
 
 ## 4. Build the asset bible, the kit and the beats — then the shot list
 

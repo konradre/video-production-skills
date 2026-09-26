@@ -8,7 +8,8 @@ This file is the same order run over a whole spot from its EDL, with the campaig
 | stage | input | output | codec | who |
 |---|---|---|---|---|
 | upscale, per shot | the APPROVED take (480p) | `edit/upscale-out/<take>__rhea-1x4.mp4` (local) or `edit/upscale-out/<id>.mp4` (hosted) | 10-bit where the tool allows | `upscale_local.sh` / `upscale_fal_topaz.py` |
-| hero pass, per clip | the upscaled mezzanine | `edit/hero/<stem>__<look>.mov` DNxHR HQX / ProRes 422 HQ 10-bit 4:2:2, pre-graded | `hero_pass.sh` (Resolve + Dehancer over the bridge) |
+| normalise, per shot | the source window (real footage at its display shape) or the upscaled mezzanine | `edit/flat/<id>.mov` ProRes 422 HQ 10-bit 4:2:2, BT.709, limited range, starting at pts 0 | `normalise_shots.py measure` → `flatten` |
+| hero pass, per clip | the flat or the upscaled mezzanine | `edit/hero/<stem>__<look>.mov` DNxHR HQX / ProRes 422 HQ 10-bit 4:2:2, pre-graded | `hero_pass.sh` (Resolve + Dehancer, `--transport auto`), then `normalise_shots.py verify` |
 | cut | the EDL: heroes (`src`, look `none`), upscaled mezzanines (a cube), designed renders | `edit/mezz/<SPOT>-footage-graded<tag>.mov` ProRes 422 HQ at the mezzanine raster, footage only | `finish_spot.py --stage cut` |
 | master | + post layers, the card when the spot has one, the VO stem (rebuilt), sfx, cues, native beds — a static sum, no loudness processing | `edit/mezz/<SPOT>-master-<W>x<H><tag>.mov` ProRes 422 HQ + PCM 24-bit | `finish_spot.py --stage master` |
 | deliver | the master | `deliver/<deliver_base><tag>.mp4` at the EDL's `canvas` (1080×1920 for a vertical spot) H.264 High CRF 17, AAC 192k; one measured static gain, a limiter at 192 kHz and again at 48 kHz; captions overlaid after the downscale; the length capped at the runtime | `finish_spot.py --stage deliver` |
@@ -33,6 +34,43 @@ approved take (the operator's pick)
 ```
 
 Do not post-scale in the upscale pass: the deliver leg does the downscale, which is what keeps the grain.
+Real footage already at the delivery raster, with no grain on the deliverable, takes NO upscale arm: the normalise resamples
+it to the display shape by lanczos and nothing is redrawn (since 2026-09-26: 1080p deliverables only, no footage warped).
+
+## The per-shot normalise — before the look (P31, 2026-09-26)
+
+A cube or a `.drx` is the grade step and assumes normalised input. On an auction spot the library look alone read pale
+beside a hand-written level chain (the raw clips spanned 32–185 of 0–255 at saturation 2–4 where the approved grade read
+12): the hand chain WAS the normalise step, and the cube had replaced it instead of following it.
+`normalise_shots.py` makes the step explicit, per shot:
+
+- **levels** — the 0.5/99.5 luma percentiles over five frames of the window → 0.02/0.88, the black point kept ≤ 0.30, the
+  white point ≥ 0.70 and the stretch capped at ×1.8 (a normalise, never a creative contrast push). Mapping to 0/1 clipped
+  7–30 % of the brightest shots under the look's own gain and exposure; at 0.02/0.88 the Dehancer heroes clipped ≤ 0.01 %.
+- **saturation** — a factor about BT.709 luma (a `colorchannelmixer` matrix) that lands the levelled chroma on
+  `t-scale × the median chroma of footage the operator approved`, clamped to ×0.70–×1.80. The Dehancer `ads-clean.drx`
+  (250D/2383, TI 35) finishes ~27 % less saturated than the cube's estimate: at `--t-scale 0.75` the heroes read 0.0249
+  against a 0.0302 target; at 0.91 the client shots' median read 0.0301. Use 0.75 when the grade is the cube alone.
+- **the flat** — 16-bit RGB in, ProRes 422 HQ 10-bit limited range out, BT.709 tags, an untagged HD source read as BT.709
+  (swscale's own default is BT.601 at every size), the display shape by lanczos (scaled up to a 1080 short side, never
+  down: a 4K source keeps its pixels for the crops downstream), and the first frame at pts 0.
+- **the read-back** — `verify` per hero: 10-bit, raster, frames, the flat's start, mean |dY| > 1/255, a (0, 0) phase
+  correlation, the frame alignment. It does NOT see what happens after the hero: the plan's seek into it is the next
+  place a frame can slip (below), and `qc_deliverable.py --prev <pre-finish> --prev-expect finish` is the row that does.
+- **the seek into a hero** — the target frame is the one NEAREST the plan's in-time (`round(in × fps)`: ±0.5 frame of
+  picture-to-sound sync; `ceil` leaves the picture up to a frame early on a synced shot), and the seek is that frame's own
+  start, floored at the decimals the plan keeps: `in = floor((f_in − f0) / fps)`. **A seek between frames followed by an
+  `fps` filter doubles the first frame whenever the next frame starts more than half a frame after the seek point**: the
+  filter rounds that frame into output slot 1 and the muxer copies it into slot 0, so the whole event plays one frame
+  late. On one spot (2026-09-26) in-points at x.2 and x.4 of a frame had done it to 4 of 22 events in the approved version
+  itself; a half-frame in-point into the heroes, `(k − 0.5) / fps`, came out of their 1/12288 s timebase as an exact
+  0.5-frame tie that rounded up and did it to 14 of 22; where `f_in = f0` it went negative and did it anyway. A builder
+  closes the whole class with `setpts=PTS-STARTPTS` before its `fps` filter. No per-hero check can see it — the finished
+  spot against the previous version can (`qc_deliverable.py --prev … --prev-expect finish`), and it reads the approved
+  version's own slips as `retimed` until the in-points take the nearest frame.
+
+The look sheet renders every candidate on the normalised frame (`look_sheet.py --normalise auto`), beside a
+normalised-only column; a sheet pick is provisional until one spot has been watched in motion at full size.
 Generate clean at 480p — no grain, halation or bloom in a prompt (baked grain upscales to smeared noise).
 Budget shape for a seven-spot campaign: all-Starlight ≈ $55, wides only ≈ $13, Rhea everywhere $0 + ~4 h GPU.
 
@@ -57,10 +95,14 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
   a portable Resolve started through its own launcher installs the sandbox junctions that redirect
   `%PROGRAMDATA%\Blackmagic Design\DaVinci Resolve` at the portable's tree, and a direct `Resolve.exe` start
   does not. Treat Local as the preferred rung and the bridge as the one that always answers; let `auto` decide
-  per run. **Diagnose before escalating** — a scripting probe answers "is it reachable, and on what project"
-  for free, and the window title names the open project; process memory size is not evidence about whether a
-  project is open. One clip per call, one render job at a time, fresh timeline names. The media pool caches
-  paths: a re-imported
+  per run. Measured again later: a GUI instance started from the portable's `Resolve.exe` directly — no launcher
+  process, both Blackmagic data trees plain folders rather than the launcher's junctions — refused Local; the
+  bridge answered and `auto` rendered every hero. Without the junctions a direct start presumably reads and writes
+  the installed version's own data trees, worth one line to whoever runs Resolve. Until then `hero_pass.sh` passed
+  `--transport bridge` whatever its header said. **Diagnose before escalating** — a scripting probe answers "is it
+  reachable, and on what project" for free, and the window title names the open project; process memory size is
+  not evidence about whether a project is open. One clip per call, one render job at a time, fresh timeline names.
+  The media pool caches paths: a re-imported
   path returns an empty list and a render of the OLD duration — fresh filenames per version.
 - **Heroes of equal frame count have identical byte sizes** (DNxHR) — verify distinctness by frame hash
   (`hero_distinct.py`) before trusting a listing.

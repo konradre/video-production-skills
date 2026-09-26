@@ -132,12 +132,20 @@ a line to voice, a cue to cut       → spot-audio-assembly
 a card, a turntable, a wall         → designed-elements
 a topic to explain in motion graphics → explainer-video (its own pipeline, end to end)
 a render, finals, a QC              → video-finish-qc
+a builder's render on the table     → video-finish-qc (the finish is implicit: normalise → look → deliver → QC)
 one clip's tier, look, grain or cap → video-finish
 a finished mix to master            → mastering-audio
 music to generate by API            → spot-audio-assembly (its music route, behind the cost line)
 client notes in                     → client-rounds
 a new spot / film / track briefed   → ad-spot-preprod / film-preprod
 ```
+
+**The finish is part of every video job, never an extra.** Every deliverable passes `video-finish-qc`'s chain — the
+per-shot normalise, the genre's look (the `.drx` hero where Resolve is on hand, the cube otherwise), the deliver encode,
+the QC against the previous version — before it goes out as final. A render a project builder makes before that chain has
+run is PRE-FINISH: the word is in its file name or note, in the delivery message and in the pause block, and NEXT carries
+the finish until it has run on the version the operator reviews. Since 2026-09-26 — eleven versions of one spot shipped
+pre-finish before anyone asked, because the builder was the project's own and no phase routed it to the finish.
 
 **Done when:** the phase skill has been invoked by name, or the stop condition and the named
 successor are in the message to the operator.
