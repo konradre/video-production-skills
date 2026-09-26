@@ -70,6 +70,10 @@ Rule for images and video alike: **quality and prompt-adherence first, permissiv
 criterion.** The table — modes, prices, caps, moderation classes, upload conventions — is
 [`references/VENUES.md`](references/VENUES.md). The decisions it settles:
 
+- 🔴 **Seedance 2.5 is the video model for every shot; Gemini Omni Flash 1.1 is the default ONLY for a UGC
+  talking-head clip** (since 2026-09-26). B-roll, product, equipment, a scene, an image-to-video from an accepted still
+  and a commercial talking head all route to Seedance 2.5 on the venues below; Omni's lower step price does not make it
+  the default for any of them.
 - Video with people in the references → **treg `reapi.video-gen.seedance-2-5.unrestricted`**, the PAYG
   people-capable route ($0.1186/s at 480p · $0.2668 at 720p · $0.462 at 1080p, PAYG, no plan behind it): `content_filter: false`
   carries the BytePlus licensed-asset escape, so it takes a **real person's likeness**, which every other
@@ -104,7 +108,8 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   polarity). **The lipsync pass stays gone** — that is what the audio reference bought, and it survives the raster
   change; what returns at 720p is a 1.5× lanczos to 1080×1920, a resample rather than a reconstruction, at $0 and no
   face-shaped softening tax. 1080p stays reachable on treg at $0.462/s for a shot that earns it. Omni Flash 1.1 keeps
-  the shots with NO locked VO (it takes no audio input on any surface).
+  only the UGC talking heads with NO locked VO (it takes no audio input on any surface); a commercial talking head with
+  no locked VO stays on Seedance 2.5 (since 2026-09-26).
 - **An EDIT or an EXTEND, and 2K MiniMax H3 → the Higgsfield API, on merit rather than price.** `video-edit` and
   `video-extend` are **structurally separate endpoints** there: treg has no row for either, monid reaches both only
   by prompt phrasing — which misreads into a fresh r2v that succeeds and **bills in full with no error to catch** —
@@ -147,9 +152,10 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   Flash 1.1, **kie first, fal the fallback** (since 2026-09-25: kie `google/gemini-omni-flash-1-1` is $0.525 per
   8 s at 720p or 1080p against fal's $0.80 / $1.20, sold in fixed 4 / 6 / 8 / 10 s steps — fal takes any whole second
   3–10 s, and a 360p draft or a 3 s take is cheaper there, so the cost line quotes both; 720p native, no uploaded audio,
-  ~15 % of takes stutter → regenerate); product-in-hand, a 30 s
-  story or a pinned voice → Seedance 2.5; a defined handheld move ≤ 8 s → Kling 3.0; the words that must land exactly →
-  an audio-driven model or a lipsync pass, never a prompt. The cost line quotes the price per USABLE take with its assumed
+  ~15 % of takes stutter → regenerate); every other shot in the spot — product-in-hand, b-roll, a 30 s story, a pinned
+  voice, a defined handheld move — → Seedance 2.5 (since 2026-09-26, Omni is the default for the UGC
+  talking-head clip only; Kling 3.0 ≤ 8 s stays an unmeasured alternative, never the default); the words that must
+  land exactly → an audio-driven model or a lipsync pass, never a prompt. The cost line quotes the price per USABLE take with its assumed
   keep rate (3:1–6:1 across models), and a cheap take is regenerated where an expensive one is repaired
   (`references/VENUES.md` § Creator-style talking heads). Sora 2 is retired; Veo 3.1, Ray3, FLUX 3, Boreal and Wan 3.0 are
   unproven here.
