@@ -166,6 +166,30 @@ def main():
         if dur > 0 and beats / dur > 0.5 and dur >= 3:
             rows.append(('WARN', 'L12', f'Cut {num}: ~{beats} action segments in {dur:g} s (> 1 per 2 s) — the model rushes; cut beats before seconds'))
 
+    # L37 multi-shot load (Emily2040/seedance-2.0 references/multishot-grammar.md, an authored heuristic first calibrated
+    # on three rendered takes): seconds per load point S = duration ÷ (beats + load). A beat is a cut (a reaction or insert
+    # with no line and no move counts half); load is 0.5 per camera move inside a cut and 1 per spoken line per 8 words
+    # (12 CJK characters). Extra actors, contact, location changes and sound cues also load a clip but cannot be read off
+    # the text, so this is a FLOOR: a clip that is Ambitious here is Ambitious for certain. It guards SPOKEN clips only:
+    # silent quick cuts are a montage, whose density L12 already reads per cut (our house skeleton cuts at 1.5–2 s).
+    if len(cuts) >= 2 and any(QUOTED.search(c[3]) for c in cuts):
+        MOVE = re.compile(r'\b(push(?:es)?[- ]in|pull(?:s)?[- ](?:back|out)|dolly|dollies|pans?|panning|tilts?|tilting|orbits?|orbiting|tracking|crane|whip[- ]pans?|zooms?|zooming|arcs?|arcing|trucks?)\b', re.I)
+        beats = load = 0.0
+        for num, t0, t1, bodytxt in cuts:
+            lines = QUOTED.findall(bodytxt); moved = bool(MOVE.search(QUOTED.sub(' ', bodytxt)))
+            head = re.split(r'[:;,.]', bodytxt, 1)[0].lower()
+            beats += 0.5 if (not lines and not moved and re.search(r'\b(insert|reaction)\b', head)) else 1.0
+            load += 0.5 if moved else 0.0
+            for q in lines:
+                cjk = len(re.findall(r'[぀-ヿ㐀-鿿가-힯]', q))
+                load += max(1.0, cjk / 12 if cjk else len(re.findall(r"[A-Za-z0-9']+", q)) / 8)
+        D = a.duration or max(float(c[2]) for c in cuts)
+        S = D / (beats + load) if beats + load else 0
+        if S and S < 2.0:
+            rows.append(('WARN', 'L37', f'multi-shot load: {D:g} s over {beats:g} beats + at least {load:g} load points = {S:.1f} s per point — '
+                                        'Ambitious (under 2): lines start to garble and reactions get cut; merge the two lightest beats or '
+                                        'split into two generations that keep every beat (DIALECTS § Multi-shot, multi-person direction)'))
+
     # L34 single-shot negatives on a generation that composes its own coverage. "No unmotivated cut / hidden splice / abrupt
     # push-in" belongs to ONE continuous shot of a few seconds; carried into a multi-cut or long generation it forbids the
     # coverage the long take was bought for — a cut inside one generation is descriptive, consistency across it is the verdict.

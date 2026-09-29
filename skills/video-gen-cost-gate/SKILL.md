@@ -163,8 +163,9 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   ~15 % of takes stutter → regenerate); every other shot in the spot — product-in-hand, b-roll, a 30 s story, a pinned
   voice, a defined handheld move — → Seedance 2.5 (since 2026-09-26, Omni is the default for the UGC
   talking-head clip only; Kling 3.0 ≤ 8 s stays an unmeasured alternative, never the default); the words that must
-  land exactly → an audio-driven model or a lipsync pass, never a prompt. The cost line quotes the price per USABLE take with its assumed
-  keep rate (3:1–6:1 across models), and a cheap take is regenerated where an expensive one is repaired
+  land exactly → an audio-driven model or a lipsync pass, never a prompt. The cost line quotes the price per USABLE take with its
+  keep rate — measured by `scripts/take_ledger.py` from this project's gate records and picks, with the assumed
+  3:1–6:1 across models beside it until there are 5 picks — and a cheap take is regenerated where an expensive one is repaired
   (`references/VENUES.md` § Creator-style talking heads). Sora 2 is retired; Veo 3.1, Ray3, FLUX 3, Boreal and Wan 3.0 are
   unproven here.
 - **A vendor limit is READ, never inferred.** A cap not read from the vendor's own schema, estimator or error is
@@ -231,6 +232,10 @@ the ones that bind every ask:
   approval, hero pass, frame sheets, the build) never wait for a GO; a residual doubt goes in the
   delivery note with its frame time — never as a re-roll question. Tight budget ⇒ one seed at a time,
   checked before the next.
+- **Before a re-roll's cost line, read the ledger**: `python3 scripts/take_ledger.py --root <project> [--budget <shot>=<n>]`
+  prints attempts and picks per shot, the measured keep rate the line quotes, and the stop-rule ladder's tripwires
+  (COST-AND-GO.md § Budget-final rules). A shot that tripped — three paid attempts with no budget and no pick, or half
+  a declared budget — goes to the operator as options, not as another batch.
 - **A venue chosen for FUNDING rather than price quotes the PREMIUM on the same line.** Where the money sits
   decides which venue is callable; the ranking decides what it costs. So a batch
   routed to a funded-but-dearer venue reads `… · Higgsfield API (funded) · 1.40× monid, +$0.41 this batch`, and the

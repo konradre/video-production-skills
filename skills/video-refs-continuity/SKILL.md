@@ -51,7 +51,9 @@ from this table verbatim** (the count read on the zoom, never a number from memo
 floor; relative scale; ~20 s on a 24 GB GPU, $0; `scripts/comfy_ready.py` first — it says whether the server
 and its two providers answer, and `scripts/comfy_up.sh` starts one from the env; any OTHER graph queued on that server
 goes through `scripts/comfy_preflight.py <graph.json> --expect video|image --host` first — it refuses a graph that
-would finish and save nothing: a preview-only output, `save_output` false, an unfed save node, the wrong kind), and `scripts/scene_proxy.py <scene.json> <out> "<camera>"`
+would finish and save nothing (a preview-only output, `save_output` false, an unfed save node, the wrong kind) or that
+names a model file the server does not hold, and lists the custom node packs the graph needs; an unattended caller
+sets `COMFY_START_POLICY=connect` or `ask` so `comfy_up.sh` never starts a server nobody asked for), and `scripts/scene_proxy.py <scene.json> <out> "<camera>"`
 prints, for ANY camera you author, where every object sits — left/right %, depth rank, in frame, occluded,
 out of frame — and renders a grey-box + depth frame of that angle. That table IS the *Room geometry per cut*
 row and the source of every geometry sentence for a new angle; on the pilot it reproduced the accepted keepers'

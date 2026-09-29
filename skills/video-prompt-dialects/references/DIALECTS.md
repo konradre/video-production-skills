@@ -35,6 +35,37 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
   keyframes) sat unread beside them for a week because nobody had a question that named them. On
   adoption, enumerate every feature the spec documents into the dialect table, even those with no use yet.
 
+## Multi-shot, multi-person direction
+
+A clip with more than one cut or more than one person is written for a crew that cannot ask a question and keeps nothing
+across a cut that the prompt does not repeat. The rules come from `Emily2040/seedance-2.0` `references/direct-for-the-model.md`:
+ten faults in three rendered takes of one banquet scene (Seedance 2.0 on 即梦, 2026-09-26/27), each rule the repair for
+one of them. **Untested here** — the first multi-shot dialogue spot measures them on 2.5 — and they sit beside our measured
+rule for an audio-driven take (numeric speech windows, `video-gen-cost-gate` § 1), not in place of it.
+
+- **A lock line ends every cut**, in the same words each time: the light source and its colour; each principal's age band,
+  hair, wardrobe and distinguishing object; where each stands against a fixed landmark; which way each faces; and which side
+  of the room the camera is on. The model forgot all of these between cuts in the first take — a woman delivered her line
+  from a doorway she had left two shots earlier. Redundancy is how continuity is bought.
+- **One action per cut, by one person; everyone else keeps idle business.** "Hold" and "nothing else moves" render
+  mannequins; write the idle instead (the guests keep looking at the door and whisper). Three actions in one block got one.
+- **A feeling is a plain word plus one physical anchor** ("embarrassed, the polite smile fades and he swallows"), never an
+  idiom (rendered literally: 脸沉下来, "his face darkened", came out as a face turning grey) and never a bare list of muscles (it read as a sulk).
+- **A reaction is a reverse angle** from the side of what is reacted to, so the eyes go past the lens toward it; the
+  eye-line is written, never inferred from the room.
+- **A crossing of the room happens on screen** (its own cut, or the cut's action); a cut from the door straight to her hand
+  at the table reads as teleporting. The lock line after the walk states the new place.
+- **Prop actions are the hand**: which hand, which grip, the tilt, where the material goes. One continuous motion under
+  about two seconds is safe; two grips or a mid-air turn is its own cut.
+- **A cut ends inside its own frame**: a close-up cannot end on the puddle by the door; write the move that gets there, or
+  the next cut.
+- **Delivery is the voice and the eyes** ("quiet but every word clear; her eyes stay on him"), and what the face does after
+  the last word — never "flat", which renders a dead face.
+- **The load ladder**: seconds per load point S = duration ÷ (beats + load). A beat is a cut (a silent reaction or insert
+  counts half); load is 0.5 per camera move inside a cut, 1 per spoken line per 8 words (12 CJK characters), 1 per extra
+  actor who acts, 1 per contact that must land, 2 per location change. S ≥ 3 is Safe, 2–3 Stretch, under 2 Ambitious:
+  offer a merged version, or two generations that keep every beat. `prompt_lint.py` L37 computes the floor it can read.
+
 ## Seedance 2.5 (Higgsfield CLI `seedance_2_5`; Higgsfield API `bytedance/seedance-2.5/*`; fal `bytedance/seedance-2.5/*`; monid `bytedance /v1/video/seedance-2.5`; treg `reapi.video-gen.seedance-2-5.unrestricted` — five routes to one model; which shot goes where, each contract and each measured rate are `video-gen-cost-gate/references/VENUES.md`)
 
 - **Modes**: `t2v` · `omni_reference` (r2v: start image + ≤30 image refs + ≤10 video refs + ≤10 audio, ≤50

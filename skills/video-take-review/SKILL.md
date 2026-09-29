@@ -151,7 +151,13 @@ the delivery width** — on a dropped-frame conform the recurring double step is
 near 30 px a pan stutters — and shake on the axis the move does not use. The 5-frame strip is the verdict; a window that
 opens on the wrong thing fails on its first frame.
 
-**Done when:** every seed is VOID (reason) or KEEPER (window, in/out, the state at the window's end).
+**A void names whether the next take is a re-roll at all.** The same flaw on two takes of an unchanged prompt stops
+the re-rolls: the next take changes ONE variable, the lever ACCEPTANCE-MATRIX names for that row. A shot at three paid
+attempts with no pick and no declared budget goes to the operator as options, not as another batch
+(`video-gen-cost-gate` COST-AND-GO.md § Budget-final rules, the stop-rule ladder; `take_ledger.py` reads the counts).
+
+**Done when:** every seed is VOID (reason) or KEEPER (window, in/out, the state at the window's end), and a void on a
+shot that has tripped a stop rule says so.
 
 ## 5. Clips to the operator; the pick is theirs
 

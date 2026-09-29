@@ -71,9 +71,24 @@ one rebuild: its stills cost $0.15 in all and its video 357.5 cr, one 20 s seed 
   with its frame time. A re-roll is offered only if the operator raises it or the seed fails a NAMED
   constraint.
 - Tight budget ⇒ regen one seed at a time, checked before the next.
-- Attempts per keeper is the real cost — instrument it (the ledger counts seeds per accepted take);
-  estimators are pinned to the last real invoice, never to a published rate alone (estimators under-shoot
-  their first invoices).
+- Attempts per keeper is the real cost — instrumented: `scripts/take_ledger.py --root <project>` counts every take the
+  gate recorded at submission against every pick in `receipts/picks.jsonl`, per shot and per venue, and prints the keep
+  rate over the shots that closed. Under 5 picks the rate is low-n and the cost line quotes the assumed 3:1–6:1 beside
+  it; a fal take carries no gate record and shows only as a pick. Estimators are pinned to the last real invoice, never
+  to a published rate alone (estimators under-shoot their first invoices).
+- **The stop-rule ladder — the earliest tripwire wins; every later number is a ceiling, never a quota**
+  (`OSideMedia/higgsfield-ai-prompt-skill` § Stop-Rule Ladder, `machina-exm/film-studio-skills`):
+  - the same flaw on two takes of an unchanged prompt → stop re-rolling and rewrite ONE variable, the lever the
+    acceptance matrix names (`video-take-review` ACCEPTANCE-MATRIX § The lever a miss pulls);
+  - three paid attempts on one shot with no budget declared and no pick → stop, and put the options to the operator:
+    accept the best take, re-scope the shot, defer it, or cut a placeholder;
+  - a declared take budget half spent without a pick → change the strategy (a different mode, a split shot), not the
+    wording;
+  - 10–15 one-line prompt versions on one shot → simplify the SHOT (split it, drop an action, change the angle);
+  - a published per-kept-shot figure (65–100 generations on a feature film) is a planning benchmark, never a stop rule.
+
+  `take_ledger.py` flags the second and third rungs from the record (exit 1 when a shot has tripped; a budget is
+  declared with `--budget <shot>=<n>`). The first and fourth rungs are the reviewer's call, read off the take reviews.
 
 ## Free before billed — the order of spend
 

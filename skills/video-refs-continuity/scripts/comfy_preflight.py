@@ -12,19 +12,30 @@ no output of the kind the job needs (a video job that only saves stills), before
   schema     with --host (live /object_info, COMFY_HOST by default) or --object-info <snapshot.json>: every class
              exists on that server, every required input is set, a combo value outside its list is a WARN; the
              server's own output_node flag decides what counts as an output
+  models     every value that names a model file (.safetensors .ckpt .pt .pth .bin .gguf .sft .onnx) must exist on the
+             server: a loader's combo list decides it, else (with --host) the server's `GET /models/<folder>` listings;
+             a missing file FAILS here instead of an hour into a queue. Without either, the files are listed unchecked
+  packs      the custom node pack behind each class, read from `/object_info`'s `python_module` — what a fresh server
+             must install for this graph
 
-  python3 scripts/comfy_preflight.py <graph.json> [--expect video|image|audio|any] [--host URL | --object-info FILE] [--json]
+  python3 scripts/comfy_preflight.py <graph.json> [--expect video|image|audio|any] [--host [URL] | --object-info FILE] [--json]
   python3 scripts/comfy_preflight.py --selftest
 
 Exit 0 PASS, 1 FAIL, 2 unusable (unreadable graph, schema asked for and unreachable). Sentinel PREFLIGHT PASS|FAIL.
 A PASS says the graph will write a file. It does not say the file will look right: that is read off the frames.
-Pattern: piorunkulaga174/dsh-comfyui scripts/comfyui_probe.py (preflight, output_kind), plus the save_output check.
+Pattern: piorunkulaga174/dsh-comfyui scripts/comfyui_probe.py (preflight, output_kind), plus the save_output check;
+the model-file and pack checks from MieMieeeee/comfyui-agent-skill scripts/comfyui/preflight.py.
 """
-import argparse, json, os, sys, urllib.error, urllib.request
+import argparse, json, os, sys, threading, urllib.error, urllib.parse, urllib.request
 
 PREVIEW = ('preview', 'showtext', 'display', 'show_text')
 SAVE = ('save', 'export', 'combine')
 H3 = {'MiniMaxH3ImageToVideo', 'MiniMaxH3ReferenceToVideo'}
+MODEL_EXT = ('.safetensors', '.ckpt', '.pt', '.pth', '.bin', '.gguf', '.sft', '.onnx')
+
+
+def norm(v):
+    return v.replace('\\', '/').strip('/')
 
 
 def kind_of(cls):
@@ -39,10 +50,11 @@ def is_link(v, ids):
     return isinstance(v, list) and len(v) == 2 and isinstance(v[0], (str, int)) and isinstance(v[1], int)
 
 
-def preflight(graph, expect='any', schema=None):
+def preflight(graph, expect='any', schema=None, models=None):
     errors, warnings, outputs = [], [], []
+    packs, unchecked = {}, []
     if not isinstance(graph, dict) or ('nodes' in graph and 'links' in graph):
-        return {'ok': False, 'errors': [('', 'ui-format', 'a UI export, not the API format: File > Export (API)')], 'warnings': [], 'outputs': [], 'expect': expect}
+        return {'ok': False, 'errors': [('', 'ui-format', 'a UI export, not the API format: File > Export (API)')], 'warnings': [], 'outputs': [], 'expect': expect, 'packs': {}, 'unchecked': []}
     ids = {str(k) for k in graph}
     has_h3 = False
     for nid, node in graph.items():
@@ -54,11 +66,24 @@ def preflight(graph, expect='any', schema=None):
         sch = schema.get(cls) if schema is not None else None
         if schema is not None and not isinstance(sch, dict):
             errors.append((nid, 'unknown-class', f'{cls} is not on this server')); continue
+        combo_keys = set()
         if sch:
-            for k, spec in (sch.get('input', {}).get('required') or {}).items():
-                if k not in inp: errors.append((nid, 'missing-input', f'{cls}.{k} is required')); continue
-                if isinstance(spec, list) and spec and isinstance(spec[0], list) and isinstance(inp[k], str) and inp[k] not in spec[0]:
-                    warnings.append((nid, 'combo-value', f'{cls}.{k}={inp[k]!r} is not in the server list'))
+            pm = sch.get('python_module') or ''
+            if pm.startswith('custom_nodes.'): packs.setdefault(pm.split('.')[1], set()).add(cls)
+            spec_in = sch.get('input', {}) or {}
+            for k, spec in (spec_in.get('required') or {}).items():
+                if k not in inp: errors.append((nid, 'missing-input', f'{cls}.{k} is required'))
+            for k, spec in list((spec_in.get('required') or {}).items()) + list((spec_in.get('optional') or {}).items()):
+                if k not in inp or not (isinstance(spec, list) and spec and isinstance(spec[0], list)): continue
+                combo_keys.add(k)
+                if isinstance(inp[k], str) and inp[k] not in spec[0]:
+                    if inp[k].lower().endswith(MODEL_EXT): errors.append((nid, 'missing-model', f'{cls}.{k}={inp[k]!r} is not among the {len(spec[0])} files this server lists for it'))
+                    else: warnings.append((nid, 'combo-value', f'{cls}.{k}={inp[k]!r} is not in the server list'))
+        for k, v in inp.items():
+            if k in combo_keys or not isinstance(v, str) or not v.lower().endswith(MODEL_EXT): continue
+            if models is None: unchecked.append((nid, f'{cls}.{k}', v)); continue
+            if norm(v) not in models and os.path.basename(norm(v)) not in {os.path.basename(m) for m in models}:
+                errors.append((nid, 'missing-model', f'{cls}.{k}={v!r} is in none of the server\'s /models folders'))
         low = cls.lower()
         if any(h in low for h in PREVIEW): continue
         flagged = sch.get('output_node') is True if sch else any(h in low for h in SAVE)
@@ -72,7 +97,8 @@ def preflight(graph, expect='any', schema=None):
     if not outputs: errors.append(('', 'no-persistent-output', 'no save/export node that writes to output/ — the job would finish and leave nothing'))
     elif need != 'any' and not any(k == need for _, _, k in outputs):
         errors.append(('', 'wrong-output-kind', f'the job needs a {need} output; the graph saves only {sorted({k for _, _, k in outputs})}'))
-    return {'ok': not errors, 'errors': errors, 'warnings': warnings, 'outputs': outputs, 'expect': need}
+    return {'ok': not errors, 'errors': errors, 'warnings': warnings, 'outputs': outputs, 'expect': need,
+            'packs': {k: sorted(v) for k, v in packs.items()}, 'unchecked': unchecked}
 
 
 def fetch_schema(host):
@@ -80,11 +106,30 @@ def fetch_schema(host):
         return json.load(r)
 
 
+def fetch_models(host):
+    """Every file the server lists under /models/<folder>, as '<folder>/<file>' plus the bare '<file>'; None when the
+    server has no /models listing (an older ComfyUI) — the model check then falls back to the combo lists alone."""
+    base = host.rstrip('/')
+    try:
+        with urllib.request.urlopen(base + '/models', timeout=15) as r: folders = json.load(r)
+    except (OSError, ValueError, urllib.error.URLError): return None
+    out = set()
+    for f in folders if isinstance(folders, list) else []:
+        try:
+            with urllib.request.urlopen(f'{base}/models/{urllib.parse.quote(str(f))}', timeout=15) as r: files = json.load(r)
+        except (OSError, ValueError, urllib.error.URLError): continue
+        for x in files if isinstance(files, list) else []:
+            out.add(norm(str(x))); out.add(f'{f}/{norm(str(x))}')
+    return out
+
+
 def report(path, res):
     outs = ', '.join(f'node {n} {c} ({k})' for n, c, k in res['outputs']) or 'none'
     print(f'{path}: expects {res["expect"]} · persistent outputs: {outs}')
     for n, code, msg in res['errors']: print(f'  FAIL {code}{" node " + str(n) if n else ""}: {msg}')
     for n, code, msg in res['warnings']: print(f'  WARN {code} node {n}: {msg}')
+    for pack, classes in sorted(res.get('packs', {}).items()): print(f'  pack {pack}: {", ".join(classes)}')
+    if res.get('unchecked'): print(f"  {len(res['unchecked'])} model file(s) not checked (no combo list, no /models listing): " + ', '.join(v for _, _, v in res['unchecked'][:6]))
     print(f"PREFLIGHT {'PASS' if res['ok'] else 'FAIL'} — {'the graph will write a file; whether it looks right is read off the frames' if res['ok'] else 'nothing queued'}")
 
 
@@ -123,6 +168,44 @@ def selftest():
     w = preflight(g(**save, **{'2': {'class_type': 'KSampler', 'inputs': {'seed': 1, 'sampler_name': 'eulerx', 'model': ['1', 0]}}}), 'image', S)
     good = w['ok'] and any(c == 'combo-value' for _, c, _ in w['warnings']); ok &= good
     print(f"  {'ok ' if good else 'BAD'} a combo value outside the server list → WARN, still PASS")
+    # the second pass: model files and packs
+    S2 = dict(S); S2['CheckpointLoaderSimple'] = {'input': {'required': {'ckpt_name': [['sd15.safetensors', 'sub/xl.safetensors']]}}, 'output_node': False}
+    S2['CustomLoader'] = {'input': {'required': {'model_name': ['STRING']}}, 'output_node': False, 'python_module': 'custom_nodes.ComfyUI-Custom'}
+    S2['VHS_VideoCombine'] = dict(S['VHS_VideoCombine'], python_module='custom_nodes.ComfyUI-VideoHelperSuite')
+    ck = lambda n: {'4': {'class_type': 'CheckpointLoaderSimple', 'inputs': {'ckpt_name': n}}}
+    cl = lambda n: {'5': {'class_type': 'CustomLoader', 'inputs': {'model_name': n}}}
+    def case(label, r, want, code=None):
+        nonlocal ok
+        got = [c for _, c, _ in r['errors']]; good = r['ok'] == want and (code is None or code in got); ok &= good
+        print(f"  {'ok ' if good else 'BAD'} {label}  (errors {got})")
+    case('a checkpoint missing from the loader\'s combo list → FAIL missing-model', preflight(g(**save, **ck('missing.safetensors')), 'image', S2), False, 'missing-model')
+    case('a checkpoint in the list (a subfolder path) → PASS', preflight(g(**save, **ck('sub/xl.safetensors')), 'image', S2), True)
+    r = preflight(g(**save, **cl('wan/x.safetensors')), 'image', S2)
+    case('a STRING model input, no /models listing → PASS, listed unchecked', r, True); ok &= len(r['unchecked']) == 1
+    case('… with a listing that holds it → PASS', preflight(g(**save, **cl('wan/x.safetensors')), 'image', S2, {'diffusion_models/wan/x.safetensors', 'wan/x.safetensors'}), True)
+    case('… with a listing that lacks it → FAIL missing-model', preflight(g(**save, **cl('wan/x.safetensors')), 'image', S2, {'other.safetensors'}), False, 'missing-model')
+    pk = preflight(g(**{'9': {'class_type': 'VHS_VideoCombine', 'inputs': {'images': ['3', 0], 'save_output': True}}}), 'video', S2)['packs']
+    good = pk == {'ComfyUI-VideoHelperSuite': ['VHS_VideoCombine']}; ok &= good
+    print(f"  {'ok ' if good else 'BAD'} the custom node pack is read from python_module: {pk}")
+    # over HTTP, against a local stand-in for the server
+    import http.server
+    routes = {'/object_info': S2, '/models': ['checkpoints', 'diffusion_models'], '/models/checkpoints': ['sd15.safetensors'], '/models/diffusion_models': ['wan/x.safetensors']}
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = routes.get(self.path)
+            if body is None: self.send_response(404); self.end_headers(); return
+            b = json.dumps(body).encode(); self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers(); self.wfile.write(b)
+        def log_message(self, *a): pass
+    srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    url = f'http://127.0.0.1:{srv.server_address[1]}'
+    try:
+        sch, mods = fetch_schema(url), fetch_models(url)
+        case('over HTTP: /object_info + /models/<folder> hold the file → PASS', preflight(g(**save, **cl('wan/x.safetensors')), 'image', sch, mods), True)
+        case('over HTTP: a file no folder lists → FAIL missing-model', preflight(g(**save, **cl('wan/y.safetensors')), 'image', sch, mods), False, 'missing-model')
+        routes.pop('/models'); none = fetch_models(url); good = none is None; ok &= good
+        print(f"  {'ok ' if good else 'BAD'} a server with no /models listing → None (the combo lists decide alone)")
+    finally:
+        srv.shutdown()
     print(f"SELFTEST {'PASS' if ok else 'FAIL'}"); return 0 if ok else 1
 
 
@@ -140,7 +223,8 @@ def main():
         if a.object_info: schema = json.load(open(a.object_info))
         elif a.host: schema = fetch_schema(a.host)
     except (OSError, ValueError, urllib.error.URLError) as e: print(f'schema unreachable ({a.object_info or a.host}): {e} — nothing checked against the server'); sys.exit(2)
-    res = preflight(graph, a.expect, schema)
+    models = fetch_models(a.host) if a.host and not a.object_info else None
+    res = preflight(graph, a.expect, schema, models)
     if a.json: print(json.dumps(res, indent=2)); sys.exit(0 if res['ok'] else 1)
     report(a.graph, res); sys.exit(0 if res['ok'] else 1)
 

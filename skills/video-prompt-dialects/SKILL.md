@@ -97,6 +97,10 @@ Rules that hold in every section:
   belongs to one continuous shot of a few seconds. A long generation — a whole continuity partition — composes its
   own coverage, and a cut inside it carries consistency by construction; those words forbid the reason it was
   generated long (HOUSE-TEMPLATE § The negative tail; LINT L34).
+- **A clip with several cuts or several people is directed for the model** — a lock line closing every cut (light, each
+  principal, position, facing, the camera's side), one action per cut with idle business for the rest, reactions as
+  reverses, crossings on screen; and a spoken clip is sized on the load ladder before it is bought (DIALECTS § Multi-shot,
+  multi-person direction; LINT L37).
 - **Never NAME an off-frame object** — the model widens to show it and invents it; write the look
   ("jabs a finger down, out of the bottom edge"); the name may appear only inside a quoted line.
 - **Bind the camera to one subject or one fixed geometry**; a move that cannot hold its named subjects
