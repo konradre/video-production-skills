@@ -5,6 +5,9 @@
                (a conforming AAC track at -inf passes a stream probe and ships silent); the true peak must sit under the platform
                ceiling (--tp-ceiling; default = the EDL's loudnorm.TP_ceiling, else -1 dBTP) — the EDL's TP is the master's
                limiter ceiling under it, and the AAC overshoot on limited peaks measured 0.4–1.0 dB, growing with the limiting
+  packets      the AAC packet clock (aac_packet_clock.py): no packet over 1024 samples, no gap between packet starts — a
+               timestamp jump before the encoder (loudnorm's flush of a partial block) becomes ONE overlong packet and every
+               later packet plays late; the stream start, the duration and a raw-PCM decode all miss it
   cuts         the delivered scene-cut list vs the EDL joins: extras are a take's own cut, motion, or a LEAK — named
   leaks        every hero event's [in,out] against ITS TAKE's own scene cuts (a window crossing one = rogue frames) — except
                the cuts the event DECLARES in accepted_cuts (composed inside one generation and kept), printed as INFO
@@ -184,6 +187,9 @@ def main():
     tpc = a.tp_ceiling if a.tp_ceiling is not None else float(ln.get('TP_ceiling', -1.0))   # the platform's bar for the DELIVERED file
     over = tp - ln['TP']   # the EDL's TP is the master's limiter ceiling; AAC overshoots the limited peaks by 0.4–1.0 dB, so the delivered bar is the platform ceiling
     verdict(np.isfinite(tp) and tp <= tpc + 0.05, 'true peak', f"{tp} dBTP vs the platform ceiling {tpc} ({'EDL loudnorm.TP_ceiling' if a.tp_ceiling is None and 'TP_ceiling' in ln else '--tp-ceiling' if a.tp_ceiling is not None else 'the default'}; EDL master target {ln['TP']}, {over:+.1f} dB over it" + ('' if over <= 1.0 else ' — more than the AAC overshoot: check the limiter order') + ')')
+    ck = json.loads(sh([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aac_packet_clock.py'), '--json', D]).stdout or '{"ok": false, "reason": "the scan did not run"}')   # fail closed
+    if ck.get('ok') is None: print(f"INFO audio packet clock: not checked — {ck.get('reason')} (the audio format row carries the verdict)")
+    else: verdict(ck['ok'], 'audio packet clock', ck['reason'] + ('' if ck['ok'] else ' — fix upstream of the encoder, never with a constant shift: the pair in aac_packet_clock.py\'s header'))
     cuts = [round(float(x), 3) for x in re.findall(r'pts_time:([\d.]+)', sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', "select='gt(scene,0.25)',showinfo", '-f', 'null', '-']).stderr)]
     joins = [round(x['tl'][0], 3) for x in e['events'][1:]]
     tol = max(0.05, 1.5 / efps)   # a scene-detector time against a declared take time: 1.5 frames
