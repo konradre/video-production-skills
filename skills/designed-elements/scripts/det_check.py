@@ -39,8 +39,6 @@ RULES = [
     (r'\bcrypto\s*\.\s*(?:getRandomValues|randomUUID)\b', 'unseeded random — draw from mulberry32(seed)'),
     (r'\brequestAnimationFrame\b', 'a draw loop outside the timeline — draw from the tweened progress'),
     (r'\bset(?:Interval|Timeout)\b', 'a wall-clock timer — tween the value instead'),
-    # measured 2026-09-29: a 1080x1920 drift layer differed at the first frame of each render worker (0.1-0.2 % of pixels,
-    # rotated sprite edges) and matched 96/96 once the context was opened with willReadFrequently
     (r'''\bgetContext\s*\(\s*['"]2d['"]\s*\)''', "a 2D canvas without {willReadFrequently:true} — Chrome changes its raster path after the first presented frame, so each worker's first frame differs"),
 ]
 SKIP_DIRS = {'node_modules', 'renders', 'frames', 'det', 'assets', '.git'}
