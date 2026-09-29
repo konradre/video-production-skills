@@ -10,9 +10,11 @@ download → receipt JSON with the billable units (re-fetched after 20 s: the bi
                        [--out-dir edit/upscale-out] [--receipts receipts] [--confirmed] [--resume]
 FAL_KEY in the environment (source the env file that holds it first; the key never appears on a command line).
 --resume re-attaches to request ids recorded in <receipts>/fal-requests.log for the named clips (never resubmits).
+Every clip must trace to the operator's recorded pick (video-production/scripts/pick_gate.py) before any upload — else exit 3.
 """
 import argparse, json, os, subprocess, sys, time, urllib.error, urllib.request
 
+GATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'video-production', 'scripts', 'pick_gate.py')   # resolved before the chdir
 ENDPOINT = 'topaz/upscale/video/generative'; BASE = 'topaz/upscale'; QUEUE = 'https://queue.fal.run'   # status/result/billing live under BASE (the full path → 405)
 
 
@@ -29,6 +31,8 @@ def main():
     for c in clips:
         p = f'{a.in_dir}/{c}.mp4'; assert os.path.exists(p), f'missing {p}'
         secs[c] = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', p], capture_output=True, text=True).stdout or 0)
+    if not a.resume and subprocess.run([sys.executable, GATE, 'check', '--root', '.', *[f'{a.in_dir}/{c}.mp4' for c in clips]]).returncode != 0:
+        print('PICK-GATE-REFUSED — record the operator\'s pick first (pick_gate.py record / derive)'); sys.exit(3)   # before any upload or billed call
     print(f"PRE-FLIGHT {a.model} x{a.factor}: " + ', '.join(f'{c} {secs[c]:.2f} s' for c in clips) + f" — {sum(secs.values()):.2f} s of input, billed per second of output at the venue's rate for this factor")
     if not a.confirmed and not a.resume: print('not confirmed — pass --confirmed after the operator\'s GO on the cost line'); sys.exit(2)
     key = os.environ.get('FAL_KEY')

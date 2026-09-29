@@ -153,6 +153,26 @@ trap above with a fixed, known factor: the scale is the deliverable's, so the SO
   readable for 6 frames. Schedule the last action before the fade starts, too; the fade swallows it.
 - **A group scale shrinks the type inside it**: 26 px × 0.72 = 18.7 px, under the floor. Multiply every font size by
   the scale and raise the SOURCE size, never the scale.
+- **Every event is a READ, not only the words.** A read is one thing the viewer must get — a label, a number, a hand
+  closing on a product, a payoff — and it needs time to be FOUND, UNDERSTOOD and REGISTERED before the next one starts:
+  ~0.8 s for a label, ~0.3 s a word, counted from full display (brag's numbers); an action by its own budget. One read
+  at a time — two at once and the viewer gets one; fast actions, slow meanings; lead the eye before an important read;
+  **the reads set the shot's length**, the last one included. Plan them as an ordered list per shot before any code
+  (ClaudeAnimationBase's reads timing sheet: an ending packed into 1.3 s read as nothing; seven timed reads fixed it).
+  In an explainer the list is the storyboard's `reads` and `explainer_timeline.py --check` holds each to its budget
+  (explainer-video STORYBOARD.md § Reads) — the small-print and closing-window rules above are its special cases.
+
+## Reviewing designed motion — four views
+
+| view | what it answers | ours |
+|---|---|---|
+| contact sheet — each shot's first, middle, last frame | the shape of the piece | `video-take-review/scripts/contact_sheet.sh` |
+| strip — EVERY frame of a moment | motion: anticipation, follow-through, pops, twinning | `video-take-review/scripts/window_frames.py` over the span |
+| crop — a region at full resolution | faces, hands, contacts, glows | `window_frames.py --box` |
+| crop that FOLLOWS a world point through the camera | a foot or a held prop on a moving shot | no instrument yet: in a code-rendered scene, place the crop per frame with the scene's own camera transform |
+
+A sheet per shot, a strip for every key motion and transition, a crop for every face that carries the story
+(ClaudeAnimationBase's four-zoom loop).
 
 ## Numbers on screen
 

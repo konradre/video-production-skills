@@ -2,6 +2,7 @@
 # upscale_local.sh — the local reconstructive upscale (Topaz Rhea ×4 by default) on OPERATOR-APPROVED takes only, one after
 # another, through the topaz_upscale tool; writes <out-dir>/<stem>__<model>x<scale>.mp4 and prints RHEA-OK/RHEA-FAILED per
 # take and the sentinel UPSCALE-LOCAL-END. A log without the sentinel is a failure whatever the file sizes say.
+# Every take must trace to the operator's recorded pick (video-production/scripts/pick_gate.py) — else PICK-GATE-REFUSED, exit 3.
 # Run it DETACHED (video-production/scripts/detach.py) with every path absolute — a Bash-backgrounded run has a 10-minute cap and a
 # truncated mezzanine silently shortens the deliverable. Poll the log on demand; never follow it.
 #
@@ -13,7 +14,10 @@ while [ $# -gt 0 ]; do case "$1" in
   --root) ROOT="$2"; shift 2;; --model) MODEL="$2"; shift 2;; --scale) SCALE="$2"; shift 2;; --out-dir) OUT="$2"; shift 2;; --tool) TOOL="$2"; shift 2;;
   -h|--help) sed -n '2,10p' "$0"; exit 0;; *) TAKES+=("$1"); shift;; esac; done
 [ ${#TAKES[@]} -gt 0 ] || { echo "no takes given"; exit 2; }; [ -f "$TOOL" ] || { echo "upscale tool not found: $TOOL (set --tool or TOPAZ_UPSCALE_PY)"; exit 2; }
-ROOT=$(cd "$ROOT" && pwd); mkdir -p "$ROOT/$OUT"
+ROOT=$(cd "$ROOT" && pwd)
+GATE="$(cd "$(dirname "$0")" && pwd)/../../video-production/scripts/pick_gate.py"   # the pick, checked in code before any work
+python3 "$GATE" check --root "$ROOT" "${TAKES[@]}" || { echo "[$(date +%H:%M:%S)] PICK-GATE-REFUSED — record the operator's pick first (pick_gate.py record / derive)"; exit 3; }
+mkdir -p "$ROOT/$OUT"
 for T in "${TAKES[@]}"; do
   stem=$(basename "$T" .mp4); echo "[$(date +%H:%M:%S)] UPSCALE $stem ($MODEL x$SCALE)"
   python3 "$TOOL" --in "$ROOT/$T" --model "$MODEL" --scale "$SCALE" --out-dir "$ROOT/$OUT" 2>&1 | tail -3

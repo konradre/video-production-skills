@@ -230,12 +230,13 @@ and the listen at each hit found no clash.
 |---|---|
 | `gen_vo.py --root --jobs [--voice] [--dry-run] [--preview] [--door]` | TTS takes by REST; characters before/after; skip-by-name; reel + index; door treatment |
 | `vo_word_times.py --root --edl [--engine local\|scribe] [--only]` | word times per line; `--only` preserves hand patches |
-| `build_vo_stem.py --root --edl [--out] [--floor-max]` | every placed line on the stem at target LUFS with a peak cap; each line's gap floor (refuses a line carrying a mix) and its source |
+| `build_vo_stem.py --root --edl [--out] [--floor-max]` | every placed line on the stem at target LUFS with a peak cap; each line's gap floor (refuses a line carrying a mix) and its source; each line decoded on its presentation clock (a timestamp gap becomes silence, never a shift) |
 | `build_captions.py --root --edl [--out-dir] [--fonts-dir]` | cards at delivery resolution + manifest; the script's words on the transcript's times; every style key checked; `highlight: none` = one plain layer per card |
 | `sfx_onsets.py <file> [--cut a:b --out]` | the syllable map by ordinal; sample-exact cuts with fades |
 | `audio_head_scan.py --root (--edl \| --files)` | stable tones/drones in each take's head, labelled |
 | `roomtone_synth.py --ref --ss --t --dur --out` | stationary room tone coloured by a clean slice |
 | `voice_ab_reel.py --out <reel.wav> name=<file> … [--gap 0.3]` | the A/B reel of voice treatments — each variant once, a gap between, the index printed and written beside the reel; `--selftest` |
+| `beat_grid.py --audio [--out <beat_data.json>] [--residual-ms 15] [--drift-ms 10] [--hpss] [--start --dur]` · `--selftest` | a beat grid that checks itself: the tracked beats' least-squares line, accepted within ±15 ms residual and 10 ms kick drift, its phase from the kicks, 0.5x/1x/2x candidates printed; exit 3 = BEAT-MAP (the tempo moves — the tracked beats are the grid) |
 | `music_loop.py --take --bars --a-target [--bpm --first-beat] [--xfade] [--out]` | a short bed looped on its own beat grid by whole bars, the take's ending kept and its hit moved by exactly the jump; a new file, never an overwrite; `--selftest` |
 | `qc_vo_placement.py --root --edl --deliv` | envelope-NCC placement of every line on the delivered file |
 

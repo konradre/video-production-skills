@@ -27,6 +27,13 @@ from pathlib import Path
 
 WORD = re.compile(r"[\w'’]+")
 SMALL_PRINT_S, CLOSING_S, RUNTIME_TOL = 2.5, 1.0, 0.15
+READ_LABEL_S, READ_WORD_S = 0.8, 0.3   # a read's hold from full display: ~0.8 s a label, ~0.3 s a word (brag; ClaudeAnimationBase's reads)
+
+
+def read_budget(r):
+    """found + understood + registered, from FULL display: text by its words; an action by its declared min_s (None = unbudgeted)"""
+    if r.get("text"): return max(READ_LABEL_S, READ_WORD_S * len(r["text"].split())) + float(r.get("entrance_s", 0))
+    return float(r["min_s"]) if r.get("min_s") is not None else None
 DEFAULTS = {"fps": 30, "target_s": 0, "lead_s": 0.25, "tail_s": 1.0, "exit_s": 0.3, "ending_fade_s": 0.5,
             "caption": {"font": "assets/fonts/Display.ttf", "size_frac": 0.028, "top_frac": 0.8, "width_frac": 0.86,
                         "lines": 2, "weight": 800, "lead_s": 0.05, "hold_s": 0.5, "gap_hold_s": 0.6}}
@@ -147,6 +154,21 @@ def check_time(cfg, board, scenes, vo_dur):
             held = s["dur"] - cfg["exit_s"] - t
             if held < SMALL_PRINT_S:
                 problems.append(f"{sc['id']}: small print {sp.get('text', '')[:40]!r} holds {held:.2f} s before the exit (under {SMALL_PRINT_S} s) — move it to an earlier beat")
+        # the READS: one thing the viewer must get at a time, each held for its budget before the next starts (STORYBOARD § Reads)
+        rs = [(s["beats"].get(r.get("beat", "start")), r) for r in (sc.get("reads") or [])]
+        for t, r in rs:
+            if t is None: problems.append(f"{sc['id']}: read {(r.get('text') or r.get('what') or '')[:40]!r} names beat {r.get('beat')!r}, which the scene does not define")
+        rs = sorted([x for x in rs if x[0] is not None], key=lambda x: x[0])
+        for k, (t, r) in enumerate(rs):
+            what = (r.get("text") or r.get("what") or "")[:40]; nxt = next((u for u, _ in rs[k + 1:] if u >= t), None)
+            if nxt is not None and nxt - t < 1e-6:
+                problems.append(f"{sc['id']}: two reads at {t:.2f} s ({what!r} and the next) — the viewer sees one; put them in sequence"); continue
+            need = read_budget(r)
+            if need is None: notes.append(f"{sc['id']}: read {what!r} has no budget — give an action read its min_s"); continue
+            end = nxt if nxt is not None else s["dur"] - cfg["exit_s"]
+            if end - t < need - 1e-6:
+                problems.append(f"{sc['id']}: read {what!r} holds {end - t:.2f} s before {'the next read' if nxt is not None else 'the exit'}, its budget {need:.2f} s"
+                                " (from full display: 0.8 s a label, 0.3 s a word) — cut a sentence, merge the reads, or move it to an earlier beat")
     # the point of view may not sit still for three scenes running (STORYBOARD § Point of view). An
     # unfilled angle is not a violation — it is an unfinished row, reported once, not per run.
     angles = [(sc["id"], (sc.get("angle") or "").strip().lower()) for sc in board["scenes"]]
@@ -403,6 +425,12 @@ def selftest():
     case("angle-three-same", three, tboard,
          words("most videos lose half their viewers in three seconds put the payoff first then explain it slowly"),
          lambda p, r, root: (any("three scenes running" in x and "s01" in x and "s03" in x for x in p), p), target=10.0)
+    fits = json.loads(json.dumps(board)); fits["scenes"][1]["reads"] = [{"beat": "start", "text": "Payoff first"}]
+    case("reads-fit", good, fits, words(spoken), lambda p, r, root: (not any("read " in x for x in p), p))
+    crowd = json.loads(json.dumps(board)); crowd["scenes"][1]["reads"] = [{"beat": "start", "text": "Payoff first"}, {"beat": "start", "what": "the arrow", "min_s": 0.4}]
+    case("reads-two-at-once", good, crowd, words(spoken), lambda p, r, root: (any("two reads at" in x for x in p), p))
+    long = json.loads(json.dumps(board)); long["scenes"][1]["reads"] = [{"beat": "b1", "text": " ".join(["word"] * 20)}]
+    case("reads-over-budget", good, long, words(spoken), lambda p, r, root: (any("its budget 6.00 s" in x for x in p), p))
     blank = json.loads(json.dumps(board))
     case("angle-blank-notes-only", good, blank, words(spoken),
          lambda p, r, root: (not p and any("angle is empty" in n for n in (r or {}).get("notes") or []),

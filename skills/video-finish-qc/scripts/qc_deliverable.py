@@ -34,6 +34,10 @@
                render and every other row passed)
   contract     INFO: the colour range tag, the keyframe spacing and the edit lists — the platform-contract encode wants `tv`, a
                closed 2 s GOP and no edit lists (look-library GUIDE § 7)
+  decoded      (decoded_checks.py) frame 0's median RGB within 2 code values of qc.frame0_bg (a limited-range master read as full
+               lifts black to 16) · the Y code values against the range tag (WARN) · with qc.loop the last→first seam · frame 0
+               as the platform thumbnail: not near-black, or the poster_at frame baked in (qc.poster: "none" declares it) · every
+               audio.sfx cue found in the mix at its time by correlation · with qc.beat_data every on_beat cut within 3 frames
   phone band   INFO, with --phone-ref <real phone clips>: the delivered file's phone-texture band (phone_texture_probe.py —
                dead-flat 8×8 share, noise floor, median block sd) against the RANGE over every reference frame; a
                creator-style spot's read, never a failure — the operator judges the phone render beside the clean one
@@ -256,6 +260,15 @@ def main():
     kf = [i for i, l in enumerate(sh(['ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries', 'packet=flags', '-of', 'csv=p=0', D]).stdout.split()) if 'K' in l]
     gaps = sorted({b - a_ for a_, b in zip(kf, kf[1:])}); mv = open(D, 'rb').read(); mi = mv.find(b'moov'); elst = mv.count(b'elst', max(mi, 0))
     print(f"INFO contract: colour range {rng or 'untagged'} (want tv) · keyframes every {gaps[:4]}{'…' if len(gaps) > 4 else ''} frames (a closed 2 s GOP = [{2 * int(efps)}]) · edit lists {elst} (want 0)")
+    # ---- the decoded picture and sound (decoded_checks.py): frame 0, range, loop seam, poster, sfx, beat cuts ----
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import decoded_checks as dc
+    q = e.get('qc', {}) or {}
+    if q.get('frame0_bg'): ok, det = dc.frame0_bg(D, q['frame0_bg']); verdict(ok, 'frame 0 vs the background', det)
+    ok, det = dc.range_read(D, rng); print(f"{'INFO' if ok else 'WARN'} range read: {det}")
+    if q.get('loop'): ok, det = dc.loop_seam(D); verdict(ok, 'loop seam', det)
+    ok, det = dc.poster(D, e.get('poster_at'), q.get('poster'), a.black_luma); verdict(ok, 'poster (frame 0)', det)
+    for name, ok, det in dc.sfx(D, '.', e.get('audio', {}).get('sfx', {})): verdict(ok, f'sfx {name} in the mix', det)
+    if q.get('beat_data'): ok, det = dc.beat_cuts(e['events'], q['beat_data'], efps, '.'); verdict(ok, 'beat cuts', det)
     # ---- against the previous version (INFO; a verdict with --prev-expect) ----
     if a.prev:
         rows = prev_compare(D, a.prev, e['events'], efps); cls = {r[0]: classify(r) for r in rows}

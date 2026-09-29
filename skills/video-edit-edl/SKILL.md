@@ -86,6 +86,14 @@ internal shot change the operator kept is part of the keeper. Declare those on t
 plan MEASURED from files (a bed `vol`, a duck, a lip-synced `at`, a loudness target) carries a `derived` block with
 its inputs' hashes, and the build fails when an input changed (`EDL-CONTRACT.md` § Derived constants).
 
+**Picture follows audio in a voiced section.** Where a line is carried by cutaways, the voice sets the slots
+(`phrase_slots.py slots`, whole frames from the phrase onsets) and each slot's clip is fitted to its slot — never the voice
+to the clip (`fit_slots.py`): a longer window is cut, one short by ≤ 20 % is slowed (frames held, none invented), a shorter
+one loops from its window start, and a slot with no clip — or a clip with no recorded pick — is reported and left empty,
+which the finish refuses. A voice sped up, slowed or padded to fit a picture is the defect a listener hears. Slow and loop
+fits are written as new files recorded as derived from their take (`pick_gate.py`), so the upscale and the finish treat
+them as ordinary takes; the fitted EDL is a new file.
+
 **Done when:** the builder prints the timeline, `scripts/edl_check.py` passes — with `--require-endcard` when the
 beat list has a card (contiguous `tl`, spans = out − in, files present, windows inside their takes, no short cue) —
 no derived constant is stale, and re-running the builder reproduces the EDL.
@@ -135,6 +143,13 @@ beat list carries a card.
 A finish script calls the gate itself before its first stage; a pipeline script per version runs
 build → gate → finish → QC and ends on a sentinel line, so a silent partial run cannot be mistaken for a
 render.
+
+**A change to the cut path is gated by the A/V-sync suite.** An edit to `finish_spot.py`, `build_vo_stem.py` or anything
+else between the EDL and the delivered file re-runs `scripts/av_sync_regress.py` — synthetic takes whose flashes and pulses
+share one clock, cut by the real finisher, read back from the decoded output — and every fixture must PASS before the change
+lands. Its first run (2026-09-29) failed the finisher of the day on all five: the cut ran 36 frames long over 40 off-grid
+events (each `-ss/-t` window rounded its own frame count), missing packets pulled a take's own sound 0.51 s early, a VO
+file's timestamp gap moved the rest of the line 0.41 s early, and the two delivery limiters left the sound 10 ms late.
 
 **Done when:** `BEAT-SHEET PASS` and `EDL-CHECK PASS` on the exact file the finisher will read.
 
@@ -187,7 +202,9 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
 | `beat_sheet.py --root --edl [--beats]` | the script-fidelity gate; exit 1 on FAIL; prints the sheet |
 | `edl_check.py --root --edl [--require-endcard] [--cuts] [--fps]` | the structural read: continuity, files, windows, cues, the seek convention, rogue frames — a crossing the event declares in `accepted_cuts` prints INFO; a VO line with no `source` WARNs |
 | `edl_insert.py --root --edl --after --id --take --in --out [--replace]` | insert or re-time an event, shifting everything downstream |
-| `trim_for_upscale.py --root --edl --ids [--out-dir]` | cut keepers with handles for a hosted upscale; writes `handle_head` |
+| `fit_slots.py --root --slots --assign --edl --out [--slow-limit 0.2] [--fit-dir edit/fit] [--plan]` · `--selftest` | picture follows audio: each voiced slot's clip CUT, SLOWED (≤ 20 % short) or LOOPED to exactly the slot's frames, a slot with no clip or no recorded pick reported MISSING and left empty; fits recorded as derived from their take; writes a new EDL; exit 3 on a missing slot |
+| `av_sync_regress.py [--only offgrid,native,late,gap,vo] [--events 40] [--fps 24] [--grid] [--debug] [--keep <dir>]` | the A/V-sync regression suite for the cut path: off-grid cuts, the take's own audio, a late audio track, missing audio packets and VO placement, through the real finisher; exit 1 on any FAIL |
+| `trim_for_upscale.py --root --edl --ids [--out-dir]` | cut keepers with handles for a hosted upscale; writes `handle_head` ; refuses a take with no recorded pick and records each trim as derived from it |
 | `phrase_slots.py words --audio --out` · `timeline --mix --dry` · `slots --words --phrases "a\|b\|…" --fps --out [--lead 2] [--next-onset\|--end] [--lag] [--onset S1=<s>]` · `--selftest` | picture slots for a voiced section: two-model word times on the whole file with their disagreements, the proof that the mix shares the dry voice's timeline (envelope lag and score), and phrases → onsets → the cut `--lead` frames before each → slots in whole frames; flags a short slot and an onset the models dispute (pass the envelope read with `--onset`) |
 | `preview_cut.py --root --plan --mix --out [--size 540x960] [--aspect 9:16] [--alt S1=<clip>:<f0>:<x> …] [--check-sheet <jpg>]` · `--selftest` | a labelled REVIEW PROXY of a recommended cut over the programme mix: each slot's window through its delivery crop, grey slates for what is not made yet, `--alt` for a side-by-side version without touching the plan, and the check sheet — the frame either side of every cut, with timeline frame numbers — to be read before the preview is sent; never a deliverable, never overwrites |
 

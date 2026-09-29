@@ -119,6 +119,8 @@ python3 ~/.claude/skills/designed-elements/scripts/sprite_burst.py --root <proje
   `wall-b`); the accepted version is never edited in place, and a new version at the same length is a new
   render file that every EDL adopts by path (`references/HYPERFRAMES-CONTRACT.md`).
 - The rules and the rounds that produced them: [`references/CRAFT.md`](references/CRAFT.md).
+- A move used twice is written once, as a card (intent · the motion core in one line · parameters with how each feels ·
+  pitfalls · a demo): [`references/MOVE-CARD.md`](references/MOVE-CARD.md).
 
 **Done when:** the fix is in the source asset, the before/after crops are saved, the element re-rendered,
 and the delivered frame re-read.

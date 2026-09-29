@@ -70,7 +70,10 @@ operator corrects, never a taste of their own.
 
 - **Track map before the gen map**: BPM, bar, 8-bar phrase, and the hits everything cuts to (near-
   silences, drops, peak bass) measured from the audio; the whole timeline allocated first — later beats
-  are placements paid for by trimming, never appends.
+  are placements paid for by trimming, never appends. The grid is MEASURED and CHECKED, never read off a tracker's tempo
+  number: `spot-audio-assembly/scripts/beat_grid.py` fits the tracked beats' line and accepts it only within ±15 ms and
+  10 ms of kick drift, phase from the kicks; a BEAT-MAP verdict (a drifting tempo — a generated track that breathes)
+  makes the tracked beat times the grid.
 - The operator cuts to the track; the EDIT is locked before finishing; the flattened master carries
   the cut's own processed audio (no VO stem, no captions).
 - Generation order is dependency-bound: a shot that continues another waits for its last state.

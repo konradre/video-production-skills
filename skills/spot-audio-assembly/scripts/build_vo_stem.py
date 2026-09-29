@@ -22,7 +22,10 @@ BLOCK = SR // 20   # 50 ms
 
 
 def decode(f, ch):
-    return np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-i', f, '-f', 'f32le', '-ac', str(ch), '-ar', str(SR), '-'], capture_output=True, check=True).stdout, np.float32)
+    """on the file's PRESENTATION clock: a raw-PCM decode concatenates samples and drops the timestamps, so a line whose file
+    had a 0.4 s timestamp gap landed its second half 0.39 s early (av_sync_regress.py, 2026-09-29); gaps become silence"""
+    return np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-i', f, '-af', f'aresample={SR}:async=1:first_pts=0:min_hard_comp=0.001',
+                                         '-f', 'f32le', '-ac', str(ch), '-ar', str(SR), '-'], capture_output=True, check=True).stdout, np.float32)
 
 
 def gap_floor(x):

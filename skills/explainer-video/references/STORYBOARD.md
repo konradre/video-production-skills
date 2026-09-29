@@ -134,6 +134,14 @@ name and looks for it.
 4. Every image's provenance goes in `facts.md` beside the claim it supports, and a credit appears on screen where the
    licence asks for one.
 
+## Reads — what the viewer must get, one at a time
+
+A scene may list its READS in order: `"reads": [{"beat": "<beat name>", "text": "<the words shown>"}, {"beat": …, "what":
+"<an action>", "min_s": 0.6}]`, with `entrance_s` when an entrance delays full display. Each read is held from its beat to
+the next read (or the exit) for its budget — ~0.8 s a label, ~0.3 s a word, from full display; an action its `min_s` —
+and two reads on one beat fail: the viewer gets one (designed-elements CRAFT.md § Readable time). `explainer_timeline.py
+--check` reports a read over its budget with the fix: cut a sentence, merge the reads, or move it to an earlier beat.
+
 ## Sustained action
 
 - Every beat's verb has an action that lasts until the next beat: data flowing, a pulse travelling an arrow, a line

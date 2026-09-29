@@ -138,6 +138,13 @@ refuses one. A real person's likeness is not a gate failure by itself — it is 
 on treg's `reapi.video-gen.seedance-2-5.unrestricted` row and refused upstream on fal and monid
 (`video-gen-cost-gate` VENUES.md § Video).
 
+**Build the set in dependency order.** A still is generated only after every still it is built FROM is accepted:
+portraits, locations and look plates first; a prop after its owner (built in the owner's hand or on the owner's table);
+an anchor frame last, after every reference it composes. `scripts/ref_dag.py --refs refs.json [--accepted A,B]` prints the
+waves, refuses a cycle, an unknown name, a prop with no owner or an anchor with no refs, and names what may be built NEXT.
+Built out of order, a prop is generated against a face nobody has accepted yet and re-rolled when the face changes
+(ReCA's image DAG: portrait / location / prop / anchor).
+
 ## 3. Accept every generated still like a seed
 
 A start image is a contract: any defect in it is in every seed built on it. Before it feeds anything,
@@ -161,6 +168,14 @@ is a copy-route regen from the pre-plate with an explicit placement sentence, ne
 Re-roll a still when its defect breaks something a later stage depends on (a continuity break, a wrong
 object); accept it when the defect sits in a property every later prompt restates anyway — re-rolling a
 defeated prior is a real risk, not a free retry.
+
+**Repair by REASON, then read it again** — the same rows, the same zoom. A stochastic miss (a stray limb, a ghost) is a
+new seed on the same request; a local defect in a right still is an EDIT on the clean plate (above); a still that shows
+exactly what was asked for — the request itself is wrong — is a re-written request, never another seed of it. Two repairs
+that do not clear the row go to the operator with both attempts; a still is never accepted because the attempts ran out
+(ReCA's validator loop does exactly that after its last attempt — the one part not taken). ReCA also reports its validator
+judging better from TEXT reference specs than from the images inline; that is its own small sample, untested here — the
+acceptance read stays on the images at zoom until our own read says otherwise.
 
 **Every cited reference is accepted the same way, not only the start image.** In reference-driven generation the
 references ARE the product: register each to its file (`--register NAME --file`) and accept it for the role it plays —

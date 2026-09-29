@@ -7,9 +7,12 @@ there handle_head == in, which the builder already wrote.
 
   trim_for_upscale.py --root <project> --edl edit/<SPOT>-EDL.json --ids S06-A S06-B [--handle-frames 4] [--fps 24]
                       [--out-dir edit/upscale-in] [--crf 8]
-Writes <edl>.bak-<ts>-pre-trim first.
+Writes <edl>.bak-<ts>-pre-trim first. Every take must trace to the operator's recorded pick (video-production/scripts/
+pick_gate.py) before anything is cut; each trim is then recorded as DERIVED from its take, so the upscale scripts accept it.
 """
-import argparse, json, os, shutil, subprocess, time
+import argparse, json, os, shutil, subprocess, sys, time
+
+GATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'video-production', 'scripts', 'pick_gate.py')   # resolved before the chdir
 
 
 def main():
@@ -23,10 +26,13 @@ def main():
     for e in edl['events']:
         if e['id'] not in a.ids: continue
         assert e.get('take'), f"{e['id']}: take is null — pick a keeper first"
+        if subprocess.run([sys.executable, GATE, 'check', '--root', '.', e['take']]).returncode != 0:
+            sys.exit(f"{e['id']}: {e['take']} traces to no recorded pick — nothing is trimmed for an upscale before the operator's pick")
         hh = min(e['in'], H); dur = (e['out'] - e['in']) + hh + H
         out = os.path.join(a.out_dir, f"{e['id']}.mp4")
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f"{e['in'] - hh:.6f}", '-t', f"{dur:.6f}", '-i', e['take'], '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', a.crf, '-pix_fmt', 'yuv420p', out], check=True)
         e['handle_head'] = round(hh, 6)
+        subprocess.run([sys.executable, GATE, 'derive', '--root', '.', '--from', e['take'], '--note', f"trim_for_upscale {e['id']}", out], check=True)
         print(e['id'], '->', out, 'head handle', round(hh, 4), 'dur', round(dur, 3))
     shutil.copy(a.edl, f"{a.edl}.bak-{time.strftime('%Y%m%d-%H%M%S')}-pre-trim")
     json.dump(edl, open(a.edl, 'w', encoding='utf-8'), indent=1, ensure_ascii=False)

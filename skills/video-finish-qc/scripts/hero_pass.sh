@@ -10,20 +10,24 @@
 # this header said, so every pass needed the in-app bridge even when Local scripting would have answered.
 #
 #   hero_pass.sh --root <project> --look ads-clean [--in-dir edit/upscale-out] [--out-dir edit/hero] [--codec DNxHR_HQX] [--format mov]
-#                [--transport auto|bridge] [--python <windows venv python>] [--tool-dir <resolve-pass dir>] <file-in-in-dir> …
+#                [--transport auto|bridge] [--python <windows venv python>] [--tool-dir <resolve-pass dir>] [--shots <shots.json>] <file-in-in-dir> …
+# Every file must trace to the operator's recorded pick (video-production/scripts/pick_gate.py; flats trace through --shots) — else exit 3.
 # --in-dir edit/flat for real footage: the normalised flats from normalise_shots.py (they start at pts 0 — a later start makes
 # Resolve render one extra leading frame).
 # --python defaults to $RESOLVE_PY (the Windows venv interpreter that can reach Resolve's scripting API); --tool-dir to
 # $RESOLVE_PASS_DIR or the repository's tools/resolve-pass (resolved from this script's real path). The tool translates /mnt/<d>/ paths itself.
 set -u
-ROOT="."; LOOK=""; IN="edit/upscale-out"; OUT="edit/hero"; CODEC="DNxHR_HQX"; FMT="mov"; TRANSPORT="auto"; PY="${RESOLVE_PY:-}"; TD="${RESOLVE_PASS_DIR:-$(cd "$(dirname "$(readlink -f "$0")")/../../../tools/resolve-pass" 2>/dev/null && pwd)}"; FILES=()
+ROOT="."; LOOK=""; SHOTS=""; IN="edit/upscale-out"; OUT="edit/hero"; CODEC="DNxHR_HQX"; FMT="mov"; TRANSPORT="auto"; PY="${RESOLVE_PY:-}"; TD="${RESOLVE_PASS_DIR:-$(cd "$(dirname "$(readlink -f "$0")")/../../../tools/resolve-pass" 2>/dev/null && pwd)}"; FILES=()
 while [ $# -gt 0 ]; do case "$1" in
   --root) ROOT="$2"; shift 2;; --look) LOOK="$2"; shift 2;; --in-dir) IN="$2"; shift 2;; --out-dir) OUT="$2"; shift 2;; --codec) CODEC="$2"; shift 2;; --format) FMT="$2"; shift 2;;
-  --transport) TRANSPORT="$2"; shift 2;; --python) PY="$2"; shift 2;; --tool-dir) TD="$2"; shift 2;; -h|--help) sed -n '2,17p' "$0" | grep -v '^set '; exit 0;; *) FILES+=("$1"); shift;; esac; done
+  --transport) TRANSPORT="$2"; shift 2;; --python) PY="$2"; shift 2;; --tool-dir) TD="$2"; shift 2;; --shots) SHOTS="$2"; shift 2;; -h|--help) sed -n '2,18p' "$0" | grep -v '^set '; exit 0;; *) FILES+=("$1"); shift;; esac; done
 case "$TRANSPORT" in auto|bridge) ;; *) echo "--transport auto|bridge (local die()s instead of falling through to the bridge)"; exit 2;; esac
 [ -n "$LOOK" ] || { echo "--look is required"; exit 2; }; [ ${#FILES[@]} -gt 0 ] || { echo "no files given"; exit 2; }
 [ -n "$PY" ] && [ -x "$PY" ] || { echo "no Resolve-capable python: pass --python or set RESOLVE_PY"; exit 2; }; [ -f "$TD/resolve_pass.py" ] || { echo "resolve_pass.py not in $TD"; exit 2; }
-ROOT=$(cd "$ROOT" && pwd); mkdir -p "$ROOT/$OUT"; cd "$TD" || exit 1
+ROOT=$(cd "$ROOT" && pwd)
+GATE="$(cd "$(dirname "$0")" && pwd)/../../video-production/scripts/pick_gate.py"; CK=(); for F in "${FILES[@]}"; do CK+=("$IN/$F"); done
+python3 "$GATE" check --root "$ROOT" ${SHOTS:+--shots "$SHOTS"} "${CK[@]}" || { echo "[$(date +%H:%M:%S)] PICK-GATE-REFUSED — record the operator's pick first; flats need --shots"; exit 3; }
+mkdir -p "$ROOT/$OUT"; cd "$TD" || exit 1
 for F in "${FILES[@]}"; do
   echo "[$(date +%H:%M:%S)] HERO $F ($LOOK)"
   "$PY" resolve_pass.py --look "$LOOK" --in "$ROOT/$IN/$F" --out-dir "$ROOT/$OUT" --format "$FMT" --codec "$CODEC" --transport "$TRANSPORT" --wait 60 --timeout 300 2>&1 | tail -3

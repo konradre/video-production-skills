@@ -75,7 +75,7 @@ two per chapter) · the one **emphasis** entrance · the **small print** and its
 type, the camera budget and the order of a scene's moves, the point-of-view catalogue, the entity source ladder, the
 set-piece choreography and the sustained-action rule: [`references/STORYBOARD.md`](references/STORYBOARD.md).
 
-**Done when:** every row fills every column, `explainer_timeline.py --check` reports no small print under 2.5 s, a
+**Done when:** every row fills every column, `explainer_timeline.py --check` reports no read over its budget, no small print under 2.5 s, a
 closing window of at least 1.0 s, no three scenes running on one angle and no NOTE about an empty angle, and every
 entity named in a row has its image and its source.
 

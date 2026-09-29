@@ -54,3 +54,19 @@ partition row quoting the SSOT lines it serves in full.
 The reference set is built per partition (`video-refs-continuity`), one still from that set is read before any
 expensive call (`video-gen-cost-gate` COST-AND-GO.md § The reference dress rehearsal), and the project's values for
 every axis that differs from the defaults are on disk ([`WHAT-VARIES.md`](WHAT-VARIES.md)).
+
+## 7. Stage isolation, and the redo that never cascades
+
+**Each stage reads ONLY the files of the stage before it.** The prompt stage reads the shot list and the reference set —
+never the script: a prompt that re-reads the script re-interprets it, and the shot list the operator approved stops being
+the source. Durations are copied from the shot list VERBATIM; a subject's anchor phrases ("greying short hair", "faded
+apron") are quoted into every prompt that shows it, word for word; nothing appears in a prompt that the shot list or the
+references do not hold; one prompt per partition, and the count is checked. The script-to-beats half of this is
+`script_diff.py`, by code (§ 5); this is the half after it. Pattern: feicaiclub's script-breakdown (stage 3 "does not even
+look at the script anymore").
+
+**A redo backs up, logs, names what may be stale — and stops.** `scripts/stage_redo.py redo --root <project> --stage
+<stage> <file>` copies the current file to `versions/<stem>.v<N>.<time><ext>` (every version kept), appends one METADATA
+row to `receipts/stage-runlog.md` (never the text), and prints the downstream stages that may now be stale in the house
+order (script → beats → shotlist → refs → prompts → takes → edl → mix → finish). It never re-runs them: which downstream
+stage is redone is the operator's call, each a redo of its own. A first generation is `stage_redo.py log`.

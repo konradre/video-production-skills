@@ -58,7 +58,12 @@ WAV.
   the file name carries the length. **A cue shorter than its span is looped on its own beat grid by whole bars, the
   take's ending kept, before a longer cue is priced** — `scripts/music_loop.py` plays the take to a beat A, jumps back a
   bar multiple to a beat B on the same bar phase, crossfades the join (40 ms, equal power) and plays through the take's
-  own ending, whose hit then lands exactly the jump later; the operator listens across the join before it enters a build
+  own ending, whose hit then lands exactly the jump later; the operator listens across the join before it enters a build.
+  With no `--bpm` the grid comes from `scripts/beat_grid.py`, which CHECKS it: a least-squares line through the tracked
+  beats (a tracker's tempo number was 2 % off; its beat times were right), accepted only when the beats sit within ±15 ms
+  of it and the kicks drift under 10 ms across the take, its phase taken from the kicks (a tracker locked onto off-beat hats
+  put a synthetic grid half a beat off — measured 2026-09-29); 2x or 0.5x only when the kicks say so. A BEAT-MAP verdict
+  (the tempo moves) loops on the tracked beats, and an irregular interval is named — a skipped beat breaks the bar phase
   (a 38.8 s take under a 57.9 s spot, zero spend, 2026-09-15). A cue neither looped nor long enough just ENDS mid-shot —
   `edl_check` fails it.
 - **The earlier accepted cue wins** — a cue the operator approved is the campaign's cue for that beat.

@@ -3,7 +3,7 @@
 | rule | where it is enforced |
 |---|---|
 | 🔴 **Cost line + GO before any billed call** — video, image, music, TTS, STT, clone, hosted upscale — however small the amount | `video-gen-cost-gate`, `spot-audio-assembly`, `video-finish-qc` (`--confirmed`) |
-| 🔴 **Approve before upscaling** — nothing is upscaled before the operator approved the take | `video-finish-qc` § tier |
+| 🔴 **Approve before upscaling** — nothing is upscaled or hero-passed before the operator approved the take | `pick_gate.py` (`video-production`): `record` at the pick; `upscale_local.sh`, `upscale_fal_topaz.py` and `hero_pass.sh` refuse a clip that traces to no pick · `video-finish-qc` § tier |
 | 🔴 **The refs gate before every generation** | `video-refs-continuity` `refs_gate.py` |
 | 🔴 **The client's text is the SSOT; client-literal is the default** — additions are proposed as cost lines, never assumed | `video-production` `script_diff.py` (PREPRODUCTION-CORE.md), `video-edit-edl` `beat_sheet.py` |
 | **Continuity is the FIRST test; the start image is the previous shot's last state; the cast is closed after the first keeper** | `video-take-review` row 0, `video-refs-continuity` |

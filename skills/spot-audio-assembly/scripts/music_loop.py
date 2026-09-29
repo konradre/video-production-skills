@@ -8,7 +8,9 @@ placed on it moves by exactly the jump. Zero spend; a second billed generation o
 existed (a 38.8 s take under a 57.9 s spot, 2026-09-15).
 
 The beat grid comes from `--bpm` (with `--first-beat` where the first downbeat sits; the grid is arithmetic from there)
-or, when `librosa` is installed and no `--bpm` is given, from beat tracking on the take. The audition is the ear's:
+or, when `librosa` is installed and no `--bpm` is given, from `beat_grid.py` — a grid that checks itself: the tracked beats'
+least-squares line, used only when it holds (residual ≤ 15 ms, kick drift ≤ 10 ms), else the tracked beats themselves as a
+BEAT MAP with any irregular interval named (a skipped beat breaks the bar phase). The audition is the ear's:
 listen across the join at 1× and at the bar level before the loop enters a build.
 
   music_loop.py --take audio/music/<take>.wav --bars 8 --a-target 26 [--bpm 108 --first-beat 0.12] [--beats-per-bar 4] [--xfade 0.04] [--out <file>]
@@ -44,10 +46,18 @@ def beat_grid(y, sr, bpm=None, first_beat=0.0, tracked=None):
         import librosa
     except ImportError:
         sys.exit('no --bpm given and librosa is not installed: pass --bpm <tempo> [--first-beat <s>] (measure the tempo once, by ear against a metronome or with any beat tracker)')
-    ym = y.mean(axis=1)
-    on = librosa.onset.onset_strength(y=ym, sr=sr)
-    tempo, beats = librosa.beat.beat_track(onset_envelope=on, sr=sr, units='time')
-    return float(np.atleast_1d(tempo)[0]), np.asarray(beats, dtype='float64')
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import beat_grid as bg                                                       # the grid that checks itself (beat_grid.py)
+    ym = y.mean(axis=1) if y.ndim > 1 else y
+    r = bg.fit(librosa.resample(ym.astype('float32'), orig_sr=sr, target_sr=22050), 22050)
+    if r['verdict'] == 'grid':
+        print(f"beat grid CHECKED: {r['bpm']} bpm, residual ±{r['residual_max_ms']} ms, drift {r['drift_ms']} ms, phase from the {r['phase_from']}")
+        return float(r['bpm']), np.arange(r['t0'], n, r['T'])
+    b = np.asarray(r['beats'], dtype='float64'); iv = np.diff(b); med = np.median(iv) if len(iv) else 0
+    odd = [f'{b[k]:.2f}' for k in range(len(iv)) if med and abs(iv[k] - med) > 0.25 * med]
+    print(f"BEAT-MAP: {r['why']} — the loop jumps whole bars of TRACKED beats; listen across the join"
+          + (f"; irregular intervals at {', '.join(odd[:6])} s (a skipped or doubled beat breaks the bar phase)" if odd else ''))
+    return float(r.get('bpm') or 60.0 / med), b
 
 
 def loop(y, sr, beats, bars, beats_per_bar, a_target, xfade):

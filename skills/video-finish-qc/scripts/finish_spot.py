@@ -85,6 +85,17 @@ def main():
 
     def ms(t): v = int(round(t * 1000)); return f'{v}|{v}'
 
+    SFPS = {}
+    def src_fps(p):
+        """a CFR source's frame rate (r_frame_rate == avg_frame_rate), else None — a VFR source keeps the fps filter's rounding"""
+        if p not in SFPS:
+            r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=r_frame_rate,avg_frame_rate', '-of', 'csv=p=0', p],
+                               capture_output=True, text=True).stdout.strip().split(',')
+            try:
+                q = [float(n) / float(d) for n, d in (x.split('/') for x in r[:2])]; SFPS[p] = q[0] if len(q) == 2 and q[0] > 0 and abs(q[0] - q[1]) < 1e-3 else None
+            except (ValueError, ZeroDivisionError): SFPS[p] = None
+        return SFPS[p]
+
     # ---- 1. graded mezzanine cut (footage only, 0–FOOT_END) ----
     if a.stage in ('cut', 'all'):
         fc = []; inputs = []
@@ -98,14 +109,21 @@ def main():
                 src = cands[0] if cands else f"{a.in_dir}/{e['id']}.mp4"; ss = float(e.get('handle_head', HANDLE))
                 if e['in'] > 0 and ss == 0: print(f"WARNING {e['id']}: in={e['in']} but handle_head=0 -> the source is assumed to START at the in-point; a FULL-TAKE hero needs handle_head=in", flush=True)
             assert os.path.exists(src), f"{e['id']}: source missing {src}"
-            inputs += ['-ss', f'{ss:.6f}', '-t', f'{dur:.6f}', '-i', src]
+            # FRAMES FROM THE TIMELINE, never from each window: ffmpeg gives a -ss/-t window its OWN frame count (0.721 s at 24 fps
+            # → 18 frames, not 17.3), and a concat of 40 off-grid windows ran 36 frames long — every VO line after it late by up to
+            # 1.5 s (av_sync_regress.py, 2026-09-29; bridgeclip's cumulative frame allocation). Event k gets exactly
+            # round(tl1*fps) - round(tl0*fps) frames, its first frame the source at in + (T0 - tl0), so the sum telescopes.
+            f0, f1 = round(e['tl'][0] * FPS), round(e['tl'][1] * FPS); nfr = f1 - f0; ss = max(0.0, ss + f0 / FPS - e['tl'][0])
+            sf = src_fps(src)   # seek onto the source's own frame grid, a quarter frame early: at a half-frame offset the fps filter's
+            if sf: ss = max(0.0, round(ss * sf) / sf - 0.25 / sf)   # nearest-frame choice flips on 1 ms timestamps (Matroska) → a frame shown twice
+            inputs += ['-ss', f'{ss:.6f}', '-t', f'{(nfr + 2) / FPS:.6f}', '-i', src]
             lut = f"format=gbrp16le,lut3d=file={ff_path(f'{a.cubes}/{look}_33.cube')}:interp=tetrahedral," if look != 'none' else ''   # look "none" = pre-graded hero (Resolve/Dehancer pass)
             z = float(e.get('zoom', 1) or 1); zc = ''
             if z > 1.0001:                                                                                   # per-event punch-in: crop 1/z around the anchor, then the normal scale
                 ax, ay = e.get('anchor', [0.5, 0.5]); cw, ch = f'iw/{z:.4f}', f'ih/{z:.4f}'
                 zc = f"crop={cw}:{ch}:clip((iw*{ax:.4f})-({cw})/2\\,0\\,iw-({cw})):clip((ih*{ay:.4f})-({ch})/2\\,0\\,ih-({ch})),"
-            fc.append(f"[{i}:v]{zc}scale={W}:{H}:flags=lanczos,fps={FPS},{lut}format=yuv422p10le,setsar=1[v{i}]")
-            print(e['id'], 'src', src, 'ss', round(ss, 4), 'look', look, 'dur', dur, 'tl', e['tl'])
+            fc.append(f"[{i}:v]{zc}scale={W}:{H}:flags=lanczos,fps={FPS},tpad=stop_mode=clone:stop=2,trim=end_frame={nfr},setpts=N/({FPS}*TB),{lut}format=yuv422p10le,setsar=1[v{i}]")
+            print(e['id'], 'src', src, 'ss', round(ss, 4), 'look', look, 'dur', dur, 'tl', e['tl'], 'frames', nfr)
         fc.append(''.join(f'[v{i}]' for i in range(len(ev))) + f'concat=n={len(ev)}:v=1:a=0[out]')
         run(['ffmpeg', '-v', 'error', '-y'] + inputs + ['-filter_complex', ';'.join(fc), '-map', '[out]', '-c:v', 'prores_ks', '-profile:v', '3', '-vendor', 'apl0', '-pix_fmt', 'yuv422p10le', '-r', str(FPS), FOOT])
         print(probe(FOOT))
@@ -155,7 +173,9 @@ def main():
             nt = float(e.get('native_audio_to', e['out'])); assert nf < nt <= e['out'], f"{e['id']}: native_audio_to outside (from,out]"
             inp += ['-ss', f"{nf:.4f}", '-t', f"{nt - nf:.4f}", '-i', e['take']]
             fi = 'afade=t=in:st=0:d=0.02,' if nf > e['in'] else ''; fo = f"afade=t=out:st={max(0, nt - nf - 0.03):.3f}:d=0.03," if nt < e['out'] else ''
-            au.append(f"[{n}:a]aformat=sample_rates=48000:channel_layouts=stereo,{fi}{fo}volume={vol},adelay={ms(e['tl'][0] + nf - e['in'])}[na{e['id']}]"); mix.append(f"[na{e['id']}]"); n += 1; used['native:' + e['id']] = f"{e['take']} from take {nf}"
+            # the take's audio on ITS presentation clock: a late track keeps its offset, missing packets become silence instead of
+            # pulling everything after them early (0.49 s on a 0.5 s gap, av_sync_regress.py 2026-09-29)
+            au.append(f"[{n}:a]aresample=48000:async=1:first_pts=0:min_hard_comp=0.001,aformat=sample_rates=48000:channel_layouts=stereo,{fi}{fo}volume={vol},adelay={ms(e['tl'][0] + nf - e['in'])}[na{e['id']}]"); mix.append(f"[na{e['id']}]"); n += 1; used['native:' + e['id']] = f"{e['take']} from take {nf}"
         # NO loudness processing in the master: a single-pass loudnorm is DYNAMIC — it rides the programme, lifting the bed in
         # every gap between lines, and every later stage inherits a ride it cannot undo. The master is a static sum; deliver
         # sets the level once with one measured gain (spot-audio-assembly MIX-AND-QC.md § The delivery loudness pass).
@@ -185,7 +205,11 @@ def main():
             # gte()*lt() zero frames showed both AND zero showed neither. An epsilon trim is the wrong fix —
             # it trades a measure-zero double for a real uncovered window.
             cin += ['-i', c['file']]; chain += f";[{last}][{k + 1}:v]overlay=0:0:enable='gte(t,{c['tl'][0]})*lt(t,{c['tl'][1]})'[v{k + 1}]"; last = f'v{k + 1}'
-        lim = f"alimiter=limit={10 ** (ln['TP'] / 20):.4f}:attack=5:release=60:level=false"
+        if edl.get('poster_at') is not None:   # the platform thumbnail is frame 0 (X, Slack, Discord): bake the chosen master frame there (brag)
+            k = len(caps) + 1; cw, chh = edl.get("canvas", [1080, 1920]); pss = max(0.0, int(float(edl['poster_at']) * FPS + 1e-6) / FPS - 0.25 / FPS)   # the frame ON SCREEN at poster_at
+            cin += ['-ss', f"{pss:.4f}", '-i', MASTER]
+            chain += f";[{k}:v]scale={cw}:{chh}:flags=lanczos,format=yuv420p,trim=end_frame=1,setpts=PTS-STARTPTS[pst];[{last}][pst]overlay=eof_action=pass:enable='eq(n,0)'[vpst]"; last = 'vpst'
+        lim = f"alimiter=limit={10 ** (ln['TP'] / 20):.4f}:attack=5:release=60:level=false:latency=1"   # latency=1: the lookahead is compensated — two limiters left the audio 10 ms late (av_sync_regress.py, 2026-09-29)
         af = f"volume={g:.3f}dB,aresample=192000,{lim},aresample=48000,{lim}"   # limit at 192 kHz, where inter-sample peaks are visible; 48 kHz; limit again
         # Measured on a real master (TP target -2.4, AAC 192k): limiter after the resample only -> -1.0 dBTP; before only -> -2.0; both -> -2.1; none -> -1.9.
         run(['ffmpeg', '-v', 'error', '-y', '-i', MASTER] + cin + ['-filter_complex', chain, '-map', f'[{last}]', '-map', '0:a', '-af', af, '-ar', '48000', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-level', '4.1', '-g', str(2 * FPS), '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-t', f'{RUN}', DELIV])   # -t: the picture is authoritative — without it AAC priming + padding set the container duration

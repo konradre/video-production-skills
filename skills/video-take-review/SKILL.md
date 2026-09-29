@@ -37,7 +37,12 @@ Continuity first, the matrix and the self-tests do not move — `video-productio
 python3 scripts/qc_seed.py --out review --plate <accepted plate> takes/S02-G4-s1.mp4
 bash    scripts/contact_sheet.sh takes/S02-G4-s1.mp4 4 4
 python3 scripts/speech_timing.py takes/S02-G4-s1.mp4 --wpm 230,250   # a take that SPEAKS; see the delivery row
+python3 scripts/seed_montage.py --out review/S02-G4-montage.jpg takes/S02-G4-s*.mp4   # every seed of the shot on ONE sheet
 ```
+
+**The seeds of one shot are then read TOGETHER** (`seed_montage.py`): the seeds as columns at the same fractions of their
+length, and a similarity table naming the near-duplicates — read one at a time, a near-duplicate looks like a new angle.
+A void's row names the lever the next generation pulls (ACCEPTANCE-MATRIX.md § The lever a miss pulls).
 
 `qc_seed.py` gives the cut list (per-frame diff), the **continuity sheet** — the plate | the first frame
 of every cut | the last frame — a 1 fps tile, the native-audio RMS peak (the hit's time) and a whisper
@@ -154,7 +159,9 @@ locate it on THEIR frame (`frame_match.py` against the take windows and the gen 
 person and the event back, and only then act — a defect acted on before it was located costs a wrong
 fix or a wasted regen. When the operator says they see it in motion, they see it.
 
-**Done when:** the pick is recorded by path with its window in the continuity ledger, voids carry
+**Done when:** the pick is recorded by path with its window in the continuity ledger and in code
+(`pick_gate.py record --root <project> --window <in>-<out> <path>`, `video-production` — the upscale and hero scripts
+refuse a clip that traces to none), voids carry
 reasons, and the next skill (the ledger update in `video-refs-continuity`, then the finishing chain
 after approval) can start from the record alone.
 

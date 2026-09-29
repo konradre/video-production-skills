@@ -23,6 +23,27 @@ takes (`video-production/references/WHAT-VARIES.md`). Rows in reading order:
 | 10 | **realism** — natural poses; dance not jerky; no phantom extra; a runner from behind; the subject in the last frame. On a creator-style / UGC take, the TELLS pass: read with the sound OFF first; the hands and fingers on the product; a torso static longer than ~6–7 s (`frame_psnr.py` reads > 45 dB); consonant lip drift inside the first 1–2 s of a line; the product changing between shots; the background warping when the subject moves, lines going wavy, shadows not following; a phone or a camera UI in frame; the same face on screen past its budget (the composited real proof at the demo beat is what relieves it) | the tile; `frame_psnr.py`; the 1:1 crops on hands and mouth | unnatural poses; another person in the background; a runner running backwards while facing the camera, fading out at the end; on a UGC take: a hand with the wrong fingers on the jar, a presenter frozen from the shoulders down, a mouth a syllable late on every "p" and "b", a jar that changed shape at the cut, a kitchen whose tiles bent, a phone drawn into her hand |
 | 11 | **plausibility of the product's fall** — haphazard placement, not aligned; landed pieces not raining before a burst | the sheet | pieces raining before anything has fired |
 
+## The lever a miss pulls
+
+A void names its row, and the row names what the NEXT generation changes — so a miss re-rolls a cause, never the same
+request (studiomi300's shot critic labels its misses "so the planner knows which lever to pull on retry"; its labels map
+onto our rows, in brackets). Where the house rules already name the lever, it is quoted from them.
+
+| row | the lever on a miss |
+|---|---|
+| 0 continuity / geometry | the start image = the previous keeper's LAST frame (the standing rule); the scene proxy's grey frame for a new angle — never more prose (`video-gen-cost-gate` § 1, the mode table) |
+| 0b across composed cuts [CHARACTER_DRIFT, WARDROBE_DRIFT] | one continuity partition as ONE refs-only generation with a look plate per light context; the references, not the prompt, carry identity and wardrobe |
+| 1 script beat [WALKING_BACKWARDS] | the script's verb in the prompt, cause before reaction as timecoded beats; the reveal on its frame |
+| 3 anatomy [HAND_FINGER_ARTIFACT] | another seed on the same prompt (the miss is stochastic); after two, fewer hands in frame or a tighter framing |
+| 4 faces | the face at its floor size in the start image or a tight reference — the face decides, not the mode (§ 1 mode table) |
+| 5 product [OBJECT_MORPHING] | the product sheet in the set and ONE still first (the reference dress rehearsal) |
+| 6 composition / eyelines [CAMERA_IGNORED] | who looks where, stated; a camera move as the clause plus the proxy clip, never the clause alone (`video-prompt-dialects`) |
+| 7 audio | a locked line as an audio reference with its words ABSENT from the prompt (DIALECTS § Supplied-audio polarity); a generated tone at the head → cut it in the edit, not a regen |
+| 8 named state | the state in the start image (an exact continuation), or a reference of it |
+| 9 dignity [RANDOM_INTIMACY] | restage it in the prompt; never re-roll the same prompt hoping |
+| 10 realism [STYLIZED_AI_LOOK, NEON_GLOW_LEAK, EXTRAS_INVADE_FRAME] | another seed first; a repeated tell named in the negative tail; a phantom extra kept out of the partition's references |
+| 11 plausibility | haphazard placement stated in the prompt; a still first |
+
 ## The window
 
 A keeper is `take + in + out + the state at out`. The operator's trims come as time or fraction ("only
