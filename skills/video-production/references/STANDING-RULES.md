@@ -7,6 +7,8 @@
 | 🔴 **The refs gate before every generation** | `video-refs-continuity` `refs_gate.py` |
 | 🔴 **The client's text is the SSOT; client-literal is the default** — additions are proposed as cost lines, never assumed | `video-production` `script_diff.py` (PREPRODUCTION-CORE.md), `video-edit-edl` `beat_sheet.py` |
 | **Continuity is the FIRST test; the start image is the previous shot's last state; the cast is closed after the first keeper** | `video-take-review` row 0, `video-refs-continuity` |
+| **Evidence is not looking: a file that probes valid has not been seen** — a report says "container valid · measured rows pass · visual pending" until the frames themselves were read; appearance is never inferred from a filename, a prompt, a job history or ffprobe | `qc_deliverable.py` (its verdict line), `video-take-review` (the rules above the matrix), `video-finish-qc` |
+| **A ComfyUI graph is preflighted before it is queued: it must SAVE an output of the job's kind** — a preview, or `save_output` false, finishes "successfully" and leaves nothing | `video-refs-continuity` `comfy_preflight.py` |
 | **Never resubmit a billed job; COMPLETED ≠ success; receipts keep the raw reply** | `video-gen-cost-gate` |
 | **1080p masters only; ≤ 30 MiB in chat, else the path** | `video-finish-qc`, `client-rounds` |
 | **Decisions as numbered plain questions with the cost and the full path inline; seeds go to the operator as clips** | `client-rounds` § the ask |

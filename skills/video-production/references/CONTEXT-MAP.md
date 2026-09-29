@@ -68,6 +68,10 @@ is questioned, a venue changes, a new element type appears, or a probe is being 
 | `shrimply` | https://github.com/soirihiroka/shrimply | an agent seam over a live NLE project: read state, typed atomic edits, never the file |
 | `WolfCut` | https://github.com/jub0t/WolfCut | an editor architecture doc worth reading before any NLE bridge |
 | `wasserman/blockout`, `motion-previs-studio` | https://github.com/wassermanproductions/motion-previs-studio | staged grey-box previs; reference video → pose, depth and a camera solve |
+| `agentkit-samples` | https://github.com/bytedance/agentkit-samples | BytePlus's Seedance template-rewrite skill (the reference-ad profiles, the never-carried list, soft beats) and the video-breakdown hook rubric → `REFERENCE-AD-STUDY.md` |
+| `minimax-h3-agent-skills` | https://github.com/lucianchen/minimax-h3-agent-skills | a same-brief three-engine comparison (H3 local · Grok Imagine · Seedance 2.0) → `video-gen-cost-gate` § 1, comparing engines |
+| `procedural-film` | https://github.com/kuhnhomeuk-cell/procedural-film | the determinism proof for code-drawn frames (`check.cjs`) → `designed-elements` `det_check.py` |
+| `dsh-comfyui` (piorunkulaga174) | https://github.com/piorunkulaga174-boop/dsh-comfyui | a ComfyUI graph preflight that fails a graph with no persistent output; "container valid, visual pending" → `comfy_preflight.py`, STANDING-RULES |
 | `anything2explainer` | https://github.com/Vincentwei1021/anything2explainer | a code-drawn narrated explainer kit with a measured craft layer — the composition drivers, readable-time arithmetic, the frame, motion and source instruments; patterns re-authored, no code carried (the toolkit is PolyForm-Noncommercial) |
 
 A rule that cites one of these projects names the project, never a line number in its code, because lines move.

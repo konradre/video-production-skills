@@ -19,6 +19,11 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
 - **G6 — negatives are targeted**: a specific likely failure, or nothing; on Seedance 2.5 the vendor
   sanctions only subtitles, BGM/audio, logos, watermarks (plus what the shot document asks for) — no
   quality packs, no generic blacklists.
+- **A fast move says what stays sharp and where it stops**: the subject sharp, directional blur on the background and the
+  motion edges only, and every whip or orbit brakes and re-locks on the subject; a cut is caused by an action (a foot
+  lands, a fan covers the lens) rather than stacked as camera words. A practitioner's claim from one take per engine
+  (H3, Grok Imagine, Seedance 2.0 — `minimax-h3-agent-skills` practice, 2026-08-24), untested here: a candidate for the
+  next action shot's A/B, not a rule yet.
 - **Point, never describe**: a cited reference gets one narrow job and an exclusion, never adjectives
   (the most expensive lesson: the words beat the picture every time).
 - **A genre dialect layers on the model's.** A creator-style / UGC spot swaps the style prefix, the camera clause, the

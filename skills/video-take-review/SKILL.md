@@ -21,10 +21,13 @@ A landed seed is read the same day, by the agent, with instruments — and the o
 only pick. The read leads with **continuity** — the priority consideration for accepting or rejecting a gen —
 never with the gag; a **void** carries its reason into the ledger; a **keeper**
 carries its usable **window**; a residual doubt travels in the delivery note with its frame time, not in
-a re-roll question. Three rules above the matrix: report what you SAW, not the win you hoped for (a take
+a re-roll question. Four rules above the matrix: report what you SAW, not the win you hoped for (a take
 that fixes one defect and introduces a worse one has the worse one as its headline); a whole-frame
-downscale assesses composition only — identity, hands, teeth and product are read at 1:1 or larger; and
-every instrument prints a known-answer self-test beside its number.
+downscale assesses composition only — identity, hands, teeth and product are read at 1:1 or larger;
+every instrument prints a known-answer self-test beside its number; and **evidence is not looking** — a take
+that probes valid and passes every measured row has still not been SEEN until its frames were read, so until then the
+report says "container valid · measured rows pass · visual pending", and appearance is never inferred from a
+filename, a prompt, a job history or `ffprobe` (pattern: `piorunkulaga174/dsh-comfyui` `references/visual-verification.md`).
 
 **What varies.** The pixel numbers here — the face floor, the instruments' blind spots, the composed-cut multiples —
 were measured on 480p takes: count in the take's native pixels, and re-measure on a new generator's first takes. The

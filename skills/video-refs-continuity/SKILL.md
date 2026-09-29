@@ -49,7 +49,9 @@ from this table verbatim** (the count read on the zoom, never a number from memo
 **Where a keeper frame exists, compute the room instead of remembering it.** `scripts/scene_blockout.py
 <keeper-frame.png>` returns the frame as a labelled grey-box scene (people, furniture, door, window, lamp,
 floor; relative scale; ~20 s on a 24 GB GPU, $0; `scripts/comfy_ready.py` first — it says whether the server
-and its two providers answer, and `scripts/comfy_up.sh` starts one from the env), and `scripts/scene_proxy.py <scene.json> <out> "<camera>"`
+and its two providers answer, and `scripts/comfy_up.sh` starts one from the env; any OTHER graph queued on that server
+goes through `scripts/comfy_preflight.py <graph.json> --expect video|image --host` first — it refuses a graph that
+would finish and save nothing: a preview-only output, `save_output` false, an unfed save node, the wrong kind), and `scripts/scene_proxy.py <scene.json> <out> "<camera>"`
 prints, for ANY camera you author, where every object sits — left/right %, depth rank, in frame, occluded,
 out of frame — and renders a grey-box + depth frame of that angle. That table IS the *Room geometry per cut*
 row and the source of every geometry sentence for a new angle; on the pilot it reproduced the accepted keepers'
@@ -331,6 +333,9 @@ be continued by a gen: write the face into the last frame, or continue from the 
   defect.
 - When correction rounds on one element stop converging (three rounds), stop generating and ask the
   operator for the asset or the framing.
+- `comfy_preflight.py` FAIL → the graph is fixed and re-checked, never queued as it stands; exit 2 (the server did not
+  answer) is no schema check at all, never a pass. A PASS means the graph will write a file — the file is still read
+  off its frames before anyone calls it good.
 - `scene_blockout.py` fails closed — server down, node or checkpoint missing, job failed — with the route's
   own reason; the GO ask then says "no scene proxy for this shot" and the row is read off the frame. Never
   write geometry from memory and call it computed.

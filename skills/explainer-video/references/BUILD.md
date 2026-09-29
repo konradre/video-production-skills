@@ -1,7 +1,9 @@
 # Build — the project, the host and scene contract, captions, the pilot
 
 The general composition contract (determinism, local assets, the render host, the render rules) is
-`designed-elements` HYPERFRAMES-CONTRACT. An explainer adds one host and many scene sub-compositions.
+`designed-elements` HYPERFRAMES-CONTRACT. An explainer adds one host and many scene sub-compositions. Its determinism is
+checked by `designed-elements` `det_check.py` — `source` on every round (the scene files are read too), `prove` once on
+the pilot — because every scene boundary a render worker starts on is a cold page (CONTRACT § The determinism proof).
 
 ## The project
 

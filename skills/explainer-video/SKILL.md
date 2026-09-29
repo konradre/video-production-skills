@@ -94,11 +94,13 @@ entity named in a row has its image and its source.
 python3 ~/.claude/skills/explainer-video/scripts/explainer_timeline.py --project <p> --timing <word-times.json>
 python3 ~/.claude/skills/designed-elements/scripts/literal_audit.py <p> --approved <p>/copy.md --approved <p>/script.md
 python3 ~/.claude/skills/designed-elements/scripts/slide_structure_audit.py <p>
+python3 ~/.claude/skills/designed-elements/scripts/det_check.py source <p>                      # prove <p> --host <render host> once, on the pilot
 ```
 
 **Done when:** the operator approved the pilot, every scene exists, the timeline wrote the slots, BEATS and captions
 (TIMELINE PASS), `literal_audit.py` passes, `slide_structure_audit.py` passes or each flag has been answered on the
-composition, and `npx hyperframes lint` reports 0 errors on the render host.
+composition, `det_check.py source` passes (and `prove` passed on the pilot), and `npx hyperframes lint` reports 0 errors
+on the render host.
 
 ## 6. Render, then read the render
 
@@ -145,7 +147,7 @@ fixed in the scaffold or the shared layer.
 |---|---|
 | `explainer_new.py --out --scenes [--canvas --fps --target]` · `--add <id>` · `--selftest` | scaffolds the thin host, one contract-clean scene per id, and the plan files |
 | `explainer_timeline.py --project --timing [--offsets --vo --check]` · `--selftest` | resolves anchors and beats from the narration; writes the slots, BEATS and captions; the runtime and readable-time checks |
-| `designed-elements` `literal_audit.py` · `slide_structure_audit.py` · `render_hyper.sh` | the on-screen text against the approved copy · the four slide-deck structures read off the source · the render on the render host |
+| `designed-elements` `literal_audit.py` · `slide_structure_audit.py` · `render_hyper.sh` · `det_check.py` | the on-screen text against the approved copy · the four slide-deck structures read off the source · the render on the render host · the determinism proof (the script read for clock and random readers; two renders at different worker splits compared) |
 | `video-take-review` `designed_frame_metrics.py` | hero size, empty runs, still share and holds on the delivered frames |
 
 ## Cross-references

@@ -61,7 +61,7 @@ def card(name, W, H, dur, fps, seed):
   {PRNG}
   var rnd=mulberry32({seed}), T0=0.83, G=3000, P=[];          // T0 = the hit the burst fires on (the sound decides it; the COMP constant moves)
   for(var i=0;i<420;i++){{ var a=-Math.PI/2+(rnd()-0.5)*1.4, sp=1400+rnd()*1600; P.push({{x:W*(0.3+0.4*rnd()), y:H*0.62, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, r:rnd()*6.28, w:(rnd()-0.5)*12, s:0.6+rnd()*1.0, d0:rnd()*0.12, k:i%3}}); }}
-  var cv=document.getElementById('burst'), cx=cv.getContext('2d'), st={{t:0}};
+  var cv=document.getElementById('burst'), cx=cv.getContext('2d',{{willReadFrequently:true}}), st={{t:0}};   // one raster path for every frame (HYPERFRAMES-CONTRACT § determinism)
   function draw(){{ var t=st.t; cx.clearRect(0,0,W,H);
     for(var i=0;i<P.length;i++){{ var p=P[i], u=t-T0-p.d0; if(u<=0) continue; var x=p.x+p.vx*u, y=p.y+p.vy*u+0.5*G*u*u; if(y>H+100) continue;
       cx.save(); cx.translate(x,y); cx.rotate(p.r+p.w*u); cx.fillStyle=['#ff4fa3','#ffe7b0','#ffffff'][p.k]; var s=44*p.s; cx.fillRect(-s/2,-s/4,s,s/2); cx.restore(); }} }}
@@ -130,7 +130,7 @@ def layer(name, W, H, dur, fps, seed):
   {PRNG}
   var rnd=mulberry32({seed}), NAMES=['piece-0','piece-1','piece-2','piece-3'], imgs=[], loaded=0;   // sprites cut from the SKU's own silhouette sheet, under assets/
   var D=[]; for(var i=0;i<700;i++){{ D.push({{x:rnd()*W, y:-H*0.2+rnd()*H*1.2, v:H*(0.25+rnd()*0.35), r:rnd()*6.28, w:(rnd()-0.5)*4, s:0.7+rnd()*0.9, k:Math.floor(rnd()*NAMES.length)}}); }}
-  var cv=document.getElementById('c'), cx=cv.getContext('2d'), st={{p:0}};
+  var cv=document.getElementById('c'), cx=cv.getContext('2d',{{willReadFrequently:true}}), st={{p:0}};   // one raster path for every frame (HYPERFRAMES-CONTRACT § determinism)
   function draw(){{ var t=st.p*{dur}; cx.clearRect(0,0,W,H);
     for(var i=0;i<D.length;i++){{ var d=D[i], im=imgs[d.k]; if(!im) continue; var y=(d.y+d.v*t)%(H*1.2)-H*0.1; cx.save(); cx.translate(d.x,y); cx.rotate(d.r+d.w*t); var w=W*0.036*d.s, h=w*im.height/im.width; cx.drawImage(im,-w/2,-h/2,w,h); cx.restore(); }} }}
   function build(){{ var tl=gsap.timeline({{paused:true}}); tl.to(st,{{p:1,duration:{dur},ease:'none',onUpdate:draw}},0); draw(); {REG} }}

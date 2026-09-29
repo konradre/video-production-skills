@@ -20,6 +20,7 @@ CMD="export PATH=\$HOME/.local/bin:\$PATH; cd $RDIR/$NAME || exit 1; mkdir -p re
 # the render's output must EXIST — the sentinel prints only then (a mis-quoted remote command once ran nothing and still ended in RENDER-END)
 if [ "$FMT" = mp4 ]; then CHECK="test -s $RDIR/$NAME/$OUT"; else CHECK="ls $RDIR/$NAME/frames/*.png > /dev/null 2>&1"; fi
 if [ -n "$HOST" ]; then
+  [ "$PUSH" = 1 ] && ssh "$HOST" "mkdir -p $RDIR"   # rsync creates the last directory only: a fresh --remote-dir failed the push
   [ "$PUSH" = 1 ] && rsync -a --delete --exclude renders --exclude frames --exclude node_modules "$DIR/$NAME/" "$HOST:$RDIR/$NAME/"
   ssh "$HOST" "bash -lc $(printf '%q' "$CMD")"; RC=$?   # %q, never '$CMD': the command carries its own single quotes
   ssh "$HOST" "bash -lc $(printf '%q' "$CHECK")" || RC=1

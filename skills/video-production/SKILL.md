@@ -138,6 +138,7 @@ a finished mix to master            → mastering-audio
 music to generate by API            → spot-audio-assembly (its music route, behind the cost line)
 client notes in                     → client-rounds
 a new spot / film / track briefed   → ad-spot-preprod / film-preprod
+a reference ad in the brief         → references/REFERENCE-AD-STUDY.md first, then the preprod skill
 ```
 
 **The finish is part of every video job, never an extra.** Every deliverable passes `video-finish-qc`'s chain — the
@@ -225,7 +226,8 @@ agent keeps one, says NEXT.
 
 - [`references/CONTEXT-MAP.md`](references/CONTEXT-MAP.md) · [`references/RESUME-CONTRACT.md`](references/RESUME-CONTRACT.md) ·
   [`references/STANDING-RULES.md`](references/STANDING-RULES.md) · [`references/WHAT-VARIES.md`](references/WHAT-VARIES.md) ·
-  [`references/CHAIN.md`](references/CHAIN.md) · [`references/RETROSPECTIVE.md`](references/RETROSPECTIVE.md).
+  [`references/CHAIN.md`](references/CHAIN.md) · [`references/RETROSPECTIVE.md`](references/RETROSPECTIVE.md) ·
+  [`references/REFERENCE-AD-STUDY.md`](references/REFERENCE-AD-STUDY.md) (a reference ad: what its profile lends, what never carries, the hook scored from frames).
 - The phase skills: `ad-spot-preprod` · `film-preprod` · `video-refs-continuity` · `video-prompt-dialects` ·
   `video-gen-cost-gate` · `video-take-review` · `video-edit-edl` · `spot-audio-assembly` · `designed-elements` ·
   `video-finish-qc` (on `video-finish`) · `client-rounds` · `explainer-video` (the explainer genre, end to end).

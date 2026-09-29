@@ -184,7 +184,9 @@ inter-shot spread before any global move — and the UGC tells by eye (`referenc
 The table and what each failure means: [`references/QC.md`](references/QC.md).
 
 **Done when:** `QC-DELIVERABLE PASS` and the listen/look found nothing; anything found goes back to the
-EDL or the hero, never to a gain nudge or a re-encode of the deliverable.
+EDL or the hero, never to a gain nudge or a re-encode of the deliverable. The PASS alone is "container valid · measured
+rows pass · visual pending" — the verdict line says so — and the look is done on the decoded frames, never inferred
+from the rows (`video-production` STANDING-RULES: evidence is not looking).
 
 ## 5. Finals and delivery
 

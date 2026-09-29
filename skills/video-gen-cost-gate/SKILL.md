@@ -148,6 +148,14 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   moves quoted beside it, and the operator rules the raster (§ 0).
 - A new venue or model is proven on the HARDEST shot first (a lipsync line, the product close-up),
   never the easiest — passing the easy spot proves the chain runs, not that the hard parts work.
+- **Comparing engines on one brief** (`minimax-h3-agent-skills`, a three-engine practice run, 2026-08-24): lock the
+  delivery spec (raster, fps, length, audio on); keep the creative intent and write each engine in its OWN dialect — one
+  literal prompt across engines is a false fairness; set each engine's reference roles before the prompt (a full-body
+  scene reference for body, wardrobe, prop and room; a front face reference only to fill identity); normalise every take
+  to one raster for the side-by-side; a smoke setting (a 4-step turbo, a small raster) proves the pipe, never the quality;
+  cost per USABLE take split three ways — the marginal cash, a plan's fee over the month's successful takes, the credits
+  actually consumed — with the retries counted. One take per engine is an observation, never a ranking; the cost line
+  names it as one.
 - **A creator-style talking head** (a UGC spot) routes by SHOT TYPE: a simple talking head or a hook sweep → Gemini Omni
   Flash 1.1, **kie first, fal the fallback** (since 2026-09-25: kie `google/gemini-omni-flash-1-1` is $0.525 per
   8 s at 720p or 1080p against fal's $0.80 / $1.20, sold in fixed 4 / 6 / 8 / 10 s steps — fal takes any whole second

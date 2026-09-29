@@ -52,6 +52,9 @@ spot that should carry the new one — the round ledger lists which spots carry 
   three clock readers: no `Date.now()` or `performance.now()` — the timeline's time is passed in as a parameter; no
   `setInterval` for a typewriter or a counter — tween `{i: 0 → n}` and slice on update; a high-frequency sine
   (`sin(t * 137.2)`) where jitter is wanted, seeded once at load where randomness is.
+- **A 2D canvas is opened with `getContext('2d', {willReadFrequently: true})`.** Chrome changes a large canvas's raster
+  path after its first presented frame, so the first frame each render worker draws comes out different from the same
+  frame drawn mid-sequence — measured on a production drift layer, fixed by this one option (§ The determinism proof).
 - **Expose a seek, and capture through it.** `window.__hfSeek = t => { tl.pause(); tl.time(t); gsap.ticker.tick();
   draw(t); }`. Two traps, both silent, both producing a plausible WRONG frame: a screenshot taken straight after
   setting the time is **one tick stale**, because the library writes styles on the next tick and the canvas waits for
@@ -89,6 +92,39 @@ render_hyper.sh --dir hyper --name <name> --format png-sequence --host <render h
   is then deterministic whatever the font-load timing — the same guarantee as the seeded PRNG.
 - A layer is verified with `layer_check.py` (contiguous frames, RGBA, the frame it becomes opaque); an
   event with `ffprobe` (raster, duration = `data-duration`, 24 fps).
+
+## The determinism proof
+
+A render is split across `--workers`: each worker is a fresh page that renders one contiguous run of frames, starting
+cold (24 frames over 3 workers start at frames 0, 8 and 16). So a composition that is not a pure function of time does
+not fail loudly — it renders a seam at every split, and a different one at a different worker count. `det_check.py`
+checks it (pattern: `procedural-film`'s `check.cjs`, which hashes each shot's first, middle and last frame warm, reversed,
+shuffled, cold and in sequence; ours renders through the real renderer instead of a harness):
+
+```bash
+python3 ~/.claude/skills/designed-elements/scripts/det_check.py source hyper/<name>                        # free, every round
+python3 ~/.claude/skills/designed-elements/scripts/det_check.py prove hyper/<name> --host <render host>    # two renders, --workers 1 and 3
+```
+
+`source` reads the composition's own script (comments ignored) for `Math.random`, `Date`, `performance.now`, crypto
+randomness, `requestAnimationFrame`, `setTimeout` / `setInterval` and a bare `getContext('2d')`; a deliberate use carries
+`det-ok: <reason>` in a comment on its line. It cannot see an accumulation. `prove` renders twice as a png-sequence,
+compares every frame on the decoded pixels on the host, and reports each scene's first, middle and last frame. The proof
+frames stay on the host under `<remote-dir>/.det/<name>/<stamp>/`; it refuses a project whose `frames/` holds PNGs, and
+`--no-push` renders a copy already on the host (the push mirrors the local project with `--delete`).
+
+Measured 2026-09-29 on the render host, hyperframes 0.8.18, `--workers 1` against `--workers 3`:
+
+| composition | frames that differ | what it shows |
+|---|---|---|
+| a seeded 320×180 canvas | 0 of 24 | the pass case |
+| the same with `Math.random` | every drawn frame | `source` catches it too |
+| the same with `acc += 3` in the `onUpdate` | 8–11 (the second worker's run, while the canvas is on screen) | `source` sees nothing; only the render does |
+| a production drift layer, 1080×1920, bare `getContext('2d')` | 32 and 64 — the first frame of the second and third workers | 0.1–0.2 % of pixels on rotated sprite edges, invisible side by side; `img.decode()` before the build and a warm-up draw of every image both left it; `{willReadFrequently: true}` → 0 of 96 |
+
+The 320×180 canvas passed without the option, so a small canvas can stay on one raster path; the option costs nothing,
+and `hyper_new.py` writes it. On that day 9 of the 21 compositions on the render host opened a bare 2D canvas: each of
+their renders at `--workers 2` carries one such frame at the split — a re-render is owed only if a review finds it.
 
 ## What the EDL needs from an element
 

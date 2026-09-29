@@ -295,7 +295,8 @@ def main():
             print('INFO phone band: the probe could not read every clip — ' + (pr_.stderr or pr_.stdout).strip()[-300:])
     by = {k: [l for l, kk in fails if kk == k] for k in ('format', 'judgement')}
     summary = '; '.join(f"{k}: {', '.join(v)}" for k, v in by.items() if v)
-    print(f"QC-DELIVERABLE {'FAIL (' + summary + ')' if fails else 'PASS'} — {D}" + ("\n      format rows: fix mechanically and re-run; judgement rows: the operator decides" if fails else '')); sys.exit(1 if fails else 0)
+    print(f"QC-DELIVERABLE {'FAIL (' + summary + ')' if fails else 'PASS'} — {D}" + ("\n      format rows: fix mechanically and re-run; judgement rows: the operator decides" if fails else ''))
+    print('      visual: PENDING — these rows are measurements; say "container valid · measured rows pass · visual pending" until the frames themselves were read (STANDING-RULES: evidence is not looking)'); sys.exit(1 if fails else 0)
 
 
 if __name__ == '__main__':
