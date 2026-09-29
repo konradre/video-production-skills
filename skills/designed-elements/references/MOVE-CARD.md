@@ -11,6 +11,11 @@ one-line: <what the viewer sees, in one sentence>
 fits: <where it goes — an opening, a data reveal, a transition, an outro>
 duration: <N frames at <fps>>
 energy: <low | medium | high>
+source: <where the move was first seen — a URL, a donor card's path — and the date it was read>
+demo: <the composition or render that shipped it>
+demo_sha256: <sha256 of that file at the shipped revision>
+prompt: <a captured prompt the move was built from, when there is one — verbatim, beside the card>
+prompt_sha256: <its sha256>
 ---
 ## Intent
 <the read it serves — what the viewer must get from it>
@@ -32,3 +37,10 @@ energy: <low | medium | high>
 
 A card is written after the move has shipped once and survived review, never speculatively; its numbers are the
 shipped ones. Pattern: video-shotcraft (`references/shots/camera/basic-3d-scene.md` is typical).
+
+**A card carries its provenance, and the hashes make it checkable.** `source` says where the move came from; `demo`
+and `demo_sha256` pin the exact file that shipped it; a move lifted from a captured prompt keeps that prompt verbatim
+beside the card with its hash. Before a card is reused, `sha256sum <demo>` must still print `demo_sha256` — a demo
+that changed since means the card describes a composition that no longer exists: re-verify the move on the current
+file, then re-stamp the hash, or re-point the card. Pattern: cth9191/motion-design `skills/motion-design/assets/presets.json`
+(each preset's `source`: the URL, the section, the date observed, the captured prompt's path and SHA-256).

@@ -41,6 +41,7 @@ python3 scripts/qc_seed.py --out review --plate <accepted plate> takes/S02-G4-s1
 bash    scripts/contact_sheet.sh takes/S02-G4-s1.mp4 4 4
 python3 scripts/speech_timing.py takes/S02-G4-s1.mp4 --wpm 230,250   # a take that SPEAKS; see the delivery row
 python3 scripts/seed_montage.py --out review/S02-G4-montage.jpg takes/S02-G4-s*.mp4   # every seed of the shot on ONE sheet
+python3 scripts/attach_proof.py --root <project> --take S02-G4-s1   # every gated reference was SENT — the attachment row
 ```
 
 **The seeds of one shot are then read TOGETHER** (`seed_montage.py`): the seeds as columns at the same fractions of their
@@ -116,6 +117,7 @@ Rows per seed, each answered PASS / FAIL / note; a FAIL is never overridden by a
 | consistency across cuts | per cut the model composed: the same faces, wardrobe, room, light and performance register either side — read on `cut_consistency.py`'s sheet and crops beside its multiples; a break on any axis FAILs, the cut's presence never does |
 | anatomy | per person, in a per-person crop at 3×: 2 arms, 2 legs, 1 head, each hand on an arm, one prop per hand |
 | faces | undistorted, ≥ ~60 px of face height in the take's native pixels (measured at 480p) for any beat the faces carry — a FLOOR, not a target: a face over it was rejected as under-rendered, and face detail compares only at equal resampled size; identity against the character's close shots (a reconstructed face is plausible, not faithful) |
+| attachment | every reference the take was gated on was SENT to the model — `attach_proof.py` compares the gate's submission record with the receipt's request record (`MISSING` = FAIL: the take was made without it, however right it looks; `UNPROVEN` = a receipt from before 2026-09-29 or a fal take — read the venue's own job record) — and the product is VISIBLE in the take and matches its reference, read on the `product` row. A path or a name in a prompt is not proof the model read the image |
 | product | shape at 2× (the exact silhouette, haphazard angles, never aligned); proportion by a 4× crop beside the product photo (the pixel instrument is blind at 480p) |
 | composition | nobody looks into the lens; the line-deliverer faces the camera, never back-to-camera; each gesture motivated in ITS framing; the reaction faces its cause with the matching emotion; no focus pull off the face; the camera holds its lock (NCC scale-match of the upper frame between frames) |
 | audio | whisper: word-like events on an unscripted mouth = "shouting" (void); the scripted words intelligible (a near-homophone is a void); a generated tone at the head (spectral flatness < 0.3 with a stable peak); the hit's peak time |

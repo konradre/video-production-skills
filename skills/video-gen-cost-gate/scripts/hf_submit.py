@@ -74,6 +74,11 @@ def main():
 
     ids = [rid(n) for n in refs]
     start_id = rid(start) if start else None
+    # what the call SENDS, by name — the receipt's half of the attachment proof (video-take-review attach_proof.py)
+    sent = [{'name': n, 'role': 'image', 'id': i} for n, i in zip(refs, ids)] + \
+           ([{'name': start, 'role': 'start_image', 'id': start_id}] if start else []) + \
+           ([{'name': None, 'role': 'audio', 'id': a.audio_ref}] if a.audio_ref else []) + \
+           ([{'name': None, 'role': 'video', 'id': a.video_ref}] if a.video_ref else [])
     prompt_path = os.path.join(root, a.prompt) if not os.path.isabs(a.prompt) else a.prompt
     text = open(prompt_path, encoding='utf-8').read()
     m = g.spot_re.search(os.path.basename(prompt_path)); spot = m.group(1) if m else None
@@ -112,7 +117,7 @@ def main():
             print(f'{a.scene}-s{s} UNPARSED reply:', out.stdout[:200], out.stderr[:200]); continue
         jid = j[0] if isinstance(j, list) else (j.get('id') or j.get('job_id'))
         if isinstance(jid, dict): jid = jid.get('id') or jid.get('job_id')
-        R.append({'name': f'{a.scene}-s{s}', 'job_id': jid, 'mode': a.mode, 'duration': a.duration, 'resolution': a.resolution, 'rate': a.rate, 'audio_ref': a.audio_ref, 'start_image': start})
+        R.append({'name': f'{a.scene}-s{s}', 'job_id': jid, 'mode': a.mode, 'duration': a.duration, 'resolution': a.resolution, 'rate': a.rate, 'audio_ref': a.audio_ref, 'start_image': start, 'inputs': sent})
         print(f'{a.scene}-s{s} job {jid}  (BILLED at acceptance)', flush=True)
         # the ledger record BEFORE polling — a hard kill still leaves a recoverable id
         rp = os.path.join(root, 'receipts', f'hf-jobs-{key}.json'); json.dump(R, open(rp, 'w'), indent=1)

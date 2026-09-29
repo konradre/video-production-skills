@@ -237,6 +237,21 @@ rules, all measured 2026-09:
   outlives the local shell, so killing the local caller does not stop the run. One drain loop that
   downloads each output as it lands beats a waiter per job.
 
+## What a proxy cannot pin — the grey-box limits
+
+Another author's measurements on Seedance 2.5 driven by a Dreamina white-model render (`alchaincyf/seedance-skill`
+`SKILL.md` § 几个绕不开的实证边界, 2026-08-06/16) — consistent with ours, untested here on every point:
+
+- **A small subject that barely moves is dropped.** Under ~10 % of the frame height and moving less than half its own
+  body height, it vanished: the take's last 4 s showed the empty altar the figure had stood at. Give such a subject a
+  larger share of the frame, a larger move, or its own reference.
+- **The proxy pins position, speed, timing and spatial relations — not a pose that breaks common sense.** A figure
+  walking backwards in the white model walked forwards in the render: an impossible pose is corrected, not obeyed.
+- **The box's colour bleeds into the render.** A blue crowd of boxes came back as a crowd in blue masks. A proxy stays
+  NEUTRAL grey; objects are told apart in the table and the labels, never by colour on the render (ours has held: no grey
+  leaked from a clip or a still under the role lines, 2026-09-10).
+- A 24 fps render against a 30 fps white model cut within one frame of the proxy's cut points.
+
 ## Hygiene
 
 - The sidecar's `scene_sha256` is the fingerprint the gate diffs: a clip rendered from an older scene than

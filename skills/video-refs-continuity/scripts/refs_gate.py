@@ -34,13 +34,21 @@ acceptance note's job (a detector that fails confidently is worse than none).
 LOOK: when the rules list look_plates, light or grade language in the prose with no look plate cited FAILS (--prose LOOK
 keeps a prose-only light on purpose). COMPETING: a cited reference no matched rule depends on is a WARN — a reference
 the prompt does not need competes with the ones it does.
+TEXT: every accepted start image and reference shows its TEXT READ — `--accept NAME --text none`, or `--text "intended:
+<the string>"` for lettering the shot must carry. A watermark, badge, price banner or caption baked into a frame is
+animated into every seed, so a frame carrying one is never accepted; a missing read is a WARN, a FAIL under
+require_text_read.
+CAST: the rules' `cast` map names each recurring member's identity references. A cited one whose member has no stress
+lock (scripts/cast_stress.py: 10 of 10 stills across angles, sizes, the scene light and every two-shot) is a WARN, a
+FAIL under require_cast_lock; a lock whose references changed since it was taken reads as no lock.
 
   refs_gate.py --prompt <file> --refs A,B,C [--target hf|kie|monid|treg] [--start-image NAME] [--births R,R]
                [--prose X,Y] [--fresh-scene] [--record NAME]            → table + REFS-GATE PASS|FAIL, exit 0|1
   refs_gate.py --register NAME --file <path>                            → bind a reference name to its file (sha256, size)
   refs_gate.py --import NAME --file <path> --provenance "<who, when, how>" → a CLIENT-SUPPLIED asset, a lineage root of its own
   refs_gate.py --record NAME --derived-from SRC [--adds ROLE,ROLE] [--file <path>]  → ledger record for a keeper crop
-  refs_gate.py --accept NAME --note "<the rows zoom-checked, the role named>" [--file <path>] → a reference may feed a gen after this
+  refs_gate.py --accept NAME --note "<the rows zoom-checked, the role named>" [--file <path>] [--text none|"intended: <string>"]
+                                                                        → a reference may feed a gen after this
   refs_gate.py --selftest
 """
 import argparse, hashlib, json, os, re, subprocess, sys, tempfile, time
@@ -106,6 +114,9 @@ class Gate:
         self.look_plates = r.get('look_plates')              # None = the look gate is off, and a WARN row says so
         self.look_re = re.compile(r.get('look_language', DEFAULT_LOOK), re.I)
         self.min_side = int(r.get('min_side', 256))
+        self.require_text = bool(r.get('require_text_read', False))
+        self.cast = r.get('cast', {})                        # {MEMBER: [identity reference names]}
+        self.require_cast_lock = bool(r.get('require_cast_lock', False))
 
     # --- storage -------------------------------------------------------------------------------
     def uploaded(self, name, target):
@@ -241,6 +252,28 @@ class Gate:
             return [(f'{label} content', 'FAIL', f"{rec['file']} is {dims[0]}x{dims[1]} — under {self.min_side} px on its short side, too small to carry a reference")], 1
         return [(f'{label} content', 'ok', f"{rec['file']} {dims[0]}x{dims[1]} · sha256 {rec['sha256'][:10]}… unchanged")], 0
 
+    def text_read(self, name, label):
+        """the text an accepted frame carries — none, or text the shot intends. Unwanted text is never accepted."""
+        rec = self.latest_record(name) or {}
+        if not rec.get('accepted'):
+            return [], 0                                      # the acceptance row already speaks for it
+        t = rec.get('text_read')
+        if t:
+            return [(f'{label} text', 'ok', t)], 0
+        lvl = 'FAIL' if self.require_text else 'WARN'
+        return [(f'{label} text', lvl, f'no text read recorded — a watermark, badge, price banner or caption baked into a frame is animated '
+                 f'into every seed; read it at zoom, then --accept {name} --text none (or --text "intended: <the string it must carry>")')], int(lvl == 'FAIL')
+
+    def cast_lock(self, member, names):
+        """a recurring member's stress lock (cast_stress.py), void when an identity reference changed after it was taken"""
+        lock = self.latest_record('STRESS:' + member) or {}
+        if not lock.get('stress_locked'):
+            return False, 'not stress-locked'
+        moved = [n for n, h in (lock.get('refs') or {}).items() if (self.latest_record(n) or {}).get('sha256') != h]
+        if moved:
+            return False, f"the lock is void — {', '.join(moved)} changed since it was taken"
+        return True, f"{lock.get('score', '?')} locked {lock.get('ts', '?')} · {lock.get('matrix', '')}"
+
     # --- the check --------------------------------------------------------------------------------
     def check(self, prompt_text, refs, target='hf', start_image=None, births=(), prose=(), spot=None, fresh=False):
         births, prose = set(births), set(prose)
@@ -265,6 +298,7 @@ class Gate:
                 inherited = set(rec.get('roles_satisfied', []))
                 rows.append(('START IMAGE ' + start_image, 'ok',
                              f"record {rec.get('ts', '?')} ACCEPTED ({rec.get('note', '')}) → roles {', '.join(sorted(inherited)) or '-'}"))
+                trows, tfail = self.text_read(start_image, '  start image'); rows += trows; fail += tfail
                 chain, rooted = self.lineage(start_image)
                 arrow = ' ← '.join(chain)
                 if rooted:
@@ -291,6 +325,18 @@ class Gate:
             if not (rec and rec.get('accepted')):
                 lvl = 'FAIL' if self.require_accept else 'WARN'
                 rows.append((f'ref {r} accepted', lvl, f'not accepted — zoom-check it for the role it plays, then --accept {r} --note "<the rows checked>"')); fail += int(lvl == 'FAIL')
+            trows, tfail = self.text_read(r, 'ref ' + r); rows += trows; fail += tfail
+        for member, names in sorted(self.cast.items()):
+            if not any(n in refs or n == start_image for n in names):
+                continue
+            locked, why = self.cast_lock(member, names)
+            if locked:
+                rows.append((f'cast {member} stress lock', 'ok', why))
+            else:
+                lvl = 'FAIL' if self.require_cast_lock else 'WARN'
+                rows.append((f'cast {member} stress lock', lvl, f'{why} — a new cast member\'s first video spend waits for 10 of 10 stills across '
+                             f'angles, shot sizes, the scene light and a two-shot beside every co-star: cast_stress.py plan --cast {member}'))
+                fail += int(lvl == 'FAIL')
         roles_satisfied = set(inherited) | births
         ruled_caps = set()
         for rule in self.rules:
@@ -399,6 +445,25 @@ def selftest():
         ok, rows, _ = g.check(P, ['VISITOR-ref']); cases.append(('light in the prose with no look plate FAILS', not ok and any(r[0] == 'look' and r[1] == 'FAIL' for r in rows)))
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm', 'SPARE-ref']); cases.append(('a reference nothing depends on WARNs (COMPETING / UNRULED), still PASSES', ok and any(r[0] == 'ref SPARE-ref' and r[1] == 'WARN' for r in rows)))
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm'], start_image='CLIENT-photo'); cases.append(('a client-supplied start image roots the lineage', ok and any('client-supplied' in r[2] for r in rows)))
+        # --- the text read and the cast stress lock ---
+        cases.append(('an accepted reference with no text read WARNs, still PASSES', ok and any(r[0] == 'ref VISITOR-ref text' and r[1] == 'WARN' for r in rows)))
+        rules = json.load(open(os.path.join(d, 'prompts', 'refs-required.json')))
+        rules.update({'require_text_read': True, 'cast': {'VISITOR': ['VISITOR-ref']}, 'require_cast_lock': True})
+        json.dump(rules, open(os.path.join(d, 'prompts', 'strict.json'), 'w'))
+        gs = Gate(d, os.path.join(d, 'prompts', 'strict.json'))
+        ok, rows, _ = gs.check(P, ['VISITOR-ref', 'LOOK-warm'])
+        cases.append(('require_text_read: a missing text read FAILS', not ok and any(r[0] == 'ref VISITOR-ref text' and r[1] == 'FAIL' for r in rows)))
+        cases.append(('require_cast_lock: a cited member with no lock FAILS', any(r[0] == 'cast VISITOR stress lock' and r[1] == 'FAIL' for r in rows)))
+        for n in ('VISITOR-ref', 'LOOK-warm'):
+            rec = gs.latest_record(n); rec['text_read'] = 'none'; gs.append(rec)
+        gs.append({'asset': 'STRESS:VISITOR', 'stress_locked': True, 'score': '10/10', 'matrix': 'stress/VISITOR/matrix.json',
+                   'refs': {'VISITOR-ref': gs.latest_record('VISITOR-ref')['sha256']}, 'ts': 'selftest'})
+        ok, rows, _ = gs.check(P, ['VISITOR-ref', 'LOOK-warm'])
+        cases.append(('text read "none" and a lock on the unchanged reference → PASS', ok and any(r[0] == 'cast VISITOR stress lock' and r[1] == 'ok' for r in rows)))
+        rec = gs.latest_record('VISITOR-ref'); rec['sha256'] = 'f' * 64; gs.append(rec)
+        ok, rows, _ = gs.check(P, ['VISITOR-ref', 'LOOK-warm'])
+        cases.append(('an identity reference changed after the lock voids it', not ok and any(r[0] == 'cast VISITOR stress lock' and 'void' in r[2] for r in rows)))
+        rec = gs.latest_record('VISITOR-ref'); rec['sha256'] = sha256(os.path.join(d, 'refs', 'VISITOR-ref.png')); gs.append(rec)
         open(os.path.join(d, 'refs', 'BROKEN-ref.png'), 'wb').write(b'not an image')
         rec = g.latest_record('BROKEN-ref'); rec['sha256'] = sha256(os.path.join(d, 'refs', 'BROKEN-ref.png')); g.append(rec)
         ok, rows, _ = g.check(P, ['VISITOR-ref', 'LOOK-warm', 'BROKEN-ref']); cases.append(('an undecodable registered file FAILS', not ok and any('does not decode' in r[2] for r in rows)))
@@ -469,6 +534,7 @@ def main():
     ap.add_argument('--provenance', help='who supplied an imported asset, when, and how')
     ap.add_argument('--accept', help='mark a recorded reference ACCEPTED')
     ap.add_argument('--note', default='accepted', help='what was zoom-checked (with --accept)')
+    ap.add_argument('--text', help='with --accept: the text the frame carries — none, or "intended: <the string it must carry>"')
     ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
     if a.selftest:
@@ -483,7 +549,7 @@ def main():
         facts = g.file_facts(a.file); prev = g.latest_record(name) or {}
         j = dict(prev); j.update({'asset': name, **facts, 'ts': now})
         if prev.get('sha256') and prev['sha256'] != facts['sha256']:
-            j.pop('accepted', None); j['note'] = f"re-registered with new content (was {prev['sha256'][:10]}…) — accept it again"
+            j.pop('accepted', None); j.pop('text_read', None); j['note'] = f"re-registered with new content (was {prev['sha256'][:10]}…) — accept it again"
         if a.import_:
             j.update({'client_supplied': True, 'provenance': a.provenance})
         g.append(j); print(f"REFS-GATE {'IMPORTED (client-supplied)' if a.import_ else 'REGISTERED'} {name} → {facts['file']} {facts['dims'][0]}x{facts['dims'][1]} sha256 {facts['sha256'][:10]}…"); return
@@ -496,7 +562,14 @@ def main():
             facts = g.file_facts(a.file)
             if rec.get('sha256') and rec['sha256'] != facts['sha256']:
                 print(f"REFS-GATE: {a.accept} content differs from its registration — accepting the file checked now")
+                j.pop('text_read', None)                     # a read of other bytes is no read of these
             j.update(facts)
+        if a.text is not None:
+            t = a.text.strip()
+            if not (t == 'none' or t.lower().startswith('intended:')):
+                sys.exit(f'REFS-GATE: --text is "none" or "intended: <string>" — a frame carrying unwanted text ({t!r}) is not '
+                         f'accepted: edit it out on the clean plate, then accept the edit')
+            j['text_read'] = t
         if g.require_files and not j.get('file'):
             sys.exit(f'REFS-GATE: {a.accept} has no registered file — accept the file you checked: --accept {a.accept} --file <path> --note "…"')
         j.update({'accepted': True, 'note': a.note, 'ts': now})

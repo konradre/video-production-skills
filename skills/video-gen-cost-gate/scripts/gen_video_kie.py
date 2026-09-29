@@ -275,6 +275,11 @@ def main():
                   for s in range(a.seeds)]
     except ValueError as e:
         sys.exit(f'refused before any call: {e}')
+    # what the call SENDS, by name — the receipt's half of the attachment proof (video-take-review attach_proof.py)
+    sent = [{'name': r, 'role': 'image', 'url': url_of(r)} for r in refs] + \
+           [{'name': n, 'role': role, 'url': url_of(n)} for n, role in ((a.start_image, 'first_frame'), (a.end_image, 'last_frame')) if n] + \
+           [{'name': None, 'role': 'audio_id', 'id': x} for x in (audio_ids or [])] + \
+           [{'name': None, 'role': 'character_id', 'id': x} for x in (character_ids or [])]
 
     each = price(a.resolution, a.duration)
     fal_each = FAL_RATE.get(a.resolution, 0) * a.duration
@@ -337,7 +342,7 @@ def main():
         R.append({'name': name, 'task_id': task, 'model': mdl, 'mode': a.mode, 'duration': a.duration,
                   'resolution': a.resolution, 'ratio': a.ratio, 'seed': inp.get('seed'),
                   'estimate_usd': each, 'estimate_credits': round(each / CREDIT_USD),
-                  'created': time.strftime('%Y-%m-%dT%H:%M:%S')})
+                  'created': time.strftime('%Y-%m-%dT%H:%M:%S'), 'inputs': sent})
         # the ledger record BEFORE polling: a hard kill still leaves a recoverable task id
         with open(rp, 'w', encoding='utf-8') as f:
             json.dump(R, f, indent=1)

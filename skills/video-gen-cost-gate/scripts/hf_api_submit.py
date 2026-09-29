@@ -296,6 +296,13 @@ def main():
             body['video_urls'] = [url_of(r) for r in vrefs]
         if auds:
             body['audio_urls'] = [url_of(r) for r in auds]
+    # what the call SENDS, by name — the receipt's half of the attachment proof (video-take-review attach_proof.py)
+    sent = [{'name': n, 'role': role, 'url': body[k]} for k, n, role in
+            (('image_url', a.start_image, 'start_image'), ('end_image_url', a.end_image, 'end_image'),
+             ('video_url', a.source, 'source_video')) if k in body]
+    sent += [{'name': n, 'role': role, 'url': u} for k, names, role in
+             (('image_urls', refs, 'image'), ('video_urls', vrefs, 'video'), ('audio_urls', auds, 'audio'))
+             for n, u in zip(names, body.get(k, []))]
 
     if not a.go:
         shown = dict(body, prompt=text[:120] + ' …')
@@ -340,7 +347,7 @@ def main():
                'tier': Q.get('tier'), 'est_tokens': Q.get('tokens'),
                'estimate_usd': Q['usd_each'], 'estimate_usd_list': Q['usd_each_list'],
                'estimate_credits': round(Q['usd_each'] / hf.CREDIT_USD, 4),
-               'submitted': time.strftime('%Y-%m-%dT%H:%M:%S%z')}
+               'submitted': time.strftime('%Y-%m-%dT%H:%M:%S%z'), 'inputs': sent}
         R.append(rec)
         # Receipt and WALLET line BEFORE polling: billing happens at acceptance, and the wallet has no
         # balance endpoint — an unrecorded spend is not merely untracked, it is unknowable.

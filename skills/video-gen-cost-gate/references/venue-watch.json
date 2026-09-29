@@ -1,0 +1,19 @@
+{
+ "_doc": "Watch list for scripts/venue_drift.py: each target is a FREE read of one venue's own machine-readable contract. 'keep' (json) or 'between' (text) selects the load-bearing part — inputs, caps, enums, prices — and leaves live latency and success counts out, so only a contract change reads as drift. 'venues' names the VENUES.md row to reconcile on a DRIFT. kie and the Higgsfield API publish no machine-readable contract we read; their rows are checked by the first receipt after a change.",
+ "targets": [
+  {"name": "monid-seedance-2.5", "venues": "VENUES.md § monid (Seedance 2.5, people-free PAYG)",
+   "cmd": ["monid", "inspect", "-p", "bytedance", "-e", "/v1/video/seedance-2.5", "-j"], "format": "json", "keep": ["input", "price", "notes"]},
+  {"name": "treg-seedance-2.5-unrestricted", "venues": "VENUES.md § Video (treg, the real-likeness row)",
+   "cmd": ["treg", "catalog", "get", "reapi.video-gen.seedance-2-5.unrestricted"], "format": "text", "between": ["PARAMS", "RUN IT"]},
+  {"name": "fal-seedance-2.5-i2v", "venues": "VENUES.md § Video (fal Seedance 2.5)",
+   "url": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance/seedance-2.5/image-to-video", "format": "json", "keep": ["components"]},
+  {"name": "fal-seedance-2.5-r2v", "venues": "VENUES.md § Video (fal Seedance 2.5)",
+   "url": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=bytedance/seedance-2.5/reference-to-video", "format": "json", "keep": ["components"]},
+  {"name": "fal-h3-r2v", "venues": "VENUES.md § Video (fal MiniMax H3)",
+   "url": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=minimax/h3/reference-to-video", "format": "json", "keep": ["components"]},
+  {"name": "fal-omni-1.1-i2v", "venues": "VENUES.md § Creator-style talking heads (fal Omni, the fallback)",
+   "url": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google/gemini-omni-flash/v1.1/image-to-video", "format": "json", "keep": ["components"]},
+  {"name": "fal-omni-1.1-r2v", "venues": "VENUES.md § Creator-style talking heads (fal Omni, the fallback)",
+   "url": "https://fal.ai/api/openapi/queue/openapi.json?endpoint_id=google/gemini-omni-flash/v1.1/reference-to-video", "format": "json", "keep": ["components"]}
+ ]
+}

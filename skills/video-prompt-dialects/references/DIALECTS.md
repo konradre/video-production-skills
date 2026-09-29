@@ -139,7 +139,9 @@ rule for an audio-driven take (numeric speech windows, `video-gen-cost-gate` § 
   materials` — tested 2026-09-10 on Seedance 2.5: the line kept every grey material out; beside a start image
   the camera followed the clip ≈3° of 25°, with refs only ≈55 %, and an object the proxy lacked was removed
   from a take; the clause carries the arrival, the clip rides only complete and never beside a start image
-  (L26; `video-refs-continuity` SCENE-PROXY.md § proxy clip).
+  (L26; `video-refs-continuity` SCENE-PROXY.md § proxy clip). The proxy stays NEUTRAL grey — a box's colour bleeds
+  into the render — and a subject under ~10 % of the frame height moving less than half a body height is dropped; an
+  impossible pose is corrected, not obeyed (SCENE-PROXY.md § What a proxy cannot pin — another author's measurements).
 - **Emotion**: trigger event → immediate observable reaction → the few clearest cues (eyes, brows, mouth,
   breathing, hands) → the target expressed outwardly; a causal reveal shows the trigger BEFORE the reaction
   and keeps both in frame or links them by an eyeline.
@@ -172,6 +174,23 @@ rule for an audio-driven take (numeric speech windows, `video-gen-cost-gate` § 
   ("sweeps him clean off his feet and out of the right edge of the frame"; not hit/strike/crush/knocked out).
 - **Native audio** (2.5 on Higgsfield): the take's bangs, clangs and knocks ride in it — name them in `< >` and
   keep `generate_audio` on; 2.0-era runs returned silence on no-dialogue shots (per-version flag).
+- **From the official 2.0 guide — UNTESTED on 2.5** (BytePlus ModelArk's Seedance 2.0 series guide §§ 9–10, read through
+  `SlavaSexton/ComfyUI-Agent-Kit` `shared/seedance/reference.md`). The 2.5 guide claims unasked subtitles, "twins" and
+  extension continuity fixed or greatly improved, so each line is a lead to test on 2.5, never a rule:
+  - **4–5 references in total**, even where the cap is 50: one or two of the character (a facial close-up plus a full
+    body), one scene, one camera-movement video, one audio — the most precise one cited FIRST in the prompt. The full
+    allowance makes the model's feature priority ambiguous: style conflicts, blurred identities, drift from intent.
+  - **A face that drifts or swaps → a dedicated headshot** (head only, neutral expression, minimal background), cited
+    first: "facial features from image 1 (headshot), styling from image 2 (full body)". Never a multi-view or three-view
+    sheet — its angles read as different people (`video-refs-continuity` `split_sheet.py` crops one to singles).
+  - **"Twins"** → bind each person to their image in every mention ("Zhang San (image 1) throws … toward Li Si (image
+    2)") and a tail forbidding identical appearances; the guide says it cannot be eliminated.
+  - **Unasked subtitles** → say "subtitle-free", strip text from every reference first (`video-refs-continuity` § 3, the
+    text read), and prefer LANDSCAPE, where the guide reports subtitles significantly less often than in portrait — a
+    trade against a vertical spot, not a free fix.
+  - **An extension seam that jumps or rolls back** → the guide trims 6 frames off the end of the earlier clip and 1 off
+    the start of the next at every join, and still prefers ending a segment on a cut. **Not adopted:** `video-edit-edl`
+    takes the trim only after a measured test on our own `video_extension` joins (none on disk as of 2026-09-29).
 
 ## Seedance 2.0 fast (draft engine; fal; monid `bytedance /v1/video/seedance-2.0-fast` — priced but **NOT adopted**, see `video-gen-cost-gate/references/VENUES.md`)
 

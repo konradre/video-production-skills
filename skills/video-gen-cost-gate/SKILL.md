@@ -178,6 +178,14 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   `W × H × fps × seconds ÷ 1024` was short by exactly one frame, and only a measured run found it
   (`references/VENUES.md` § monid).
   The cap is read before a shot list splits any action (`video-production/references/PREPRODUCTION-CORE.md` § 2).
+- **A venue's contract is WATCHED, not re-read by luck.** `scripts/venue_drift.py` reads each watched venue's own
+  machine-readable contract — free reads only: `monid inspect`, `treg catalog get`, fal's public OpenAPI — keeps the
+  inputs, caps, enums and prices (never live latency), and compares a hash with the baseline VENUES.md was reconciled
+  against. Run it before the first batch of a session on any watched venue: a `DRIFT` prints the diff and the VENUES row
+  to reconcile, the row is fixed before any cost line quotes it, and only then `--accept` moves the baseline, so a change
+  never fires once and falls silent (`references/venue-watch.json`; baseline taken 2026-09-29 after the caps and prices
+  were checked against this table; kie and the Higgsfield API publish no contract we read — their first receipt is the
+  check). Pattern: `cclank/lanshu-awesome-ai-video-kit` `scripts/monitor_models.py`.
 
 ### Mode by what the shot must hold
 
@@ -220,6 +228,11 @@ the ones that bind every ask:
   read for identity, wardrobe, setting and look; its path rides in the cost line, so the GO is given against a
   seen preview, never a description. A still costs cents; a wrong reference costs the whole batch (operator
   ruling 2026-09-13; COST-AND-GO.md § The reference dress rehearsal).
+- **A new cast member is stress-locked before the first video that shows them** — the rehearsal's once-per-member form:
+  at least ten stills across three angles, three shot sizes, every light they appear in and a two-shot beside every
+  co-star, 10 of 10 for a character (`video-refs-continuity` § 3, `scripts/cast_stress.py`). Its matrix is its own cost
+  line and GO: `N stills × $0.05 at 2K on kie`; the gate's `cast stress lock`
+  row rides in every later video's ask.
 
 - **Free before billed.** Whisper the existing takes for the words, RMS-scan for the onset, cut a
   keeper frame as a reference, re-run an edit — search the disk before a regen. Order of spend: disk →
@@ -293,7 +306,9 @@ Dry run by default; `--go` spends. Each path runs the refs gate first and holds 
 explicit GO overrides, never a silent or unoverridable stop (§ 0) — prints the
 cost, parses the venue's reply shape-safely (Higgsfield `generate create --json` returns a bare LIST of
 job ids), writes the raw reply to `receipts/raw/`, appends a ledger record per seed BEFORE polling,
-and detaches the poller. Reference names resolve through `receipts/<NAME>-upload-id.txt`
+and detaches the poller. Each seed's receipt record carries `inputs` — every reference the call SENT, by name, with
+the url or upload id it went as — so `video-take-review` `attach_proof.py` can prove after the call that nothing gated was
+left behind (fal's path writes no gate record, so its takes read UNPROVEN there). Reference names resolve through `receipts/<NAME>-upload-id.txt`
 (`scripts/hf_upload.py`), `refs-urls.json` (`scripts/kie_upload.py`, which MERGES — an overwrite once
 dropped eleven live URLs), `monid-urls.json` (`scripts/monid_upload.py`, which merges the same way) or
 `treg-urls.json` (`scripts/treg_host.py`, which merges and re-hosts); a

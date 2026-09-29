@@ -51,8 +51,9 @@ from this table verbatim** (the count read on the zoom, never a number from memo
 floor; relative scale; ~20 s on a 24 GB GPU, $0; `scripts/comfy_ready.py` first — it says whether the server
 and its two providers answer, and `scripts/comfy_up.sh` starts one from the env; any OTHER graph queued on that server
 goes through `scripts/comfy_preflight.py <graph.json> --expect video|image --host` first — it refuses a graph that
-would finish and save nothing (a preview-only output, `save_output` false, an unfed save node, the wrong kind) or that
-names a model file the server does not hold, and lists the custom node packs the graph needs; an unattended caller
+would finish and save nothing (a preview-only output, `save_output` false, an unfed save node, the wrong kind), that
+names a model file the server does not hold, or that a template conversion broke (an editor-only Reroute or note left
+in, a dotted dynamic key such as `resize_type.width` flattened), and lists the custom node packs the graph needs; an unattended caller
 sets `COMFY_START_POLICY=connect` or `ask` so `comfy_up.sh` never starts a server nobody asked for), and `scripts/scene_proxy.py <scene.json> <out> "<camera>"`
 prints, for ANY camera you author, where every object sits — left/right %, depth rank, in frame, occluded,
 out of frame — and renders a grey-box + depth frame of that angle. That table IS the *Room geometry per cut*
@@ -163,7 +164,7 @@ the picture's mouth as the resting state and a closed one gives a lazy mouth (co
 and the ledger (what has happened is visible; what the script has not yet done is absent).
 
 ```
-python3 scripts/refs_gate.py --root <project> --accept <NAME> --note "<every row checked>"
+python3 scripts/refs_gate.py --root <project> --accept <NAME> --note "<every row checked>" --text none
 ```
 
 A defect is fixed at the source: a surgical edit (a count, a ghost, one limb) on the CLEAN plate with the
@@ -187,8 +188,39 @@ the note names that role's read (a face for an identity ref, no subject in a loo
 setting ref). The gate re-hashes the file on every run, so a reference edited after acceptance fails until it is
 checked again.
 
-**Done when:** the acceptance note names every row checked, and the gate shows the still `ACCEPTED` with a
-`lineage → keeper` chain (or `--fresh-scene` for a scene with no predecessor, stated in the GO ask).
+**Read the TEXT in every frame you accept.** A watermark, a badge, a price banner, a caption or a line of interface
+baked into a start image or a reference is animated into every seed, and a model reads lettering in a reference as an
+instruction to letter the frame (the official Seedance 2.0 guide's fix for unasked subtitles starts with removing text
+from the references). Accept with `--text none`, or with `--text "intended: <the string>"` for lettering the shot must
+carry (a garment's print, a product label); a frame carrying unwanted text is not accepted — edit it out on the clean
+plate, then accept the edit. The gate prints the text read for the start image and every cited reference: a missing read
+WARNs, and FAILs when the rules set `require_text_read`.
+
+**A new cast member is stress-locked before the first video that shows them.** The dress rehearsal (`video-gen-cost-gate`
+COST-AND-GO § The reference dress rehearsal) checks a reference SET for one batch; the stress lock checks one MEMBER once,
+under the conditions that break an identity: three angles, three shot sizes, every light context they appear in (its look
+plate), and a two-shot beside every co-star they share a frame with — at least ten cheap stills from the member's own
+identity references. Each prompt pastes the canonical descriptor verbatim (`stress/<NAME>/descriptor.txt`, never
+shortened) and holds a static composition, no action; each still is read against the references for face, hair, age
+cues, build, wardrobe and distinctive marks, and a two-shot for BOTH identities. A character locks at 10 of 10 — one
+drift is a miss, never averaged away by the good ones; a location or a prop is shown as its matrix and locks on the
+operator's explicit pass. On a miss the member stays draft: revise the reference set (a new identity still, a dedicated
+headshot) and rerun the affected rows, or move the scene to a later block. Stills cost, so each member's matrix is its
+own cost line and GO.
+
+```
+python3 scripts/cast_stress.py plan   --root <project> --cast W1 --refs S01-W1-ref --costar LEAD=S01-LEAD-ref --light "lamp=LOOK-interior-lamp"
+python3 scripts/cast_stress.py record --root <project> --cast W1 --row T03 --verdict pass|miss --note "<what was read>"
+python3 scripts/cast_stress.py lock   --root <project> --cast W1          # 10 of 10, or the operator's pass for a place or prop
+```
+
+The plan writes its prompts into `gen_stills.py`'s own layout and generates nothing; the lock lands in the gate's ledger
+with each identity reference's sha256, the rules' `cast` map tells the gate which references belong to whom, and
+`require_cast_lock` turns an unlocked member's cited reference from a WARN into a FAIL. A reference changed after the
+lock voids it. Pattern: `machina-exm/film-studio-skills` `skills/stress-test/SKILL.md`.
+
+**Done when:** the acceptance note names every row checked and the frame's text read, and the gate shows the still
+`ACCEPTED` with a `lineage → keeper` chain (or `--fresh-scene` for a scene with no predecessor, stated in the GO ask).
 
 ## 4. Run the gate before the GO — code, not memory
 
@@ -338,6 +370,13 @@ be continued by a gen: write the face into the last frame, or continue from the 
 - `comfy_preflight.py` FAIL → the graph is fixed and re-checked, never queued as it stands; exit 2 (the server did not
   answer) is no schema check at all, never a pass. A PASS means the graph will write a file — the file is still read
   off its frames before anyone calls it good.
+- A graph converted from an official template stays the template: only the prompt, the seed and a size the job asks for
+  change. Never strip or "simplify" nodes — a path the job does not use stays wired and bypassed — resolve a Reroute to
+  its source `[node id, output slot]` (the slot matters: a checkpoint loader's VAE is slot 2, not 0), and keep every
+  dotted key as the template writes it. A server rejection names the key it wants in
+  `node_errors.<id>.errors[].extra_info.input_name`: patch that one node with the key LITERALLY and resubmit — never
+  regenerate the graph from the template, which brings back every bug already fixed (`NousResearch/hermes-agent`
+  `optional-skills/creative/comfyui` v5.1.0, `references/template-integrity.md`).
 - `scene_blockout.py` fails closed — server down, node or checkpoint missing, job failed — with the route's
   own reason; the GO ask then says "no scene proxy for this shot" and the row is read off the frame. Never
   write geometry from memory and call it computed.

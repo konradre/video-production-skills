@@ -17,6 +17,10 @@ no output of the kind the job needs (a video job that only saves stills), before
              a missing file FAILS here instead of an hour into a queue. Without either, the files are listed unchecked
   packs      the custom node pack behind each class, read from `/object_info`'s `python_module` — what a fresh server
              must install for this graph
+  template   a graph converted from an official template keeps the template's own shape: an editor-only node (Reroute,
+             Note, MarkdownNote, PrimitiveNode) left in the API graph FAILS; a dynamic input keeps its DOTTED keys
+             (`values.a` for an autogrow list, `resize_type.width` under a dynamic combo's selected option), so a
+             required dynamic input is met by its dotted keys and a flattened one (`width`) FAILS as missing
 
   python3 scripts/comfy_preflight.py <graph.json> [--expect video|image|audio|any] [--host [URL] | --object-info FILE] [--json]
   python3 scripts/comfy_preflight.py --selftest
@@ -24,7 +28,9 @@ no output of the kind the job needs (a video job that only saves stills), before
 Exit 0 PASS, 1 FAIL, 2 unusable (unreadable graph, schema asked for and unreachable). Sentinel PREFLIGHT PASS|FAIL.
 A PASS says the graph will write a file. It does not say the file will look right: that is read off the frames.
 Pattern: piorunkulaga174/dsh-comfyui scripts/comfyui_probe.py (preflight, output_kind), plus the save_output check;
-the model-file and pack checks from MieMieeeee/comfyui-agent-skill scripts/comfyui/preflight.py.
+the model-file and pack checks from MieMieeeee/comfyui-agent-skill scripts/comfyui/preflight.py; the template checks from
+NousResearch/hermes-agent optional-skills/creative/comfyui/references/template-integrity.md (purzbeats, v5.1.0), confirmed
+against ComfyUI's own comfy_api/latest/_io.py (dynamic inputs expand to `<parent>.<child>` ids).
 """
 import argparse, json, os, sys, threading, urllib.error, urllib.parse, urllib.request
 
@@ -32,6 +38,13 @@ PREVIEW = ('preview', 'showtext', 'display', 'show_text')
 SAVE = ('save', 'export', 'combine')
 H3 = {'MiniMaxH3ImageToVideo', 'MiniMaxH3ReferenceToVideo'}
 MODEL_EXT = ('.safetensors', '.ckpt', '.pt', '.pth', '.bin', '.gguf', '.sft', '.onnx')
+EDITOR_ONLY = {'Reroute', 'Note', 'MarkdownNote', 'PrimitiveNode'}   # frontend nodes: the server has no class for them
+AUTOGROW, DYNCOMBO = 'COMFY_AUTOGROW_V3', 'COMFY_DYNAMICCOMBO_V3'
+
+
+def present(k, inp):
+    """A required input is set by its own key or, for a dynamic input, by its dotted children (`values.a`)."""
+    return k in inp or any(x.startswith(k + '.') for x in inp)
 
 
 def norm(v):
@@ -61,6 +74,9 @@ def preflight(graph, expect='any', schema=None, models=None):
         if not isinstance(node, dict) or not isinstance(node.get('class_type'), str) or not isinstance(node.get('inputs'), dict):
             errors.append((nid, 'bad-node', 'needs class_type and an inputs object')); continue
         cls, inp = node['class_type'], node['inputs']; has_h3 |= cls in H3
+        if cls in EDITOR_ONLY:
+            errors.append((nid, 'editor-only', f'{cls} is an editor-only node the server has no class for: point each input that '
+                           f'reads it at its source [node id, output slot] (a Reroute), or drop it (a note)')); continue
         for k, v in inp.items():
             if is_link(v, ids) and str(v[0]) not in ids: errors.append((nid, 'dangling-link', f'{k} → node {v[0]}, which the graph does not have'))
         sch = schema.get(cls) if schema is not None else None
@@ -72,7 +88,11 @@ def preflight(graph, expect='any', schema=None, models=None):
             if pm.startswith('custom_nodes.'): packs.setdefault(pm.split('.')[1], set()).add(cls)
             spec_in = sch.get('input', {}) or {}
             for k, spec in (spec_in.get('required') or {}).items():
-                if k not in inp: errors.append((nid, 'missing-input', f'{cls}.{k} is required'))
+                dyn = spec[0] if isinstance(spec, list) and spec and isinstance(spec[0], str) else None
+                if dyn == DYNCOMBO:
+                    errors += dyncombo(nid, cls, k, spec, inp, warnings)
+                elif not present(k, inp):
+                    errors.append((nid, 'missing-input', f'{cls}.{k} is required' + (f' (an autogrow list: keys {k}.<name>)' if dyn == AUTOGROW else '')))
             for k, spec in list((spec_in.get('required') or {}).items()) + list((spec_in.get('optional') or {}).items()):
                 if k not in inp or not (isinstance(spec, list) and spec and isinstance(spec[0], list)): continue
                 combo_keys.add(k)
@@ -99,6 +119,25 @@ def preflight(graph, expect='any', schema=None, models=None):
         errors.append(('', 'wrong-output-kind', f'the job needs a {need} output; the graph saves only {sorted({k for _, _, k in outputs})}'))
     return {'ok': not errors, 'errors': errors, 'warnings': warnings, 'outputs': outputs, 'expect': need,
             'packs': {k: sorted(v) for k, v in packs.items()}, 'unchecked': unchecked}
+
+
+def dyncombo(nid, cls, k, spec, inp, warnings):
+    """A dynamic combo: the parent key names the option, and that option's own inputs ride as `<k>.<input>`."""
+    if k not in inp:
+        return [(nid, 'missing-input', f'{cls}.{k} is required (a dynamic combo: its value selects the option whose inputs ride as {k}.<input>)')]
+    opts = (spec[1] or {}).get('options') if len(spec) > 1 and isinstance(spec[1], dict) else None
+    if not isinstance(opts, list):
+        return []
+    sel = next((o for o in opts if isinstance(o, dict) and o.get('key') == inp[k]), None)
+    if sel is None:
+        warnings.append((nid, 'combo-value', f'{cls}.{k}={inp[k]!r} is not one of its options {[o.get("key") for o in opts if isinstance(o, dict)]}'))
+        return []
+    out = []
+    for sub in ((sel.get('inputs') or {}).get('required') or {}):
+        if not present(f'{k}.{sub}', inp):
+            flat = ' — the key is flattened: keep the dotted form the template writes' if sub in inp else ''
+            out.append((nid, 'missing-input', f'{cls}.{k}.{sub} is required by option {inp[k]!r}{flat}'))
+    return out
 
 
 def fetch_schema(host):
@@ -159,6 +198,7 @@ def selftest():
         ('a required input missing → FAIL missing-input', g(**{'9': {'class_type': 'SaveImage', 'inputs': {'images': ['3', 0]}}}), 'image', S, False, 'missing-input'),
         ('a save node with no input link → FAIL unfed-output', g(**{'9': {'class_type': 'SaveImage', 'inputs': {'images': 'x', 'filename_prefix': 'x'}}}), 'image', None, False, 'unfed-output'),
         ('a UI export → FAIL ui-format', {'nodes': [], 'links': []}, 'any', None, False, 'ui-format'),
+        ('a Reroute left in an API graph → FAIL editor-only', g(**save, **{'6': {'class_type': 'Reroute', 'inputs': {'': ['3', 0]}}}), 'image', None, False, 'editor-only'),
     ]
     ok = True
     for label, graph, exp, sch, want, code in cases:
@@ -184,6 +224,22 @@ def selftest():
     case('a STRING model input, no /models listing → PASS, listed unchecked', r, True); ok &= len(r['unchecked']) == 1
     case('… with a listing that holds it → PASS', preflight(g(**save, **cl('wan/x.safetensors')), 'image', S2, {'diffusion_models/wan/x.safetensors', 'wan/x.safetensors'}), True)
     case('… with a listing that lacks it → FAIL missing-model', preflight(g(**save, **cl('wan/x.safetensors')), 'image', S2, {'other.safetensors'}), False, 'missing-model')
+    # the template checks: dynamic inputs keep their dotted keys (ComfyUI comfy_api/latest/_io.py finalize_prefix)
+    S3 = dict(S)
+    S3['ComfyMathExpression'] = {'input': {'required': {'expression': ['STRING'], 'values': [AUTOGROW, {'template': {}, 'min': 1}]}}, 'output_node': False}
+    S3['ResizeImageMaskNode'] = {'input': {'required': {'input': ['IMAGE'], 'resize_type': [DYNCOMBO, {'options': [
+        {'key': 'scale dimensions', 'inputs': {'required': {'width': ['INT'], 'height': ['INT'], 'crop': [['center', 'disabled']]}}},
+        {'key': 'scale by', 'inputs': {'required': {'multiplier': ['FLOAT']}}}]}]}}, 'output_node': False}
+    mx = lambda inputs: {'7': {'class_type': 'ComfyMathExpression', 'inputs': inputs}}
+    rz = lambda inputs: {'8': {'class_type': 'ResizeImageMaskNode', 'inputs': dict({'input': ['3', 0]}, **inputs)}}
+    case('an autogrow list set by its dotted keys (values.a) → PASS', preflight(g(**save, **mx({'expression': 'a/2', 'values.a': ['2', 0]})), 'image', S3), True)
+    case('an autogrow list with no entry at all → FAIL missing-input', preflight(g(**save, **mx({'expression': 'a/2'})), 'image', S3), False, 'missing-input')
+    case('a dynamic combo with its option and the dotted option inputs → PASS', preflight(g(**save, **rz({'resize_type': 'scale dimensions', 'resize_type.width': 1920, 'resize_type.height': 1088, 'resize_type.crop': 'center'})), 'image', S3), True)
+    r = preflight(g(**save, **rz({'resize_type': 'scale dimensions', 'width': 1920, 'height': 1088, 'crop': 'center'})), 'image', S3)
+    case('the same option with its keys flattened (width) → FAIL missing-input', r, False, 'missing-input'); ok &= any('flattened' in m for _, _, m in r['errors'])
+    w = preflight(g(**save, **rz({'resize_type': 'scale to fit', 'resize_type.width': 1})), 'image', S3)
+    good = w['ok'] and any(c == 'combo-value' for _, c, _ in w['warnings']); ok &= good
+    print(f"  {'ok ' if good else 'BAD'} a dynamic combo value outside its options → WARN, still PASS")
     pk = preflight(g(**{'9': {'class_type': 'VHS_VideoCombine', 'inputs': {'images': ['3', 0], 'save_output': True}}}), 'video', S2)['packs']
     good = pk == {'ComfyUI-VideoHelperSuite': ['VHS_VideoCombine']}; ok &= good
     print(f"  {'ok ' if good else 'BAD'} the custom node pack is read from python_module: {pk}")

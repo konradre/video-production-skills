@@ -197,6 +197,8 @@ def main():
     imgs += [(r, 'reference_image') for r in refs]
     for name, role in imgs:
         content.append({'type': 'image_url', 'image_url': {'url': url_of(name)}, 'role': role})
+    # what the call SENDS, by name — the receipt's half of the attachment proof (video-take-review attach_proof.py)
+    sent = [{'name': n, 'role': r, 'url': url_of(n)} for n, r in imgs]
     print('  ordinals (cite these EXACTLY in the prompt):')
     for i, (name, role) in enumerate(imgs, 1):
         print(f'    @Image{i} = {name}  ({role})')
@@ -235,7 +237,7 @@ def main():
         R.append({'name': f'{a.scene}-s{s}', 'run_id': rid, 'provider': a.provider,
                   'endpoint': a.endpoint, 'mode': a.mode, 'duration': dur,
                   'resolution': a.resolution, 'ratio': ratio, 'est_tokens': toks,
-                  'estimate_usd': round(est_each, 6)})
+                  'estimate_usd': round(est_each, 6), 'inputs': sent})
         print(f'{a.scene}-s{s} run {rid}  (BILLED at acceptance, est ${est_each:.4f})', flush=True)
         # the ledger record BEFORE polling — a hard kill still leaves a recoverable id
         rp = os.path.join(root, 'receipts', f'monid-runs-{key}.json')

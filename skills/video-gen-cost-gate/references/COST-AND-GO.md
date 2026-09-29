@@ -35,6 +35,8 @@ rehearsal still: startframes/S02-G4-rehearsal.png — identity, wardrobe, room a
 | refs present AND uploaded for this target; a start image with its own accepted record | a plate generated without the product sheet buys a round of wrong-shaped pieces |
 | every cited reference registered to its file, unchanged since acceptance, and accepted for the role it plays | a correctly named, uploaded reference showing the wrong person, garment or room passes a name check and burns the batch |
 | the reference dress rehearsal read — one still from the SAME set, its path in the ask (refs-only calls; batches over ~30 cr) | in reference-driven generation an absent or wrong reference does not degrade the shot, it invents a different one at full price |
+| every recurring member the shot shows is stress-locked — the gate's `cast … stress lock` row reads ok (`cast_stress.py`) | an identity that drifts under a new angle or light is found on a video seed at full price, not on a still at cents |
+| every accepted start image and reference carries its text read — `none`, or the string the shot intends | a watermark, a badge or a price banner baked into a reference is animated into every seed |
 | the generation is a whole continuity partition within the vendor's READ cap; its negatives scoped to its length | one continuous action split into separate generations paid three times and shipped two seams |
 | every noun and action traces to the script or the ledger; nothing invented | an invented character or beat costs several gens before it is caught |
 | the state at frame 0 = the previous shot's last state (nothing raining before the burst; no second bang after it) | a continuation that restarts the event is a rejected batch |
@@ -63,6 +65,15 @@ COMPETING references, an older plate or a stray look the shot does not depend on
 operator approves a spend against a seen still, not against a description. A rehearsal still is read and set aside;
 it becomes a start image only by passing the gate's acceptance for that role. The asymmetry behind the rule, from
 one rebuild: its stills cost $0.15 in all and its video 357.5 cr, one 20 s seed alone 50 cr.
+
+**The stress-test lock is the rehearsal's big brother for a new cast member.** One rehearsal still proves a reference
+set for one batch; a recurring member is proven once, before their first video, under the conditions that break an
+identity: three angles, three shot sizes, every light context they appear in, and a two-shot beside every co-star they
+share a frame with — ten stills at least, read against the references, and a character locks only at 10 of 10: one drift
+is a miss, never averaged away by the nine good ones. A location or a prop locks on the operator's pass over its matrix.
+The matrix is its own cost line (`scripts/cast_stress.py plan` prints it: $0.05 per still at 2K on kie) and its own GO; the lock then rides every later ask as the gate's `cast … stress
+lock` row, and a reference changed after the lock voids it (`video-refs-continuity` § 3; machina-exm/film-studio-skills
+`skills/stress-test/SKILL.md`).
 
 ## Budget-final rules
 
