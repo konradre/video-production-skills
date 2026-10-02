@@ -90,7 +90,7 @@ Both routes reach the same deliverable. The trade is money against wall-clock.
 
 ```
 Is this a one-off, or is the GPU free tonight?
-  YES → LOCAL (Topaz Video AI, unlimited local rendering under the subscription) — $0
+  YES → LOCAL (Topaz Video AI, unlimited local rendering under the subscription) — USD 0
         Cost is hours. Benchmark before committing (step 3)
   NO — latency matters, or the GPU is claimed?
        → HOSTED (fal `topaz/upscale/video/generative`) — see references/EVIDENCE.md for rates

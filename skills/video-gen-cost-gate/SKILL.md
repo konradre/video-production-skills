@@ -42,10 +42,10 @@ number still produces a sentence; it never produces a stop.
 
 ```
 ❌ "480p is the house rule — I can't generate at 720p"
-✅ "480p is the chain; 720p is 2.25× the tokens (+$0.41 on this batch) and moves the face floor,
+✅ "480p is the chain; 720p is 2.25× the tokens (+USD 0.41 on this batch) and moves the face floor,
     the upscale tier and the review limits. I'd stay at 480p. 720p if you want it?"
 ❌ "That venue is fourth on price, so we use monid"
-✅ "monid is cheapest; the funded venue is 1.40× that, +$0.41 here. Which?"
+✅ "monid is cheapest; the funded venue is 1.40× that, +USD 0.41 here. Which?"
 ❌ Silently narrow a batch, a venue or a raster to the rule and report only the narrowed result
 ✅ Run what was asked; put the cheaper or safer alternative beside it with its number
 ```
@@ -75,22 +75,23 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   and a commercial talking head all route to Seedance 2.5 on the venues below; Omni's lower step price does not make it
   the default for any of them.
 - Video with people in the references → **treg `reapi.video-gen.seedance-2-5.unrestricted`**, the PAYG
-  people-capable route ($0.1186/s at 480p · $0.2668 at 720p · $0.462 at 1080p, PAYG, no plan behind it): `content_filter: false`
+  people-capable route (USD 0.1186/s at 480p · USD 0.2668 at 720p · 🔴 1080p SETTLES at USD 0.6428/s — the catalog's
+  0.462 is only the RESERVE, measured 2026-10-02 on four takes; quote 1080p at 0.643/s, PAYG, no plan behind it): `content_filter: false`
   carries the BytePlus licensed-asset escape, so it takes a **real person's likeness**, which every other
   row refuses. Its references are hosted by `treg host` and the call is **CLI-only** — the treg MCP exposes
   no upload tool. ⚠ **Higgsfield's subscription and its PAYG API are two venues with separate wallets** — price
   them apart (`references/VENUES.md` § Venue ranking). `seedance_2_5 --mode omni_reference` is the subscription
   route; the **API** carries **no 1080p, no Topaz, no GPT Image 2.5 and no lipsync**, so a move onto it has to name
-  the cover for each. `minimax_h3` at 2K runs the other way — **cheaper on the API at $0.0715/s** than on the plan. fal's Seedance refuses any
+  the cover for each. `minimax_h3` at 2K runs the other way — **cheaper on the API at USD 0.0715/s** than on the plan. fal's Seedance refuses any
   photoreal person in a reference (`content_policy_violation`, billed 0) — fal only for people-free
   shots. MiniMax H3 is 768p minimum and a different look.
 - **People-free Seedance with no plan to feed → monid `bytedance /v1/video/seedance-2.5`, the
   pay-as-you-go route.** Same model, same 480p house shape as the Higgsfield route, bought by the
-  second instead of by the month: **$10.7/1M tokens ⇒ $0.1039/s at 4 s → $0.1029/s at 30 s**, measured.
+  second instead of by the month: **USD 10.7/1M tokens ⇒ USD 0.1039/s at 4 s → USD 0.1029/s at 30 s**, measured.
   Rank by MARGINAL cost and prefer pay-as-you-go over plan lock-in at equal cost — a plan's true rate is
   its price ÷ the credits actually burned, and **a venue is NEVER ranked by its current balance** (a low
   wallet is a funding question; `references/VENUES.md` § Venue ranking). References ride free on monid's
-  own `sfs` store (`scripts/monid_upload.py`, $0.00), so "it needs a public URL" never routes work off
+  own `sfs` store (`scripts/monid_upload.py`, USD 0.00), so "it needs a public URL" never routes work off
   it. **The partition is the same one fal already forces, for a different reason:** real human faces are
   rejected UPSTREAM (BytePlus ModelArk) and monid exposes none of the licensed-asset escapes, so a
   photoreal person in a reference routes to treg's unrestricted row — the escape monid lacks — or to
@@ -99,15 +100,15 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   reference, delivered through a 1.5× scale**, on a venue that accepts one — never a post-generation lipsync pass,
   and never a prompt-voiced mouth (`references/VENUES.md` § The talking-head default, which supersedes both the
   earlier 1080p-native default and the Omni Flash 1.1 + `sync-lipsync/v3` default before it).
-  **On price the venue is treg for a real likeness ($0.2668/s) or monid for people-free ($0.2311/s); the
+  **On price the venue is treg for a real likeness (USD 0.2668/s) or monid for people-free (USD 0.2311/s); the
   Higgsfield API places fourth and carries no 1080p at all** — ⚠ **fourth is a premium to quote, not
   a prohibition: where the funds are allocated decides which venue is reachable** (`references/VENUES.md` § Price
   ranks the venues, funding decides which one is reachable). The audio drives the WORDS, not just the
   timbre: both proof takes spoke the script line verbatim. 🔴 **The words must be ABSENT from the prompt** — written
   dialogue beats reference audio and demotes it to timbre (`video-prompt-dialects` DIALECTS.md § Supplied-audio
   polarity). **The lipsync pass stays gone** — that is what the audio reference bought, and it survives the raster
-  change; what returns at 720p is a 1.5× lanczos to 1080×1920, a resample rather than a reconstruction, at $0 and no
-  face-shaped softening tax. 1080p stays reachable on treg at $0.462/s for a shot that earns it. Omni Flash 1.1 keeps
+  change; what returns at 720p is a 1.5× lanczos to 1080×1920, a resample rather than a reconstruction, at USD 0 and no
+  face-shaped softening tax. 1080p stays reachable on treg at USD 0.643/s settled for a shot that earns it. Omni Flash 1.1 keeps
   only the UGC talking heads with NO locked VO (it takes no audio input on any surface); a commercial talking head with
   no locked VO stays on Seedance 2.5 (since 2026-09-26).
 - **An EDIT or an EXTEND, and 2K MiniMax H3 → the Higgsfield API, on merit rather than price.** `video-edit` and
@@ -115,12 +116,12 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   by prompt phrasing — which misreads into a fresh r2v that succeeds and **bills in full with no error to catch** —
   and fal routes both through a `task` enum with the same failure shape. A wrong URL is a 404; a wrong phrasing is a
   silent full charge. Billed at the 0.6× tier, worth it only when `gen > 1.5 × in` (both durations bill). H3 at 2K
-  is $0.0715/s there, 45 % under fal. ⚠ The API has **no cost cap** (treg takes `X-Treg-Max-Cost`), returns **no
+  is USD 0.0715/s there, 45 % under fal. ⚠ The API has **no cost cap** (treg takes `X-Treg-Route-Max-Cost`, checked against the RESERVE, so a 1080p settle can pass it), returns **no
   estimate number** for Seedance, and its `video-extend` takes a `video_url`, **not the CLI's job id** — feed the
   keeper's own output URL back (outputs live ≥ 7 days; untested, one receipt settles it).
 - **A person or object swapped into an EXISTING clip → the Higgsfield API's Genjutsu** (`--model genjutsu --mode
   object-swap`, or `motion-transfer` to drive a reference with the clip's motion) — the one route that re-casts
-  footage we already hold. Priced per second of INPUT, rounded up ($0.318 @480p, list); the source is the gate's
+  footage we already hold. Priced per second of INPUT, rounded up (USD 0.318 @480p, list); the source is the gate's
   start image and its length is probed, never typed (`references/VENUES.md` § Video).
 - **A prompt for an audio-driven take carries the VO's own speech windows as numeric beats** — it fixes the ENDPOINT
   (end-of-line error 0.83 s → 0.06 s, measured) but not the interior: the model buys the ending by elongating one word.
@@ -131,7 +132,7 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   prompt or the model reads it as a plain r2v, generates a NEW video, succeeds, and bills in full with
   no error to catch (`video-prompt-dialects` DIALECTS.md § Seedance 2.5).
 - Stills → **GPT Image 2.5 is the default image model for every still, plate and reference, and kie is the
-  FIRST venue for image gens (house rule, 2026-09-10)**: kie `gpt-image-2-5-flare-image-to-image` ($0.05 at
+  FIRST venue for image gens (house rule, 2026-09-10)**: kie `gpt-image-2-5-flare-image-to-image` (USD 0.05 at
   2K; validated 09-10 — one still matched the scene proxy's end table with no invented element), Higgsfield
   `gpt_image_2_5` second (2–2.5 cr at 2k; `--variant sunburst` for the precision tier); **Nano Banana Pro is
   the fallback** —
@@ -157,8 +158,8 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   actually consumed — with the retries counted. One take per engine is an observation, never a ranking; the cost line
   names it as one.
 - **A creator-style talking head** (a UGC spot) routes by SHOT TYPE: a simple talking head or a hook sweep → Gemini Omni
-  Flash 1.1, **kie first, fal the fallback** (since 2026-09-25: kie `google/gemini-omni-flash-1-1` is $0.525 per
-  8 s at 720p or 1080p against fal's $0.80 / $1.20, sold in fixed 4 / 6 / 8 / 10 s steps — fal takes any whole second
+  Flash 1.1, **kie first, fal the fallback** (since 2026-09-25: kie `google/gemini-omni-flash-1-1` is USD 0.525 per
+  8 s at 720p or 1080p against fal's USD 0.80 / USD 1.20, sold in fixed 4 / 6 / 8 / 10 s steps — fal takes any whole second
   3–10 s, and a 360p draft or a 3 s take is cheaper there, so the cost line quotes both; 720p native, no uploaded audio,
   ~15 % of takes stutter → regenerate); every other shot in the spot — product-in-hand, b-roll, a 30 s story, a pinned
   voice, a defined handheld move — → Seedance 2.5 (since 2026-09-26, Omni is the default for the UGC
@@ -202,7 +203,7 @@ neither is a start image — each holds different things (measured 2026-09-10, o
 | an EXACT continuation — a named state, a held prop, the last pose | start image = the keeper's LAST frame (the standing rule), refs for identity | a start image carries the state pixel-exact; refs-only re-imagines it |
 | a face at medium framing, a spoken line | whichever row above fits; the FACE at the right size — in the start image or a tight ref — decides, not the mode | an unreferenced element is invented (the 08-30 r2v evidence) |
 
-Refs-only skips the still (≈2 cr or $0.05) but also skips the one reviewable frame before a 10 cr take: when
+Refs-only skips the still (≈2 cr or USD 0.05) but also skips the one reviewable frame before a 10 cr take: when
 the angle is risky, buy the still and start from it. The scene is complete first (`video-refs-continuity`
 SCENE-PROXY.md § Build it) and every render rides under its role line (`video-prompt-dialects` LINT L26).
 
@@ -231,7 +232,7 @@ the ones that bind every ask:
 - **A new cast member is stress-locked before the first video that shows them** — the rehearsal's once-per-member form:
   at least ten stills across three angles, three shot sizes, every light they appear in and a two-shot beside every
   co-star, 10 of 10 for a character (`video-refs-continuity` § 3, `scripts/cast_stress.py`). Its matrix is its own cost
-  line and GO: `N stills × $0.05 at 2K on kie`; the gate's `cast stress lock`
+  line and GO: `N stills × USD 0.05 at 2K on kie`; the gate's `cast stress lock`
   row rides in every later video's ask.
 
 - **Free before billed.** Whisper the existing takes for the words, RMS-scan for the onset, cut a
@@ -251,7 +252,7 @@ the ones that bind every ask:
   a declared budget — goes to the operator as options, not as another batch.
 - **A venue chosen for FUNDING rather than price quotes the PREMIUM on the same line.** Where the money sits
   decides which venue is callable; the ranking decides what it costs. So a batch
-  routed to a funded-but-dearer venue reads `… · Higgsfield API (funded) · 1.40× monid, +$0.41 this batch`, and the
+  routed to a funded-but-dearer venue reads `… · Higgsfield API (funded) · 1.40× monid, +USD 0.41 this batch`, and the
   operator rules with the number in front of them. **Never silently reroute a batch to a cheaper venue the operator
   has not funded, and never refuse a funded venue for placing fourth.**
 - Decisions go to the operator as **numbered plain questions** with the cost and the file path inline.
@@ -271,10 +272,10 @@ python3 scripts/gen_video_kie.py --root <project> --scene S01-H1 --prompt prompt
     --mode t2v|i2v|flf|r2v --duration 4|6|8|10 [--refs A,B] [--start-image NAME] [--audio-ids ID] [--go]  # Omni, kie first
 python3 scripts/gen_video_fal.py --root <project> --prompt-file … --engine omni --mode i2v|r2v|t2v \
     --image … --duration 7 --resolution 720p --aspect-ratio 9:16 [--go]                                 # Omni, the fallback
-python3 scripts/monid_upload.py --root <project> --batch 'references/*.png' --go   # sfs, $0.00, idempotent
+python3 scripts/monid_upload.py --root <project> --batch 'references/*.png' --go   # sfs, USD 0.00, idempotent
 python3 scripts/monid_upload.py --root <project> --verify        # ONE recursive /ls for the whole set
 python3 scripts/monid_upload.py --root <project> --refresh --go  # re-issue lapsed urls, moves no bytes
-python3 scripts/treg_host.py --root <project> --batch 'references/*.png' --go     # treg.to, $0.00, idempotent
+python3 scripts/treg_host.py --root <project> --batch 'references/*.png' --go     # treg.to, USD 0.00, idempotent
 python3 scripts/treg_host.py --root <project> --verify           # every recorded expiry, zero API calls
 python3 scripts/treg_host.py --root <project> --refresh --go     # RE-UPLOADS: a new url, and it spends quota
 python3 scripts/monid_submit.py --root <project> --scene S02-G4 --prompt prompts/r2v/S02-G4.txt \

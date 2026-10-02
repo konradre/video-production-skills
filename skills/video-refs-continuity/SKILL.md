@@ -48,7 +48,7 @@ from this table verbatim** (the count read on the zoom, never a number from memo
 
 **Where a keeper frame exists, compute the room instead of remembering it.** `scripts/scene_blockout.py
 <keeper-frame.png>` returns the frame as a labelled grey-box scene (people, furniture, door, window, lamp,
-floor; relative scale; ~20 s on a 24 GB GPU, $0; `scripts/comfy_ready.py` first — it says whether the server
+floor; relative scale; ~20 s on a 24 GB GPU, USD 0; `scripts/comfy_ready.py` first — it says whether the server
 and its two providers answer, and `scripts/comfy_up.sh` starts one from the env; any OTHER graph queued on that server
 goes through `scripts/comfy_preflight.py <graph.json> --expect video|image --host` first — it refuses a graph that
 would finish and save nothing (a preview-only output, `save_output` false, an unfed save node, the wrong kind), that
@@ -238,7 +238,7 @@ python3 scripts/refs_gate.py --root <project> --import CLIENT-PHOTO --file asset
 Each target has its own upload ledger, and the gate reads the one the call will use: `receipts/<NAME>-upload-id.txt`
 for `hf`, `refs-urls.json` for `kie`, `monid-urls.json` for `monid`, `treg-urls.json` for `treg`. A reference bound for
 monid is hosted on monid's own
-`sfs` store by `video-gen-cost-gate/scripts/monid_upload.py` at **$0.00** — and because a lapsed sfs URL is re-issued by a
+`sfs` store by `video-gen-cost-gate/scripts/monid_upload.py` at **USD 0.00** — and because a lapsed sfs URL is re-issued by a
 free `/cat` rather than re-uploaded, an expired link there costs nothing, unlike kie's ~24 h expiry. The same call also
 carries a privacy consequence the other targets do not: an sfs URL is fetchable by anyone who holds it until its `ttl`
 lapses, and `/rm` frees the quota without recalling a copy already served — so a client's own asset gets a short `ttl`,
@@ -248,7 +248,7 @@ read locally from the recorded `expiresAt` or the url's own `?e=<unix>` (zero AP
 inside a generation's p95 WARNs, and the fix is free: `monid_upload.py --refresh <NAME> --go`.
 
 **A treg reference expires the same way and is checked the same way, with one fact reversed.** It is hosted by
-`video-gen-cost-gate/scripts/treg_host.py` at **$0.00** — hosting on treg is deliberately un-metered, a courtesy beside
+`video-gen-cost-gate/scripts/treg_host.py` at **USD 0.00** — hosting on treg is deliberately un-metered, a courtesy beside
 polling — and the url carries a **7-day TTL**. But `treg host` returns an OPAQUE token, not a signed url: nothing about
 the expiry is encoded in the link, so a treg reference whose expiry the ledger does not record **FAILS** where the same
 monid reference only WARNs, because monid's `?e=<unix>` can rebuild a lost ledger and treg's token cannot. The other
