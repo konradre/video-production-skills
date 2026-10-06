@@ -307,7 +307,9 @@ only copy of that wallet that exists: `hf_api_submit.py` writes a spend at accep
 `hf_api_poll.py` writes the matching refund for a `failed` / `nsfw` / cancelled request, which are not
 charged. An unrecorded spend there is not untracked but **unknowable**.
 
-Dry run by default; `--go` spends. Each path runs the refs gate first and holds on FAIL — a priced warning an
+Dry run by default; `--go` spends. `gen_stills.py`'s dry run also lints every still prompt with `video-prompt-dialects`'
+`prompt_lint` (`--dialect kie`) and prints its realism rows — L38 quality words, L39 grain asked of a still — and any FAIL
+beside the cost line: a warning the GO ask answers, never a block. Each path runs the refs gate first and holds on FAIL — a priced warning an
 explicit GO overrides, never a silent or unoverridable stop (§ 0) — prints the
 cost, parses the venue's reply shape-safely (Higgsfield `generate create --json` returns a bare LIST of
 job ids), writes the raw reply to `receipts/raw/`, appends a ledger record per seed BEFORE polling,

@@ -112,6 +112,23 @@ def main():
         jobs.append((k, full, refs, names))
         print(f"  {k:<10} {len(full):>4} chars · {len(refs)} refs · {', '.join(names)}{'   [OVERWRITES]' if (OUT / f'{k}.png').exists() else ''}")
         for i, n in enumerate(names, 1): print(f"              @ref{i} = {n}")
+    # the realism lint beside the cost line (video-prompt-dialects REALISM.md, LINT L38 quality words / L39 grain asked of a
+    # still): a warning answered in the GO ask, never a block. The gate checks that the prompt skill was loaded; this checks the words.
+    import subprocess as _sp, tempfile as _tf
+    lint = Path(__file__).resolve().parents[2] / "video-prompt-dialects" / "scripts" / "prompt_lint.py"
+    lint_hits = {}
+    for k, full, refs, names in jobs:
+        if not lint.exists():
+            print(f"\nLINT not found at {lint} — the realism rows were not checked"); break
+        with _tf.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as tf: tf.write(full)
+        out = _sp.run([sys.executable, str(lint), "--dialect", "kie", tf.name], capture_output=True, text=True).stdout
+        os.unlink(tf.name)
+        rows = [r.strip() for r in out.splitlines() if r.startswith("  ") and len(r.split()) > 1 and (r.split()[0] == "FAIL" or r.split()[1] in ("L38", "L39"))]
+        if rows: lint_hits[k] = rows
+    for k, rows in lint_hits.items():
+        print(f"\nLINT {k}"); [print(f"  {r}") for r in rows]
+    if lint.exists():
+        print(f"\nREALISM LINT: {len(lint_hits)} of {len(jobs)} prompts flagged" + (" — answer them in the GO ask (a warning, never a block)" if lint_hits else " — no quality words, no grain asked of a still"))
     births = [x for x in a.births.split(",") if x]; prose = [x for x in a.prose.split(",") if x]; gate_roles = {}; gate_fail = False
     for k, full, refs, names in jobs:
         start = names[0] if names else None   # i2i: ref 1 is the edited image for gpt2 AND nano

@@ -75,9 +75,11 @@ copies it and then adds its own. Ask for "a clean, noise-free image" (L39). Grai
 - A still the operator already approved is EDITED, never re-rolled: "Turn this picture into a real photograph of the
   same place. Preserve the exact composition, camera position, layout and every object; change only how it is
   photographed and lit." Restate the keep-list; one change per pass.
-- Measured (Sunburst, 2026-10-07): a whole-frame realism edit kept the layout and every approved detail and moved the
+- Measured here on two Sunburst edits (2026-10-07) — a lead, not a community practice: the hivemind showed no signal for
+  it either way (its nearest threads call render-to-photo edits on GPT Image 2 "hit or miss" and show a whole-frame H3
+  realism pass that worked on game vehicles), and r/StableDiffusion could not be read that day (Arctic Shift timed out). What the two edits showed: a whole-frame realism edit kept the layout and every approved detail and moved the
   exposure, colour, sky and textures toward a photograph — and an object the source drew as CG SURVIVED it (a
-  campfire's smooth glowing stones and drawn flames; round, spiky "pom-pom" foliage). A CG object takes its own
+  campfire's smooth glowing stones and drawn flames; leaf clusters drawn as soft, uniform "pom-pom" balls). A CG object takes its own
   targeted edit: "Change only the <object>: <its real look>. Keep everything else exactly as it is."
 - An identity reference edited for realism is a NEW file, and its stress lock lapses (`video-refs-continuity` § 3).
   Read the new face beside the approved one at 2–4× — face shape, eyes, nose, mouth, hairline, age cues, marks — before
@@ -86,7 +88,7 @@ copies it and then adds its own. Ask for "a clean, noise-free image" (L39). Grai
 ### 2.6 Read a still for realism, at full size
 
 The tells: smooth or glowing surfaces on things that are rough in life (stones, bark, skin); flames drawn as clean,
-symmetric tongues; repeated, symmetric foliage; even, shadowless light in a night scene; a punchy sky; poreless skin;
+symmetric tongues; repeated, symmetric or uniformly fuzzy foliage (judge it against a real photo of the species — a Joshua tree's clusters really are round); even, shadowless light in a night scene; a punchy sky; poreless skin;
 hands. Each is fixed by a targeted edit (§ 2.5), never by re-rolling the whole frame.
 
 ## 3. Footage — MiniMax H3
