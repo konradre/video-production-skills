@@ -140,8 +140,9 @@ criterion.** The table — modes, prices, caps, moderation classes, upload conve
   `nano-banana-pro` / Higgsfield `nano_banana_pro`), or the copy route (`video-refs-continuity`). GPT Image 2
   is superseded; never start a new still on it. **A photoreal reference is Sunburst**: `--model gpt25s`, billed at
   Flare's price on kie (USD 0.05 at 2K, measured 2026-10-07; kie has no quality parameter) and written per
-  `video-prompt-dialects` REALISM.md § 2; Higgsfield `gpt_image_2_5 --variant sunburst --quality max` (≈ 16.5 cr at
-  2k) is the one route with a quality setting.
+  `video-prompt-dialects` REALISM.md § 2; Higgsfield `gpt_image_2_5 --variant sunburst --quality max` (≈ 9 cr at 2k with
+  one reference, 16.5 with three) is the one route with a quality setting, and it needs a paid plan — a free plan is
+  refused at submit (`job_minimum_basic_plan_required`, billed 0, measured 2026-10-07).
 - Generation resolution is **480p on the 480p chain — every shot except one**; MiniMax H3 generates at its 768p
   minimum on fal (a house rule) or at 2K, its only tier, on Higgsfield; approval, then a reconstructive upscale
   (`video-finish`). 🔴 **The carve-out: a talking head with a locked VO generates at

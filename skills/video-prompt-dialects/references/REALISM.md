@@ -33,8 +33,9 @@ a gap fills it with its default render, and the default is the look that reads a
   **Flare** for fast drafts. OpenAI rates Sunburst above GPT Image 2 and Flare level with it.
 - **kie bills both the same** — USD 0.05 a 2K still, measured 2026-10-07 — so a photoreal reference is Sunburst:
   `gen_stills.py --model gpt25s`. kie has no `quality` parameter; the model and the words are the levers.
-  Higgsfield `gpt_image_2_5 --variant sunburst --quality max` is the route with a quality setting (≈ 16.5 cr a 2K
-  still; `video-gen-cost-gate` VENUES.md).
+  Higgsfield `gpt_image_2_5 --variant sunburst --quality max` is the route with a quality setting (≈ 9 cr a 2K
+  still with one reference, 16.5 with three; `video-gen-cost-gate` VENUES.md) — on a paid plan only: a free plan is refused
+  at submit, `job_minimum_basic_plan_required`, nothing billed (measured 2026-10-07).
 - kie's 2K lands 2736×1536 at 16:9, above OpenAI's 2560×1440 "experimental" line. A front-end that shrinks references
   (one caps them at 768 KiB) erases the difference; 2K is enough.
 

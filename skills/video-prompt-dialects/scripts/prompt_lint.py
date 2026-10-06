@@ -59,6 +59,7 @@ def _selftest():
                        'watermarks, animation styling or over-smoothed skin.', 'L40', False),
         ('minimax-h3', 'Live-action night footage of a small campfire, no blaze, no sparks, no drifting embers.', 'L40', True),
         ('minimax-h3', 'Live-action night footage of the desert; the moon itself never in frame.', 'L40', True),
+        ('minimax-h3', 'Live-action, low at the foot of a trunk - the tree above it never in frame.', 'L40', True),
         ('minimax-h3', 'Live-action night footage. (S1) sings: <d>[English] No light, no love, no stars</d>', 'L40', False),
         ('minimax-h3', 'A medium close-up frames a man beside a fire. Live-action night footage.', 'L41', True),
         ('minimax-h3', 'Live-action night footage from a full-frame cinema camera. A medium close-up frames a man.', 'L41', False),
@@ -365,7 +366,7 @@ def main():
         for m in re.finditer(r'\b(?:never|without)\s+(?:a|an|the|any)\s+([a-z][^.;:!?,\n]{1,40})', plain, re.I):
             if not ARTIFACT.search(m.group(1)):
                 found.append(m.group(1).strip())
-        for m in re.finditer(r'\b([a-z][a-z-]+)(?: itself)? (?:is |stays |remains )?(?:never|not) (?:in|inside|within|enters?|appears? in) '
+        for m in re.finditer(r'\b((?:[a-z][a-z-]+ ){0,2}[a-z][a-z-]+)(?: itself)? (?:is |stays |remains )?(?:never|not) (?:in|inside|within|enters?|appears? in) '
                              r'(?:the )?(?:frame|shot|picture)', plain, re.I):
             if not ARTIFACT.search(m.group(1)):
                 found.append(m.group(1))
