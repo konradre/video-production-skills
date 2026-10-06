@@ -5,6 +5,7 @@ prompt or in the GO ask.
 
   prompt_lint.py [--dialect seedance-2.5|seedance-2.0|minimax-h3|create-a-meme|kie] [--refs A,B,C]
                  [--cap N] [--caps-stoplist WORD,WORD] [--locked <first-line prompt>] [--strict] <prompt.txt>
+  prompt_lint.py --selftest     the photoreal rows L38-L41 against known-good and known-bad prompts
 
 --refs   the reference NAMES in slot order (their count is the slot maximum the prompt may cite)
 --locked the prompt a model-voiced series was calibrated on (its first line): any sentence that differs outside the
@@ -41,7 +42,50 @@ CAPWORD = re.compile(r"\b[A-Z][A-Z']{1,}\b")
 CUT = re.compile(r'(?:Cut|Shot|Stage)\s*(\d+)\s*\((\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)\s*s\)\s*:\s*(.*?)(?=(?:Cut|Shot|Stage)\s*\d+\s*\(|【|$)', re.S)
 
 
+def _selftest():
+    """Each photoreal row fires on its incident and stays silent on a known-good prompt (MiniMax's own examples, the
+    sanctioned tail, a clean still). Runs this file as a subprocess per case; exit 0 only when every case holds."""
+    import os, subprocess, tempfile
+    cases = [  # (dialect, prompt, row, fires)
+        ('kie', 'A hyperrealistic 8K masterpiece of a desert at night.', 'L38', True),
+        ('kie', 'A cinematic photograph of a campfire at night.', 'L38', True),
+        ('minimax-h3', '[Shot 1] Live-action, cinematic, a medium-wide shot frames a baker opening the shutters.', 'L38', False),
+        ('minimax-h3', 'Live-action night footage. (S1) sings: <d>[English] A stunning masterpiece, no fire, no stars</d>', 'L38', False),
+        ('kie', 'A real, unretouched photograph, ISO 3200. A clean, noise-free image. No HDR look, no glow or bloom, '
+                'no over-sharpening, no painterly or CGI rendering, no film grain, without chromatic aberration.', 'L39', False),
+        ('kie', 'A real photograph with fine sensor noise in the shadows and visible film grain.', 'L39', True),
+        ('kie', 'The worn wood grain of the tailgate planks in firelight.', 'L39', False),
+        ('minimax-h3', 'Live-action night footage. The flames stay small and low. No subtitles, on-screen text, '
+                       'watermarks, animation styling or over-smoothed skin.', 'L40', False),
+        ('minimax-h3', 'Live-action night footage of a small campfire, no blaze, no sparks, no drifting embers.', 'L40', True),
+        ('minimax-h3', 'Live-action night footage of the desert; the moon itself never in frame.', 'L40', True),
+        ('minimax-h3', 'Live-action night footage. (S1) sings: <d>[English] No light, no love, no stars</d>', 'L40', False),
+        ('minimax-h3', 'A medium close-up frames a man beside a fire. Live-action night footage.', 'L41', True),
+        ('minimax-h3', 'Live-action night footage from a full-frame cinema camera. A medium close-up frames a man.', 'L41', False),
+        ('minimax-h3', 'integrated_multimodal_description: [Shot 1] Live-action, cinematic, a close shot begins on a glass.', 'L41', False),
+        ('minimax-h3', 'The target video is live-action, natural colour. [Shot 1] A wide shot frames a ridge at dusk.', 'L41', False),
+        ('minimax-h3', 'For the target video, <Picture 1> (from [Shot 1]) is fully referenced. integrated_multimodal_description: '
+                       '[Shot 1] Live-action, cinematic, the woman in <Picture 1> stays by the window.', 'L41', False),
+    ]
+    bad = 0
+    with tempfile.TemporaryDirectory() as d:
+        for i, (dialect, prompt, row, fires) in enumerate(cases):
+            f = os.path.join(d, f'case{i}.txt')
+            with open(f, 'w', encoding='utf-8') as fh:
+                fh.write(prompt)
+            out = subprocess.run([sys.executable, os.path.abspath(__file__), '--dialect', dialect, f],
+                                 capture_output=True, text=True).stdout
+            got = f' {row} ' in out
+            ok = got == fires
+            bad += not ok
+            print(f'  {"PASS" if ok else "FAIL"}  {row} {"fires" if fires else "silent"}  [{dialect}] {prompt[:60]}')
+    print(f'SELFTEST {"OK" if not bad else "FAIL"}  {len(cases) - bad}/{len(cases)}')
+    return 1 if bad else 0
+
+
 def main():
+    if '--selftest' in sys.argv[1:]:
+        sys.exit(_selftest())
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('prompt')
     ap.add_argument('--dialect', default='seedance-2.5', choices=list(CAPS))
@@ -272,6 +316,79 @@ def main():
             gone = [s for s in lock if s not in cur]; new = [s for s in cur if s not in lock]
             what = '; '.join([f'- "{s[:60]}"' for s in gone[:2]] + [f'+ "{s[:60]}"' for s in new[:2]]) or 'the same sentences in a different order'
             rows.append(('WARN', 'L36', f'drifted from the locked prompt {a.locked}: {what} — only the quoted line changes between lines; re-lock on purpose'))
+
+    # L38-L41 photoreal rows (references/REALISM.md). Dialogue is skipped: a sung or spoken word is never an instruction.
+    plain = QUOTED.sub(' ', text)
+
+    # L38 quality words push the generic glossy render (REALISM.md § 1). "cinematic" and "epic" only in a still prompt:
+    # MiniMax's own H3 examples open "Live-action, cinematic, ...", where it is a style word. 2K/4K are L6's.
+    QUALITY = (r'\b(?:8|16)k\b|\bhyper[- ]?realistic\b|\bhyper[- ]?real\b|\bultra[- ]?realistic\b|\bphoto[- ]?realistic\b'
+               r'|\bphotorealism\b|\bmasterpiece\b|\baward[- ]winning\b|\bstunning\b|\bbreathtaking\b'
+               r'|\b(?:highly|ultra|hyper)[- ]detailed\b|\bbest quality\b|\bhigh[- ]quality\b|\btrending on artstation\b'
+               r'|\boctane render\b|\bunreal engine\b')
+    if a.dialect == 'kie':
+        QUALITY += r'|\bcinematic\b|\bepic\b'
+    q = sorted({m.group(0).lower() for m in re.finditer(QUALITY, plain, re.I)})
+    if q:
+        rows.append(('WARN', 'L38', f'quality words {q} — they push the generic render; describe the capture '
+                                    '(camera, lens, exposure) and the light (REALISM.md § 1)'))
+
+    # L39 grain or noise asked of a still (REALISM.md § 2.4): the video copies a reference's grain and adds its own.
+    if a.dialect == 'kie':
+        GRAIN = re.compile(r'\b(?:film|fine|coarse|natural|heavy|light|subtle|visible|analog(?:ue)?|photographic)[- ]grain\b'
+                           r'|\bgrainy\b|\b(?:sensor|digital|luminance|shadow|colou?r) noise\b|\bnoise in the shadows\b'
+                           r'|\bnoisy\b|\bhalation\b|\bchromatic aberration\b', re.I)
+        g = []
+        for m in GRAIN.finditer(plain):
+            before = plain[max(0, m.start() - 40):m.start()]
+            if re.search(r'\b(?:no|without|free of|zero|never)\b[^.;]*$', before, re.I):
+                continue
+            g.append(m.group(0).lower())
+        if g:
+            rows.append(('WARN', 'L39', f'grain or noise asked of a still: {sorted(set(g))} — the video copies it and adds '
+                                        'its own; ask for "a clean, noise-free image" and put grain in the video prompt (REALISM.md § 2.4)'))
+
+    # L40 a negation naming a scene object on H3 (REALISM.md § 3.5): ONE positive stream, so a named thing can be drawn
+    # (the L31 grid). The tail may name artifacts that are not objects in the scene; anything else is stated positively.
+    if a.dialect == 'minimax-h3':
+        ARTIFACT = re.compile(r'subtitle|caption|text|lettering|letters|words|watermark|logo|brand|animat|cartoon|anime|styli[sz]'
+                              r'|cgi|\bcg\b|render|skin|smooth|plastic|waxy|hdr|glow|bloom|halation|grad(?:e|ing)|saturat|sharpen'
+                              r'|artifact|morph|warp|distort|blur|music|score|narration|voice-?over|dialogue|speech|\bcuts?\b|splice'
+                              r'|transition|jump|frame rate|stutter|jitter|painterly|illustrat|drawing|\b3d\b|video game|daylight'
+                              r'|lighting|performance|acting|angle|reframe|camera|change|longer', re.I)
+        found = []
+        for m in re.finditer(r'\b(?:no|nor)\s+([^.;:!?\n]+)', plain, re.I):
+            for item in re.split(r',|\bor\b|\band\b|\bnor\b|\bno\b', m.group(1), flags=re.I):
+                item = item.strip(' -–—')
+                if item and not ARTIFACT.search(item):
+                    found.append(item)
+        for m in re.finditer(r'\b(?:never|without)\s+(?:a|an|the|any)\s+([a-z][^.;:!?,\n]{1,40})', plain, re.I):
+            if not ARTIFACT.search(m.group(1)):
+                found.append(m.group(1).strip())
+        for m in re.finditer(r'\b([a-z][a-z-]+)(?: itself)? (?:is |stays |remains )?(?:never|not) (?:in|inside|within|enters?|appears? in) '
+                             r'(?:the )?(?:frame|shot|picture)', plain, re.I):
+            if not ARTIFACT.search(m.group(1)):
+                found.append(m.group(1))
+        if found:
+            rows.append(('WARN', 'L40', f'a negation names scene objects {found[:6]} — H3 can draw what a negation names; '
+                                        'state the wanted state ("the flames stay small and low"; "the light falls from '
+                                        'behind the camera") and keep the tail to artifacts (REALISM.md § 3.5)'))
+
+    # L41 H3 reads the style first (REALISM.md § 3.1): "[Shot 1] Live-action, cinematic, ...", or the style sentence
+    # just before [Shot 1] in the full-reference form; a front-end scene text opens with it.
+    if a.dialect == 'minimax-h3':
+        STYLE = re.compile(r'live[- ]action|cinematic|documentary|2d[- ]animated|3d cg|claymation|watercolou?r|vintage film'
+                           r'|stop[- ]motion|animated|realistic|realism|naturalistic', re.I)
+        m = re.search(r'\[Shot 1\]\s+(?=[A-Za-z<])', text)   # the shot's start, never a citation "(from [Shot 1])"
+        if m:
+            after = text[m.end():].strip()
+            lead = text[max(0, m.start() - 300):m.start()] + ' ' + re.split(r'(?<=[.!?])\s', after, maxsplit=1)[0]
+        else:
+            start = re.sub(r'^\s*(?:integrated_multimodal_description|detailed_description)\s*:\s*', '', text)
+            lead = re.split(r'(?<=[.!?])\s', start.strip(), maxsplit=1)[0]
+        if not STYLE.search(lead):
+            rows.append(('WARN', 'L41', f'the first shot does not open with a style word — "Live-action, …" first, then the '
+                                        f'composition (REALISM.md § 3.1): "{lead.strip()[:70]}"'))
 
     # report
     order = {'FAIL': 0, 'WARN': 1}

@@ -206,6 +206,9 @@ rule for an audio-driven take (numeric speech windows, `video-gen-cost-gate` § 
   order, blank-line separated — `integrated_multimodal_description: [Shot 1] …` / `overall_soundscape:` /
   `non_diegetic_music:`. Full-reference: `subject_definitions · summary · retention_analysis ·
   detailed_description · overall_soundscape · non_diegetic_music`.
+- **Live-action realism → [`REALISM.md`](REALISM.md) § 3**: the style word first in `[Shot 1]` ("Live-action,
+  cinematic, a medium close-up frames …"), the camera as type + amplitude + speed, grain in the video and never in
+  its references, negatives that name only artifacts (L40), and a front-end's one scene text in priority order.
 - Labels: `<Subject N>` (defined once, its source pictures cited INSIDE the definition — one subject per
   ASSET), `<Picture N>` (a concrete frame), `<Video N>` (camera motion is a Video relationship), `<Audio N>`;
   each label exactly one definition, one `retention_analysis` entry (`fully_preserved · partially_preserved
@@ -331,7 +334,7 @@ rule for an audio-driven take (numeric speech windows, `video-gen-cost-gate` § 
 
 ## Image models (stills, plates, references)
 
-- **kie gpt-image-2.5 image-to-image** (the default still model since 2026-09-10; `-flare-` by default, `-sunburst-` the precision tier; the contract below was measured on gpt-image-2; the first 2.5 still (09-10, three refs incl. a grey layout frame) followed it — roles, preserve list, anti-blend, conflict priority — with no invented element): ref 1 is the edited image; cite the others by role; phrase as a
+- **kie gpt-image-2.5 image-to-image** (the default still model since 2026-09-10; `-flare-` by default, `-sunburst-` the precision tier — and the tier for a photoreal still, billed at Flare's kie price (measured 2026-10-07), written as a capture per [`REALISM.md`](REALISM.md) § 2; the contract below was measured on gpt-image-2; the first 2.5 still (09-10, three refs incl. a grey layout frame) followed it — roles, preserve list, anti-blend, conflict priority — with no invented element): ref 1 is the edited image; cite the others by role; phrase as a
   transformation; preserve list; anti-blend ("do not blend any two references, do not average their
   builds"); conflict priority ("in favour of @ref1, then @ref2"); 1–3 refs each with one clear job;
   single-subject crops at native resolution (a montage blends into an average). Refuses the WORDS of some

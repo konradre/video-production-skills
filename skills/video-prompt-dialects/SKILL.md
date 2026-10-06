@@ -43,13 +43,18 @@ affirmatives in the body and the lint do not move — `video-production/referenc
 | Seedance 2.0 fast | as 2.5 | `Shot 1:` storyboard line, never numeric timestamps | 9 img / 3 vid / 3 aud | half the price; refuses real faces |
 | MiniMax H3 (fal, 768p min) | `<Subject N>` / `<Picture N>` defined once, cited in the definition; `Image 1` in prose | named fields in fixed order, blank-line separated; `[Shot N] At 00:MM.mmm` strictly increasing | 7 k | dialogue VERBATIM in `<d>[English] …</d>` — the opposite polarity; `prompt_expansion_mode` rewrites and invents — `fast`, persist and diff `expanded_prompt` |
 | Create a Meme (web front-end) | `@ref1…@ref9` by upload order; `[Video1]` motion clip; start + end frame outside the slots | one paragraph | **2000 chars, hard** | never press "Enhance prompt"; the 【】 layout written out does not fit |
-| kie gpt-image-2.5 (i2i, flare / sunburst — the default) · nano-banana-pro (the fallback) | ref 1 = the image being edited; "@ref2 the product" | prose: a transformation ("must appear 100 % identical to its own reference; only the pose, light and setting change"), the preserve list, the conflict priority, the exclusion per ref | — | gpt2 composes and copies; nano edits surgically and IGNORES sheets when composing; the words a moderator refuses go through the copy route |
+| kie gpt-image-2.5 (i2i, flare / sunburst — the default) · nano-banana-pro (the fallback) | ref 1 = the image being edited; "@ref2 the product" | prose: a transformation ("must appear 100 % identical to its own reference; only the pose, light and setting change"), the preserve list, the conflict priority, the exclusion per ref | — | gpt2 composes and copies; nano edits surgically and IGNORES sheets when composing; the words a moderator refuses go through the copy route; a photoreal still is Sunburst at Flare's kie price, written as a capture, clean of grain (REALISM.md § 2) |
 
 The full contracts, wire limits and moderation classes: [`references/DIALECTS.md`](references/DIALECTS.md).
+**A live-action job reads [`references/REALISM.md`](references/REALISM.md) whole before its first prompt** — stills on
+GPT Image 2.5 (Sunburst, the capture sentence, night exposure, a clean image, realism edits that keep an approved still)
+and footage on MiniMax H3 (the style first, the camera vocabulary, grain in the video, the safe negative form, singing,
+a front-end's one scene text). A governed project's skill gate denies a prompt write until this skill is loaded.
 Parameters — resolution, duration, aspect, audio toggle — never appear in the prompt; they ride on the call.
 
 **Done when:** the dialect is named, the reference slots are listed in upload order with their names, and
-the layout (cut budgets vs stage form vs single line) is chosen from the shot document.
+the layout (cut budgets vs stage form vs single line) is chosen from the shot document, and a live-action job has
+read REALISM.md.
 
 ## 2. Compile the house template from the shot document
 
@@ -133,8 +138,9 @@ outside the stoplist and outside a quoted line, and a whole quoted line in capit
 category referents and gait mechanics; "aerial view"; camera move vs diverging subjects; a framing that
 is not on its own clause; beat density; the char cap; a prompt that repeats a reference's description;
 single-shot negatives on a long generation (`--duration`); a per-line prompt that drifted from its locked first line
-(`--locked`); and by eye, a look plate restated in prose and a
-citation that resolves to no asset.
+(`--locked`); the photoreal rows — quality words, grain asked of a still, an H3 negation naming a scene object, H3's
+style not first (`--selftest` proves each one fires and stays silent on MiniMax's own examples); and by eye, a look
+plate restated in prose and a citation that resolves to no asset.
 The lint is advisory except the slot and cap rows — but a warning row is answered in the prompt or in the
 GO ask, never ignored.
 
@@ -183,6 +189,8 @@ the file path.
 ❌ "SO WEAK FOLLICLES WAKE BACK UP" (a shouted line)         ✅ "so weak FOLLICLES wake back up" — one word in capitals carries the stress
 ❌ line 4's prompt reworded while its line changes          ✅ the first line's prompt locked; only the quoted words change (`--locked`)
 ❌ "authentic UGC style, no studio lighting"                ✅ "window daylight from camera-left, a warm bulb over the counter, the frame drifting as she talks"
+❌ "a hyperrealistic 8K cinematic still of the camp"        ✅ "a real, unretouched photograph taken on a full-frame camera, 35 mm at f/2.8, ISO 3200, a few seconds"
+❌ H3: "a small fire, no sparks, no embers"                  ✅ "the flames stay small and low, the air above them clear" (REALISM.md § 3.5)
 ```
 
 ## Failure behavior

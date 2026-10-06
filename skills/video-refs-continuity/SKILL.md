@@ -129,6 +129,10 @@ of an accepted still › a fresh still. Build in this order:
 Point at references, never describe them — any adjective about a cited reference can only contradict
 it. One subject per reference at native resolution, a preserve list and a conflict priority in the
 prompt: [`references/REFERENCE-CONTRACT.md`](references/REFERENCE-CONTRACT.md).
+A reference that must read as a photograph is written per `video-prompt-dialects`
+[`REALISM.md`](../video-prompt-dialects/references/REALISM.md) § 2 — the capture, night exposure, a clean image — and
+an approved still is made real by an edit that keeps it, never by a re-roll; a CG object that survives the edit gets its
+own targeted edit, and a changed identity reference is read face-to-face against the approved one before it replaces it.
 
 The composite tools ship in `scripts/` (Python 3, numpy, Pillow, scipy): `plate_pieces.py` (exact product
 sprites onto a plate — perspective-sized, locally tinted, kept off dark and bright pixels),
