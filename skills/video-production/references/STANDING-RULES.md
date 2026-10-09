@@ -19,7 +19,7 @@
 | **Read a tool's official docs fully before the first call, and index every FEATURE the spec documents — not only the rules you came for; clones go where the operator keeps them, never duplicated** | `video-gen-cost-gate` § venues, `video-prompt-dialects` § global rules |
 | **Destructive ops: the operator names the exact targets; one command per target, alone; project trees have no VCS → `.bak` first** | every writer |
 | **One background waiter at a time; detached jobs with absolute paths and a timeout; poll, never follow; a missing sentinel is a failure** | `video-finish-qc`, `designed-elements` |
-| **Free disk = the HOST drive's, read before heavy work; scratch and intermediates live on the host drive; a mezzanine is never `.bak`-copied; the finisher refuses a batch under its floor** | `status_line.py --drive`, `project_size.py`, `finish_spot.py --min-free-gb` |
+| **Free disk = the HOST drive's, read before heavy work; scratch and intermediates live on the host drive; a mezzanine is never `.bak`-copied; under its floor the finisher warns with the numbers and runs — a buffer, not a gate (since 2026-10-09)** | `status_line.py --drive`, `project_size.py`, `finish_spot.py --min-free-gb` |
 | **At every phase boundary the superseded derived set is listed by category with sizes and the operator names what goes — one delete per category** | `project_size.py --plan`, the pause |
 | **At intake every skill's BODY is swept against the project's axes; the declarations (applies / not, with the reason) ride in the pause block** | `corpus_sweep.py`, `pause_block.py --skills` |
 | **The pause block carries the substrate list — what the spots are made from** | `pause_block.py --substrate` |

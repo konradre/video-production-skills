@@ -49,7 +49,9 @@ Then the axes that move with THIS project are walked once against the brief — 
 generator and its native raster, the tools and hardware on hand, the voices and the music licence, the client and the
 budget ([`references/WHAT-VARIES.md`](references/WHAT-VARIES.md)). Every value that differs from the skills' defaults is
 written into the project's own files: the EDL's `canvas`, `fps`, `runtime_s` and `audio.loudnorm`, the `caption_style`,
-the shot list's header, the pause block. A number in a skill is a default until the project confirms it. A UGC / creator-style spot
+the shot list's header, the pause block — and the target platforms with their placement in `delivery-targets.json` at the
+root, from which every safe-band read takes its zones ([`references/SAFE-AREAS.md`](references/SAFE-AREAS.md)). A number
+in a skill is a default until the project confirms it. A UGC / creator-style spot
 adds its own axes — the AOV band, the funnel stage, the platform, a real or a synthetic persona, phone-shot or generated
 footage — because each moves the build between native lo-fi and product-forward polish (`ad-spot-preprod`
 UGC-GRAMMAR.md § Where lo-fi wins).
@@ -214,6 +216,7 @@ agent keeps one, says NEXT.
 | `status_line.py --root [--deliverable --drive --keep-tags --higgsfield --higgsfield-api --monid --treg --elevenlabs --open --job]` | the status template with free reads only; unreadable balances said, never 0; the Higgsfield subscription and API wallets as two lines, the API's labelled a ledger ESTIMATE; the project's size and its superseded derived set; the render floor |
 | `project_size.py --root [--keep-tags spot=tag,…] [--plan <file>] [--selftest]` | substrate vs derived by directory role; the superseded set by category with sizes; a plan file the operator names deletions from — it never deletes |
 | `corpus_sweep.py --skills <dir> --axes k=v,… [--selftest]` | every skill's body summary (What varies + section headers) against the project's axes — the reading aid behind the intake declarations |
+| `safe_zones.py --from <dir> [--seek] [--drawbox WxH]` · `--targets <list> [--conditions …]` · `--selftest` | the project's safe band from the nearest `delivery-targets.json` (up to the project root, never `$HOME`) against SAFE-AREAS.md's table: the `hyperframes check --caption-zone` zones with one SAFE BAND line naming the file, the zone runs' seek list, or an ffmpeg filter that paints the band on a frame; with no declaration, the strict ad union, labelled a recommendation |
 | `probe_sources.py <file>… [--json] [--selftest]` | storage, SAR, DAR, rotation, the DISPLAY shape, fps, codec, bit depth, duration and audio per source; exit 2 when any source must be normalised before a crop |
 | `pause_block.py --resume --deliverable --next --transcript <jsonl\|latest> [--phases <rules> --root <project>] [--builder --keepers --refs --substrate --skills --balances --open --job --resume-cmd]` | appends the STATE AT PAUSE block with a clock timestamp and a `.bak`; the skills-consulted line comes from the transcript (`--skills-unmeasured` labels a typed one) |
 | `skills_invoked.py --transcript <jsonl\|latest> [--since --until] [--phases <rules> --root <project>] [--calls\|--line\|--json] [--selftest]` | the Skill invocations with timestamps, the compactions, and with the rules file the gap list — phases whose actions ran without their skill; `--install-gate --root <project> --genre <g> [--registry <file>]` writes the project's rules file from `references/SKILL-GATE-TEMPLATE.json`, the genre's `require_any` overrides applied |
@@ -226,6 +229,7 @@ agent keeps one, says NEXT.
 
 - [`references/CONTEXT-MAP.md`](references/CONTEXT-MAP.md) · [`references/RESUME-CONTRACT.md`](references/RESUME-CONTRACT.md) ·
   [`references/STANDING-RULES.md`](references/STANDING-RULES.md) · [`references/WHAT-VARIES.md`](references/WHAT-VARIES.md) ·
+  [`references/SAFE-AREAS.md`](references/SAFE-AREAS.md) (the platforms' UI keep-outs; a project declares its targets in `delivery-targets.json`) ·
   [`references/CHAIN.md`](references/CHAIN.md) · [`references/RETROSPECTIVE.md`](references/RETROSPECTIVE.md) ·
   [`references/REFERENCE-AD-STUDY.md`](references/REFERENCE-AD-STUDY.md) (a reference ad: what its profile lends, what never carries, the hook scored from frames).
 - The phase skills: `ad-spot-preprod` · `film-preprod` · `video-refs-continuity` · `video-prompt-dialects` ·

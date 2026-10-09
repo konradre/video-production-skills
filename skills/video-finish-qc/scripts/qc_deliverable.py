@@ -267,6 +267,7 @@ def main():
     ok, det = dc.range_read(D, rng); print(f"{'INFO' if ok else 'WARN'} range read: {det}")
     if q.get('loop'): ok, det = dc.loop_seam(D); verdict(ok, 'loop seam', det)
     ok, det = dc.poster(D, e.get('poster_at'), q.get('poster'), a.black_luma); verdict(ok, 'poster (frame 0)', det)
+    if e.get('poster_at') is not None: ok, det = dc.poster_flash(D); print(f"{'INFO' if ok else 'WARN'} poster flash: {det}")   # WARN only: the chosen thumbnail is kept
     for name, ok, det in dc.sfx(D, '.', e.get('audio', {}).get('sfx', {})): verdict(ok, f'sfx {name} in the mix', det)
     if q.get('beat_data'): ok, det = dc.beat_cuts(e['events'], q['beat_data'], efps, '.'); verdict(ok, 'beat cuts', det)
     # ---- against the previous version (INFO; a verdict with --prev-expect) ----

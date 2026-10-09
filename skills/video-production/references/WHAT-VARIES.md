@@ -12,8 +12,8 @@ This file lists the second and third kinds by the axis that moves them. Everythi
 
 **At intake** (`video-production` § 1), walk the axes below against the brief and write every value that differs into the
 project's own files — the EDL's `canvas`, `fps`, `runtime_s` and `audio.loudnorm`, the campaign's `caption_style`, the
-shot list's header, the pause block. A skill's default applies only where the project holds no value of its own. A
-default carried into a project it does not fit raises no error; it ships wrong.
+shot list's header, the pause block, the target platforms in `delivery-targets.json`. A skill's default applies only where
+the project holds no value of its own. A default carried into a project it does not fit raises no error; it ships wrong.
 
 **A lead** is a number measured on one production: the starting point for the first takes of the next, re-measured
 there, never a pass/fail threshold on a different generator, raster or genre. The leads are listed last.
@@ -37,7 +37,7 @@ there, never a pass/fail threshold on a different generator, raster or genre. Th
 | what moves | the skills' default | re-derive from | where it lives |
 |---|---|---|---|
 | aspect, delivered raster, frame rate | 9:16, 1080×1920 delivered, 24 fps CFR (the EDL's `canvas` and `fps`); a 2160×3840 mezzanine and design canvas | the platform's or festival's spec; a landscape piece changes the canvas, the mezzanine and the design canvas together (`finish_spot.py --canvas`, `hyper_new.py --canvas`) | `video-finish-qc` PIPELINE.md, `video-edit-edl` EDL-CONTRACT.md |
-| safe zones | gags, faces and text clear of the vertical platform UI — GLOBAL-SPEC.md and PIPELINE.md carry different figures, each from the spec it was read from | the target platform's current overlay, read before the shot list | `ad-spot-preprod` GLOBAL-SPEC.md |
+| safe zones | gags, faces and text clear of the vertical platform UI — the project's declared band: the union of its target platforms' keep-outs (ad or organic); with nothing declared, the strict ad union with its cost stated | the platforms' current templates; re-read when the table is ~6 months old or an app redesigns | `video-production` SAFE-AREAS.md; the project's `delivery-targets.json` |
 | loudness target and true-peak ceiling | the client reference's measured integrated level; with no reference, the house −14 LUFS; the true peak under the platform's ceiling, with the EDL's TP target ≈ 1 dB below it for AAC | the client's reference first, then the platform's or broadcaster's published target and ceiling | `spot-audio-assembly` MIX-AND-QC.md, `video-finish-qc` § 3 |
 | the delivery encode | H.264 High, CRF 17, AAC 192 kbps, 8-bit 4:2:0; for paid social progressive, CFR, Rec.709, no HDR | the platform's ingest spec; a broadcaster or a festival names its own codec, container and mezzanine | `video-finish-qc` PIPELINE.md |
 | grain | off for phone-tier social; coarse, on a mezzanine above delivery, from ~5 Mbps up — the phone-native tier INVERTS this: fine sensor-style noise or a denoise at delivery resolution, and a phone-class encode, dosed until the texture probe reads inside the project's real phone clips' band | the delivery bitrate — a decision tree, not a setting; on a creator-style spot the real clips' band | `video-finish` § 5 (the phone-native tier) and § 6 |

@@ -12,6 +12,8 @@ thumbnail from frame 0), video-shotcraft's final review (every SFX audible in th
   loop_seam   with qc.loop: the last frame against the first, beside the clip's median frame-to-frame step
   poster      frame 0 is the platform thumbnail: not near-black — or, with poster_at, equal to that frame (the finisher bakes
               it); qc.poster: "none" declares a black first frame on purpose
+  poster_flash with poster_at: the baked frame 0 against frame 1, beside the clip's median step — a poster unlike the
+              opening flashes for one frame at autoplay (showtime's bake guard); a WARN line, never a FAIL
   sfx         every audio.sfx cue found in the delivered mix at its time: normalised cross-correlation of the cue (at its
               vol) with the mix over ±20 ms, and its level against the mix; a sample over 5 s with no `dur` is flagged
               (bound it to its action)
@@ -100,6 +102,19 @@ def poster(p, poster_at=None, declared=None, black=16.0):
         ' — the platform thumbnail is black: set poster_at in the EDL (the finisher bakes that frame into frame 0), or declare qc.poster: "none"')
 
 
+def poster_flash(p):
+    """the baked poster against the opening: frame 0 vs frame 1 beside the clip's median frame-to-frame step (loop_seam's
+    statistic). A poster unlike the opening shows for one frame at autoplay before the film — a WARN, never a FAIL"""
+    n = nframes(p)
+    if n < 4: return True, 'too few frames to read'
+    f0, f1 = frame_gray(p, n=0), frame_gray(p, n=1)
+    if f0 is None or f1 is None: return True, 'could not decode frames 0 and 1'
+    steps = [np.abs(frame_gray(p, n=i + 1) - frame_gray(p, n=i)).mean() for i in np.linspace(1, n - 2, 6).astype(int)]
+    jump = float(np.abs(f1 - f0).mean()); med = float(np.median(steps)); lim = max(4.0, 3 * med)
+    return jump <= lim, f"frame 0 (the poster) → frame 1 (the opening): mean |dY| {jump:.1f} vs the clip's median step {med:.1f} (limit {lim:.1f})" + (
+        '' if jump <= lim else ' — the poster flashes for one frame at autoplay; pick the poster from the opening, or compose the opening as the hook')
+
+
 def _pcm(p, ss=0.0, d=None):
     c = ['ffmpeg', '-v', 'error', '-ss', f'{ss:.4f}', '-i', p] + (['-t', f'{d:.4f}'] if d else []) + [
         '-af', 'aresample=48000:async=1:first_pts=0', '-ac', '1', '-ar', '48000', '-f', 'f32le', '-']
@@ -162,6 +177,8 @@ def selftest():
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', "color=c=black:s=64x64:r=24:d=2,drawbox=x=0:y=0:w=iw:h=ih:color=white:t=fill:enable='eq(n\\,0)+eq(n\\,24)'",
                         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', pb], check=True)
         chk.append(('frame 0 equal to the poster frame at 1.0 s passes', poster(pb, poster_at=1.0)[0]))
+        chk.append(('a poster unlike the opening is flagged as a flash', not poster_flash(pb)[0]))
+        chk.append(('frame 0 that flows into frame 1 reads no flash', poster_flash(lp)[0]))
         os.makedirs(os.path.join(r, 'sfx'))
         subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', "aevalsrc='0.8*sin(2*PI*1500*t)*exp(-12*t)':s=48000:d=0.4", os.path.join(r, 'sfx', 'hit.wav')], check=True)
         mixp = os.path.join(r, 'mix.mp4'); quiet = os.path.join(r, 'quiet.mp4')

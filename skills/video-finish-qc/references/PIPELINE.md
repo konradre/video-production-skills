@@ -115,8 +115,8 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
   from the second outage (2026-09-15, 62 GB of superseded mezzanines in one day, the host drive full under a build):
   the free space that matters is the HOST drive's — a VM's disk image never shrinks, so `df` inside the guest is not free
   space; scratch and intermediates live on the host drive, where a deleted file frees space at once; a mezzanine is never
-  `.bak`-copied (a copy doubles the footprint — `.bak` is for small project files). `finish_spot.py` refuses to start under
-  its floor (`--min-free-gb`, 40 GB or 3x the spot's mezzanine pair), and at every phase boundary
+  `.bak`-copied (a copy doubles the footprint — `.bak` is for small project files). `finish_spot.py` warns under its floor
+  (`--min-free-gb`, 40 GB or 3x the spot's mezzanine pair) and runs — a buffer, not a gate — and at every phase boundary
   `video-production/scripts/project_size.py` lists the superseded derived set by category for the operator to name.
 
 ## The deliverable contract
@@ -134,6 +134,6 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
   res" claim was false: X re-encodes everything, 1080p ceiling). YouTube: upload 1440p so the VP9/AV1
   ladder serves 1080p playback with the grain intact.
 - Ads delivery spec (paid social, 2026): 9:16 1080×1920 · H.264 progressive (never HEVC for paid) · CFR ·
-  AAC stereo 48 kHz ≥ 128 kbps · Rec.709, no HDR · safe zones top 150 px / bottom 350 px / right 10 % ·
+  AAC stereo 48 kHz ≥ 128 kbps · Rec.709, no HDR · safe zones per `video-production` SAFE-AREAS.md (this spec's read was 150 / 350 / right 10 %; the 2026 ad bands are 240–288 top and 660–672 bottom) ·
   TikTok ≤ 500 MB, Meta < 200 MB. Ship 24 fps CFR at the EDL's rate; a 30 fps request is
   `fps=30` duplication, never optical flow on dialogue.

@@ -28,7 +28,7 @@ In order:
 
 ```
 deliverable: <path> (<size>)                 ← every "it is with you" names the path
-drive: <free GB>                             ← under the floor = stop heavy work
+drive: <free GB>                             ← under the floor = say so before heavy work; a buffer, not a gate
 balances: <vendor> <credits> · <vendor> <chars> · vendors without a balance endpoint: unreadable
 background jobs: <named> | none
 open: <items>

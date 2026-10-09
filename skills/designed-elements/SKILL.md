@@ -155,7 +155,8 @@ and the delivered frame re-read.
 | script | does |
 |---|---|
 | `hyper_new.py --out --kind card\|turntable\|layer [--dur --canvas --seed]` | scaffolds a composition that obeys the contract |
-| `render_hyper.sh --dir --name --format mp4\|png-sequence [--host --push --pull]` | renders locally (Node ≥ 22) or on the render host; `RENDER-END` only once the output exists, `RENDER-FAILED` and exit 1 otherwise |
+| `render_hyper.sh --dir --name --format mp4\|png-sequence [--host --push --pull] [--keep-out <zone>]… [--check-only] [--no-check] [--check-timeout 600]` | runs `hyperframes check` REPORT-ONLY first — a `--caption-zone` run per zone of the project's declared safe band (`video-production` `safe_zones.py`; the strict ad union when none is declared), the full report alone and the other zones at once, each under the check timeout, then `check_summary.py`'s read — then renders locally (Node ≥ 22) or on the render host; `RENDER-END` only once the output exists, `RENDER-FAILED` and exit 1 otherwise |
+| `check_summary.py <check.json>…` · `--selftest` | the read of a `hyperframes check --json` report: per-section counts, every lint error, LAYOUT NOT SAMPLED when lint stopped the layout audit, every zone hit (a warning, so `ok` stays true), a switched-off section as `off`; exits 0 on findings |
 | `layer_check.py --frames [--expect-dur]` | validates a PNG-sequence layer; prints its opaque window |
 | `det_check.py source <composition>` · `frames <A> <B> [--project]` · `prove <composition> [--host --workers 1,3 --no-push]` | the determinism proof: the script read for clock/random readers and a bare 2D canvas; two renders at different worker splits compared frame by frame on the host (the proof frames stay there, under `<remote-dir>/.det/`); refuses a project whose `frames/` holds PNGs; `--selftest` |
 | `asset_edge_repaint.py --src --dst --above --below --job …` | repaints a notch/speck at a fitted two-colour edge; 8× review crops |

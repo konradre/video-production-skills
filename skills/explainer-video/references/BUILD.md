@@ -66,5 +66,8 @@ face at `assets/fonts/Display.ttf` is the one measured, so it is the one rendere
 ## Render
 
 `render_hyper.sh --host <render host> --push --pull` (WSL2's headless Chromium hangs); `npx hyperframes lint` on the host
-first, 0 errors. The script prints `RENDER-END` only when the output exists and `RENDER-FAILED` otherwise. A two-scene
-1080×1920, 30 fps, 11 s pilot with captions and a voice track rendered in 11–13 s on the render host (2026-09-12).
+first, 0 errors. `render_hyper.sh` then runs `hyperframes check` report-only before the render, one run per zone of the
+band the project declares in `delivery-targets.json` (`video-production` SAFE-AREAS.md; a landscape explainer reads none
+unless it declares `keep_out` zones), and every ZONE line is read. `--keep-out` only adds a zone. The script prints
+`RENDER-END` only when the output exists and `RENDER-FAILED` otherwise. A two-scene 1080×1920, 30 fps, 11 s pilot with
+captions and a voice track rendered in 11–13 s on the render host (2026-09-12).

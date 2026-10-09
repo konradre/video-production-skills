@@ -23,8 +23,9 @@ made without one. The plan is a set of files in the project, not a memory.
 
 **What varies.** The vertical format, the tiers, the sign-off structure, the wipe, the two-state grade and the product
 rules are an ad campaign's defaults: a spot with no product on screen drops the product rules, the platform sets the
-aspect and the safe zones, the vendor sets the clip cap, and the client's brand kit sets the sign-off. The client's text
-as SSOT, the continuity partitions and the diff do not move — `video-production/references/WHAT-VARIES.md`.
+aspect and the safe zones (the targets declared in `delivery-targets.json` — `video-production/references/SAFE-AREAS.md`),
+the vendor sets the clip cap, and the client's brand kit sets the sign-off. The client's text as SSOT, the continuity
+partitions and the diff do not move — `video-production/references/WHAT-VARIES.md`.
 
 ## 1. Decide the format and the tiers
 
@@ -85,8 +86,9 @@ one-line verdict sit beside them.
 
 ## 3. Fix the global spec and the standing rules
 
-9:16, safe zones, the two-state grade, the lens, the music arc (the before cue → the wipe → the after cue → the
-closing bed), captions burned in, the venue's clip ceiling, the true-size framing rule. The seven
+9:16, safe zones (the declared targets' band — `video-production` SAFE-AREAS.md), the two-state grade, the lens, the
+music arc (the before cue → the wipe → the after cue → the closing bed), captions burned in, the venue's clip ceiling,
+the true-size framing rule. The seven
 standing rules — the product and its pieces DESIGNED never generated; text never generated; the
 explicit frame never framed; the wipe in every spot; B plates from the A keeper's frame 0; the fill
 SKU-locked and named on every shot; the easiest spot first and knowing what it proves — and the sign-off

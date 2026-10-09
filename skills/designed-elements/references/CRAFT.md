@@ -138,10 +138,12 @@ kickers and years **34 px** (a sub-label 32) · credits and sources **30 px** at
 handwritten annotation **48 px** · a title **100 px** and up. **Nothing below 30 px, ever** — copy that does not fit
 moves to another scene or goes, it does not shrink. Scale the whole table by the raster's short side ÷ 1080.
 
-**A safe area multiplies every one of those floors by its reciprocal.** A vertical social cut wraps the content in
-about `scale(0.78)`, which leaves roughly 190 px clear at the top and 230 at the bottom of a 1080×1920 stage — and
-takes 22 % off every glyph. Size the type at **floor ÷ 0.78** before the wrap, not after. This is the group-scale
-trap above with a fixed, known factor: the scale is the deliverable's, so the SOURCE size absorbs it.
+**A safe area multiplies every one of those floors by its reciprocal.** A vertical social cut that wraps the content in
+about `scale(0.78)` takes 22 % off every glyph: size the type at **floor ÷ 0.78** before the wrap, not after. This is the
+group-scale trap above with a fixed, known factor: the scale is the deliverable's, so the SOURCE size absorbs it. The wrap
+is NOT the safe area — it leaves only ~190 px clear at the top and ~230 at the bottom of a 1080×1920 stage, under every
+platform's ad band (660–672 px at the bottom). Text and CTAs sit inside the project's declared band (`video-production`
+SAFE-AREAS.md).
 
 ## Readable time — computed from the composition's timeline, never judged on the render
 

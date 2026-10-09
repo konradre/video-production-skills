@@ -4,9 +4,11 @@
 
 - **Aspect** 9:16, 1080×1920 delivered; generated at the venue's native resolution (480p on the
   established chain) and reconstructed up (`video-finish-qc` § tier).
-- **Safe zones**: gags, faces and text clear of the top 250 px and the bottom 350 px (platform UI);
-  critical for every text gag. The figures are one platform overlay's at the time they were read
-  (`video-finish-qc` PIPELINE.md carries a paid-social spec's) — read the target platform's current overlay first.
+- **Safe zones**: gags, faces and text clear of the platform UI — the project's declared band (its targets in
+  `delivery-targets.json` at the root), the union of its target platforms' keep-outs (`video-production` SAFE-AREAS.md:
+  the 2026 ad bands are 240–288 px at the top and 660–672 px at the bottom, TikTok's right rail besides); with no target
+  declared, recommend the strict union and say its cost.
+  Critical for every text gag; decided here, before the shot list.
 - **Lens**: eye-level, mild wide (~28 mm) for scene work; product shots 50 mm, shallow, locked off.
 - **The true-size rule**: the product's size is anchored to a body part per framing; a close-up is
   close enough that the actual shape and the actual size of the product's pieces read.

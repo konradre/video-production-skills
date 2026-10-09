@@ -95,11 +95,13 @@ footage and the one-take discipline. The generator's cap is read before the beat
 ## Captions
 
 Burned in when autoplay is muted (most social viewing); made with the platform's own caption tool or a hand-typed look so
-the text matches what real users post; short chunks aligned to speech; contrast ≥ 4.5:1; inside the platform's safe zones;
-never over the product, a face, a price or a disclosure. Two defensible styles — speech-aligned native chunks, or a ≤ 6-word
-overlay discipline reserving the bottom third for the hook and the CTA — pick ONE per platform and write it into the
-campaign's `caption_style` (`spot-audio-assembly` CAPTIONS.md). The house ALL-CAPS brand-colour style is a product-spot
-default, not a UGC one.
+the text matches what real users post; short chunks aligned to speech; contrast ≥ 4.5:1; inside the project's declared
+safe band (`video-production` SAFE-AREAS.md); never over the product, a face, a price or a disclosure. Two defensible
+styles — speech-aligned native chunks, or a ≤ 6-word overlay discipline that reserves one low strip for the hook and the
+CTA — pick ONE per platform and write it into the campaign's `caption_style` (`spot-audio-assembly` CAPTIONS.md). The
+community wording is "the bottom third", but at 1080 × 1920 that whole third lies inside every platform's ad keep-out
+(660–672 px), where the platform's own caption, CTA button and handle sit: the strip goes directly ABOVE the declared
+band, never in it. The house ALL-CAPS brand-colour style is a product-spot default, not a UGC one.
 
 ## The variant matrix — one variable at a time
 

@@ -80,7 +80,18 @@ render_hyper.sh --dir hyper --name <name> --format png-sequence --host <render h
   (`~/.local/bin` on the PATH), its own Chrome cache, `unzip` present. `--workers 2`, a timeout above the
   job, the sentinel `RENDER-END`; a log without it is a failure. `render_hyper.sh` prints it only once the mp4 or the
   frames exist, and `RENDER-FAILED` with exit 1 otherwise.
-- `npm run check` (lint + runtime + layout + motion + contrast) before a render round.
+- `render_hyper.sh` runs `hyperframes check` (lint + runtime + layout + contrast; the motion audit runs only beside a
+  `<comp>.motion.json` spec, so the summary reads `motion off`) before every render, REPORT-ONLY, once per zone of the
+  project's declared safe band (`video-production` SAFE-AREAS.md, read from `delivery-targets.json` by `safe_zones.py`; the
+  strict ad union when none is declared; `--keep-out` adds a zone): `renders/check.json` (the full report, run alone),
+  a `renders/check-zone<N>.json` per further zone (run at once, contrast off), each under `--check-timeout`, and
+  `check_summary.py`'s read. A zone hit is a WARNING, so `ok` stays true: read the ZONE lines. A LINT error stops the layout
+  audit (duration 0, no samples) — such a comp was never laid out, so fix the lint first. Two lint errors recur on reused
+  comps: a font stack naming a family with no `@font-face` (`'Bangers', Impact, sans-serif` → `font_family_without_font_face`)
+  — a stack names `@font-face` families and one generic, nothing else; and a project copied to a new name with only one of
+  `data-composition-id` and the `__timelines` key renamed (`timeline_id_mismatch` — the render still succeeds, which hides
+  it). Audit artefacts, not defects: per-word masked reveals read as `text_occluded`/`content_overlap`; a png-sequence layer
+  is checked with `--no-contrast`. A gate comes later, for comps made after this rule, with declared findings.
 - **Headless Chromium fails slowly or silently, never loudly**: a blur with σ < 0.8 has no effect; `feConvolveMatrix`
   drops to a software path (0.13 fps measured upstream); an SVG filter carries `color-interpolation-filters="sRGB"`;
   keep a frame under ~600 DOM nodes and 6 SVG filter instances; render a 30-frame test at a 3 fps floor before a
