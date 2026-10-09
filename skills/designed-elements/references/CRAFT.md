@@ -149,6 +149,16 @@ SAFE-AREAS.md).
 
 ## Readable time — computed from the composition's timeline, never judged on the render
 
+- **Every line of designed type holds at least `max(0.70 s, 0.25 s + characters ÷ 17)` from full display** — the
+  subtitle reading rate, 17 characters a second (klik's reading law; showtime's `0.3 s + max(characters ÷ 17, words ÷ 3)`
+  agrees within a few per cent on long lines and asks more of short ones — never under 1 s, 43 % more for a one-word
+  label). A 35-character line holds 2.31 s. Budget it per LINE, never per scene:
+  a scene can pass its total while a line inside it fails. The reveal and the exit are not reading time, so a reveal
+  that does not fit is shortened, never the hold — except a typewriter, whose hold counts from its first character,
+  because the viewer reads along with it.
+- **A piece with no voice to set its length is summed at intake**: every line's hold plus its reveal and exit must fit
+  the length before anything is built (SKILL § 1). A script that needed 667 frames against a 600-frame spec was found
+  after animation and cost two full re-times (klik).
 - **Small print** (a source line, a legal line, a price condition) holds **≥ 2.5 s at ≥ 50 % opacity**. Put it on
   the scene's FIRST beats, never its last: 40–70 characters on a last beat held 0.97–1.7 s, and eight lines were
   reworked in one film.
@@ -159,7 +169,8 @@ SAFE-AREAS.md).
   the scale and raise the SOURCE size, never the scale.
 - **Every event is a READ, not only the words.** A read is one thing the viewer must get — a label, a number, a hand
   closing on a product, a payoff — and it needs time to be FOUND, UNDERSTOOD and REGISTERED before the next one starts:
-  ~0.8 s for a label, ~0.3 s a word, counted from full display (brag's numbers); an action by its own budget. One read
+  a line by the floor above and never under ~0.8 s (brag's label number), counted from full display; an action by its
+  own budget. One read
   at a time — two at once and the viewer gets one; fast actions, slow meanings; lead the eye before an important read;
   **the reads set the shot's length**, the last one included. Plan them as an ordered list per shot before any code
   (ClaudeAnimationBase's reads timing sheet: an ending packed into 1.3 s read as nothing; seven timed reads fixed it).

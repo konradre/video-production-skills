@@ -65,7 +65,7 @@ SCENE = """<!doctype html>
            line-height:1.05; text-align:center; opacity:0; }
   .small { position:absolute; left:%PAD%px; right:%PAD%px; top:%SMALL_T%px; font-size:%SMALL_PX%px; line-height:1.2;
            text-align:center; color:#c9d2e6; opacity:0; }
-  .dot { position:absolute; width:%DOT%px; height:%DOT%px; border-radius:50%; background:#8fb2ff; }
+  .dot { position:absolute; left:0; top:0; width:%DOT%px; height:%DOT%px; border-radius:50%; background:#8fb2ff; }
 </style>
 <div id="root" data-composition-id="%SID%" data-width="%W%" data-height="%H%" data-duration="%DUR%">
   <div id="%SID%-hero" class="hero"></div>
@@ -95,11 +95,12 @@ SCENE = """<!doctype html>
   // the title lands on its beat — a beat named "title" in storyboard.json
   tl.fromTo(el('title'), { y: %RISE%, opacity: 0.3 }, { y: 0, opacity: 1, duration: 0.4, ease: 'power2.out', immediateRender: false },
             BEATS.title !== undefined ? BEATS.title : 0.15);
-  // sustained action until the exit: the hero pushes 1.0 -> 1.05 and the dots keep orbiting it
+  // sustained action until the exit: the hero pushes 1.0 -> 1.05 and the dots keep orbiting it, moved by transform
+  // (a box moved by left/top steps in whole pixels — designed-elements HYPERFRAMES-CONTRACT § index.html)
   tl.to(el('hero'), { scale: 1.05, duration: Math.max(0.1, exitAt - 0.45), ease: 'none' }, 0.45);
   dots.forEach(function (d) {
     var st = { a: rnd() * Math.PI * 2 }, a0 = st.a;
-    function draw() { d.style.left = (%CX% + Math.cos(st.a) * %ORBIT% - %DOT_HALF%) + 'px'; d.style.top = (%CY% + Math.sin(st.a) * %ORBIT% * 0.6 - %DOT_HALF%) + 'px'; }
+    function draw() { d.style.transform = 'translate(' + (%CX% + Math.cos(st.a) * %ORBIT% - %DOT_HALF%) + 'px, ' + (%CY% + Math.sin(st.a) * %ORBIT% * 0.6 - %DOT_HALF%) + 'px)'; }
     draw(); tl.to(st, { a: a0 + Math.PI * 1.2, duration: exitAt, ease: 'none', onUpdate: draw }, 0);
   });
   // the exit reaches zero before the cut: opacity 1 - (n/N)^1.5 over the last 0.3 s
@@ -229,6 +230,7 @@ def selftest():
             "COPY object": "var COPY = {" in s1,
             "no unfilled placeholders": not re.search(r"%[A-Z_]+%", host + s1),
             "storyboard rows": len(json.loads((root / "storyboard.json").read_text())["scenes"]) == 2,
+            "dots move by transform, never left/top": "d.style.transform = 'translate(" in s1 and not re.search(r"style\.(left|top)\s*=", s1),
         }
         add_scene(root, "s03-close", 9)
         checks["--add"] = (root / "compositions" / "scenes" / "s03-close.html").exists() and "## s03-close" in (root / "script.md").read_text()

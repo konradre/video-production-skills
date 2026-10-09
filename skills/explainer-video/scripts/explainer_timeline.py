@@ -27,12 +27,13 @@ from pathlib import Path
 
 WORD = re.compile(r"[\w'’]+")
 SMALL_PRINT_S, CLOSING_S, RUNTIME_TOL = 2.5, 1.0, 0.15
-READ_LABEL_S, READ_WORD_S = 0.8, 0.3   # a read's hold from full display: ~0.8 s a label, ~0.3 s a word (brag; ClaudeAnimationBase's reads)
+READ_LABEL_S, READ_BASE_S, READ_CPS = 0.8, 0.25, 17.0   # a read's hold from full display: a line 0.25 s + characters ÷ 17
+# (the subtitle rate; klik, showtime), never under ~0.8 s (brag's label number) — designed-elements CRAFT § Readable time
 
 
 def read_budget(r):
-    """found + understood + registered, from FULL display: text by its words; an action by its declared min_s (None = unbudgeted)"""
-    if r.get("text"): return max(READ_LABEL_S, READ_WORD_S * len(r["text"].split())) + float(r.get("entrance_s", 0))
+    """found + understood + registered, from FULL display: text by its characters; an action by its declared min_s (None = unbudgeted)"""
+    if r.get("text"): return max(READ_LABEL_S, READ_BASE_S + len(" ".join(r["text"].split())) / READ_CPS) + float(r.get("entrance_s", 0))
     return float(r["min_s"]) if r.get("min_s") is not None else None
 DEFAULTS = {"fps": 30, "target_s": 0, "lead_s": 0.25, "tail_s": 1.0, "exit_s": 0.3, "ending_fade_s": 0.5,
             "caption": {"font": "assets/fonts/Display.ttf", "size_frac": 0.028, "top_frac": 0.8, "width_frac": 0.86,
@@ -168,7 +169,7 @@ def check_time(cfg, board, scenes, vo_dur):
             end = nxt if nxt is not None else s["dur"] - cfg["exit_s"]
             if end - t < need - 1e-6:
                 problems.append(f"{sc['id']}: read {what!r} holds {end - t:.2f} s before {'the next read' if nxt is not None else 'the exit'}, its budget {need:.2f} s"
-                                " (from full display: 0.8 s a label, 0.3 s a word) — cut a sentence, merge the reads, or move it to an earlier beat")
+                                " (from full display: 0.25 s + characters ÷ 17, never under 0.8 s) — cut a sentence, merge the reads, or move it to an earlier beat")
     # the point of view may not sit still for three scenes running (STORYBOARD § Point of view). An
     # unfilled angle is not a violation — it is an unfinished row, reported once, not per run.
     angles = [(sc["id"], (sc.get("angle") or "").strip().lower()) for sc in board["scenes"]]
@@ -430,7 +431,10 @@ def selftest():
     crowd = json.loads(json.dumps(board)); crowd["scenes"][1]["reads"] = [{"beat": "start", "text": "Payoff first"}, {"beat": "start", "what": "the arrow", "min_s": 0.4}]
     case("reads-two-at-once", good, crowd, words(spoken), lambda p, r, root: (any("two reads at" in x for x in p), p))
     long = json.loads(json.dumps(board)); long["scenes"][1]["reads"] = [{"beat": "b1", "text": " ".join(["word"] * 20)}]
-    case("reads-over-budget", good, long, words(spoken), lambda p, r, root: (any("its budget 6.00 s" in x for x in p), p))
+    case("reads-over-budget", good, long, words(spoken), lambda p, r, root: (any("its budget 6.07 s" in x for x in p), p))
+    # by characters, not words: two long words that a per-word budget (0.8 s) passed need 1.78 s, and 1.72 s is left
+    wide = json.loads(json.dumps(board)); wide["scenes"][1]["reads"] = [{"beat": "b1", "text": "Internationalisation works"}]
+    case("reads-by-characters", good, wide, words(spoken), lambda p, r, root: (any("holds 1.72 s" in x and "its budget 1.78 s" in x for x in p), p))
     blank = json.loads(json.dumps(board))
     case("angle-blank-notes-only", good, blank, words(spoken),
          lambda p, r, root: (not p and any("angle is empty" in n for n in (r or {}).get("notes") or []),

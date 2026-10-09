@@ -36,7 +36,9 @@ root duration belong to `explainer_timeline.py`; an edit by hand is overwritten 
   composition id, the scene root's composition id and the timeline key are the same string — a mismatch renders
   frozen, silently.
 - Entrances with `fromTo`. A beat entrance takes `immediateRender: false`, so it stays hidden until its beat; a
-  continuation of the same property is a `to`.
+  continuation of the same property is a `to`. A `from()` with that setting never runs in a timeline that also holds a
+  `repeat: -1`; the `fromTo` does (designed-elements HYPERFRAMES-CONTRACT § Silent traps).
+- Anything that moves is moved by `transform`, an `onUpdate` included: a box placed by `left`/`top` steps in whole pixels.
 - **Times come from `BEATS`** — scene-local seconds written from the narration; a literal time in a scene is a defect.
 - **Every on-screen string lives in `COPY`**, whole (the source audit reads it); every random number from a seeded PRNG.
 - The first element enters on frame 1 above zero opacity; the exit reaches zero before the cut, 1 − (n/N)^1.5.

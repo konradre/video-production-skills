@@ -5,7 +5,7 @@ Every other instrument in this kit reads the delivered frames. This one reads in
 the defect it looks for is structural: a composition can pass hero size, empty runs and still share
 and still be a deck, and the frames cannot tell you why. The four rules come from an upstream kit
 whose author restated his own anti-slide doctrine as greps after a model that had read the doctrine
-produced a deck anyway (research/reference/bang-motion-analysis.md L1).
+produced a deck anyway.
 
 Each rule is a JUDGEMENT row, like the frame instrument's flags: it names a structure to go and
 look at, not a verdict. Read the composition before acting on a FAIL.

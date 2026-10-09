@@ -40,6 +40,9 @@ spot that should carry the new one — the round ledger lists which spots carry 
 - `data-composition-id` = the project name; `data-width/height` = the render raster (the mezzanine
   raster for an event that will be cut with heroes — 2160×3840 for a 1080×1920 spot; the delivery raster
   for a layer the finisher scales).
+- **The root and every whole-length clip carry ONE `data-duration`**, written from the project's length (`hyper_new.py`
+  and `explainer_timeline.py` write them so). A whole-length clip set shorter than its root by hand is hidden for the rest
+  by the runtime, which hides an inactive clip, and that reads as a blank frame before the cut.
 - Every random number comes from a **seeded PRNG** (`mulberry32(seed)`): a render is reproducible, and a
   "fix one thing" round changes one thing.
 - Canvas elements draw from a tweened progress object inside the timeline, never from `requestAnimationFrame`
@@ -52,13 +55,13 @@ spot that should carry the new one — the round ledger lists which spots carry 
   `gsap_timeline_registered_before_async_build`). Fit computed from an advance table never needs the font wait.
 - **Motion lives on the ONE timeline.** No CSS `transition`: it starts when its style changes, so a cold render worker
   starts it at its own first frame and every worker split shows a different frame (measured, § Silent traps). CSS
-  `@keyframes` are seeked exactly in an mp4 render, but in a png-sequence LAYER an opacity keyframe animation renders at
-  full opacity once it starts — so a layer tweens opacity on the timeline. `det_check.py source` fails a transition and
-  warns on an opacity `@keyframes`.
+  `@keyframes` are seeked exactly, png-sequence and mp4 alike, opacity included (measured on the frames' alpha).
+  `det_check.py source` fails a transition.
 - **Things move by transform.** `x`/`y`/`scale`/`rotation`, never `top`/`left`/`width`/`height`/`margin`/`padding`,
-  `fontSize` or `letterSpacing`: layout values snap to whole pixels, so slow motion steps (the engine's lint error
-  `gsap_non_transform_motion` — it reads tween vars only, so an `onUpdate` writing `style.left`/`style.top` snaps the same
-  way and passes unflagged).
+  `fontSize` or `letterSpacing`. A box moved by a layout value snaps to whole pixels: `left` 6 px over 3 s arrived as six
+  1-px jumps, where `x` moved the same box 1/12 px every frame (measured 0.8.18). The engine's lint error
+  `gsap_non_transform_motion` reads tween vars only, so an `onUpdate` writing `style.left`/`style.top` snaps the same way
+  and passes unflagged. Text is placed in quarter pixels whichever way it moves.
 - **Anything that flows is a tweened DISTANCE, never an accumulation.** `pos += speed * dt` per frame is the
   determinism hole the seeded PRNG does not close: the value depends on how many frames happened, so a scrub lands
   somewhere else than a playthrough and two renders of one composition differ. Tween the distance (`flow` to
@@ -81,7 +84,9 @@ spot that should carry the new one — the round ledger lists which spots carry 
 - No network at render for assets: fonts (`@font-face` from `assets/fonts/`), textures, cut-outs, sprites
   all local. Text in a display face is DESIGNED here — packaging text from a generator corrupts ("WARNIGY"). GSAP is the
   one exception: from the CDN at an EXACT version (`gsap@3.14.2`, as the scaffolds write it; never the engine docs'
-  floating `gsap@3`). Its tag is parser-blocking, so the timeline is never built before it loads.
+  floating `gsap@3`). Its tag is parser-blocking, so the timeline is never built before it loads, and the engine fetches
+  it at render time: a version that 404s fails the render (`RENDER-FAILED`, exit 1, no output — measured). An
+  unreachable or slow CDN was not tested.
 - **A PNG asset carries no colour chunk** (`gAMA`, `cHRM`, `iCCP`, `cICP`). Chromium colour-manages a PNG that has one,
   so the render departs from the file's own pixel values: a 128 grey with `gAMA` 1.0 rendered 188 (measured, png and
   mp4). Save the art as plain sRGB values; `det_check.py source` lists any PNG that still carries one.
@@ -109,8 +114,12 @@ render_hyper.sh --dir hyper --name <name> --format png-sequence --host <render h
   comps: a font stack naming a family with no `@font-face` (`'Bangers', Impact, sans-serif` → `font_family_without_font_face`)
   — a stack names `@font-face` families and one generic, nothing else; and a project copied to a new name with only one of
   `data-composition-id` and the `__timelines` key renamed (`timeline_id_mismatch` — the render still succeeds, which hides
-  it). Audit artefacts, not defects: per-word masked reveals read as `text_occluded`/`content_overlap`; a png-sequence layer
-  is checked with `--no-contrast`. A gate comes later, for comps made after this rule, with declared findings.
+  it). Audit artefacts, not defects: per-word masked reveals read as `text_occluded`/`content_overlap` — a group off duty
+  set to `autoAlpha: 0` on a non-clip wrapper drops out of the overlap audit (two overlapping lines: `content_overlap`;
+  one of them in such a wrapper: nothing), and an intended bleed marked `data-layout-bleed="true"` drops its
+  `canvas_overflow` (measured 0.8.18). Hide it in the CSS or with `gsap.set`: a `tl.set` at 0 draws the lint warning
+  `gsap_timeline_set_initial_hide`, though its claim that frame 0 shows the unhidden state did not reproduce (frame 0 came
+  out hidden, png and mp4). A png-sequence layer is checked with `--no-contrast`. A gate comes later, for comps made after this rule, with declared findings.
 - **Headless Chromium fails slowly or silently, never loudly**: a blur with σ < 0.8 has no effect; `feConvolveMatrix`
   drops to a software path (0.13 fps measured upstream); an SVG filter carries `color-interpolation-filters="sRGB"`;
   keep a frame under ~600 DOM nodes and 6 SVG filter instances; render a 30-frame test at a 3 fps floor before a
@@ -119,7 +128,9 @@ render_hyper.sh --dir hyper --name <name> --format png-sequence --host <render h
   once with fontTools (a humanist sans ran ≈ 0.57 em lowercase · 0.67 capitals · 0.59 digits — measure YOUR face);
   `letter-spacing` counted once per character, because Chromium adds it after every glyph and it does not scale with
   the font size. A fit that bottoms out below ~78 % of the design size means the copy changes, not the size. The fit
-  is then deterministic whatever the font-load timing — the same guarantee as the seeded PRNG.
+  is then deterministic whatever the font-load timing — the same guarantee as the seeded PRNG. A build that must
+  measure once reads layout boxes with `offsetWidth`/`offsetLeft`/`offsetTop`: `getBoundingClientRect` returns the box
+  after every ancestor's transform, so under a scaled stage it is off by that scale.
 - A layer is verified with `layer_check.py` (contiguous frames, RGBA, the frame it becomes opaque); an
   event with `ffprobe` (raster, duration = `data-duration`, 24 fps).
 
@@ -131,8 +142,8 @@ failed silently: a plausible frame and no error. Re-measure after an engine upgr
 | trap | what the render shows | the rule | caught by |
 |---|---|---|---|
 | a CSS `transition` | a cold worker starts it at its own first frame, so each split shows another colour (191,0,64 against 234,0,21 at 1.5 s) | tween the change on the timeline | `det_check.py source`, FAIL |
-| an opacity `@keyframes` in a png-sequence layer | full opacity from the moment it starts; an mp4 renders the same animation exactly | a layer tweens opacity on the timeline | `det_check.py source`, WARN |
-| `will-change: transform` on text that scales up | drawn once at its first size, then stretched: 16 px text scaled 3× lost its stencil cuts (edge energy −22 %) | no `will-change` on anything that grows past its first size; translation and a scale down to rest are unaffected | `det_check.py source`, WARN |
+| `will-change: transform` on text that scales | the layer is drawn once, at the scale it has when a worker first paints it, and every later frame resamples that bitmap: 16 px text scaled up 3× renders soft and lost its stencil cuts (edge energy −13.5 % in png, −19 % in mp4); text scaled DOWN to rest keeps the bigger bitmap — up to 143 levels off the same text without `will-change` on ~660 px — and rests differently at each worker split, so the proof fails it, with `immediateRender` true or false (measured on png; an mp4's own encoding noise between two identical cells, ~70 levels, hides all but its peak) | `will-change` only on what translates (a translation is unaffected); never on anything that scales | `det_check.py source`, WARN |
+| a `from()` with `immediateRender: false` in a timeline that also holds a `repeat: -1` | the tween never runs: the element holds its from-values the whole film, from frame 0, the same at every worker split, so the proof passes | write the entrance as a `fromTo`, or give the repeat a count: either one animates | `det_check.py source`, WARN |
 | a PNG carrying `gAMA`, `cHRM`, `iCCP` or `cICP` | colour-managed: a 128 grey with `gAMA` 1.0 renders 188 | plain sRGB values with no colour chunk (§ index.html) | `det_check.py source`, WARN |
 | a colour tween between hues, written in hex, `rgb()` or `hsl()` | interpolated in sRGB: blue → yellow passes through grey, 128,128,128 | write both ends as `oklch(L C H)`: GSAP tweens the three numbers (midpoint 0,207,189); the hue moves as a number, so write one end as H ± 360 to take the short way round | the eye |
 | a blur across a worker split | 4 px off by 1 code value at the second worker's first frame | none: Chromium's antialiasing | `det_check.py frames` reports it as NOISE |
@@ -151,6 +162,8 @@ failed silently: a plausible frame and no error. Re-measure after an engine upgr
 - `gsap_repeat_refresh_relative_value` and `gsap_relative_value_second_writer` (errors): a relative value accumulates
   differently on a cold seek.
 - `html_dir_attribute_breaks_render` (error): `<html dir="…">` renders a blank video.
+- `video_nested_in_timed_element` (error): a `<video data-start>` inside an element that carries its own `data-start`,
+  the root included.
 - `font_family_without_font_face` (error) and `system_font_will_alias` (warning, printed): fonts are local
   `@font-face` (§ Rendering).
 - `gsap_callback_dom_measurement` (warning, printed): DOM measured inside a callback runs again on every seek, against
@@ -158,8 +171,8 @@ failed silently: a plausible frame and no error. Re-measure after an engine upgr
 - `subcomposition_blanks_before_host` (warning, printed): a sub-composition slot that ends before its host leaves the
   frame blank.
 - `overlapping_gsap_tweens` (warning, printed): two tweens write one property at the same time.
-- `gsap_infinite_repeat` (warning): `repeat: -1` is clipped to a declared `data-duration` and renders deterministically.
-  `gsap_repeat_floor_unclamped` and `gsap_repeat_ceil_overshoot` (warnings, printed): a computed repeat that turns into
+- `gsap_infinite_repeat` (warning): `repeat: -1` is clipped to a declared `data-duration` and renders deterministically,
+  but it freezes a `from()` with `immediateRender: false` in the same timeline (the table above). `gsap_repeat_floor_unclamped` and `gsap_repeat_ceil_overshoot` (warnings, printed): a computed repeat that turns into
   −1 or runs past the comp.
 
 **Reported elsewhere, not reproduced here** (png and mp4). Keep these out of this contract unless a new measurement on
@@ -172,7 +185,7 @@ the render host's engine brings one back:
   timeline in a 4 s slot stays visible);
 - a font face first requested mid-film losing the load race on a cold worker (a local face renders on its first frame);
 - a `filter` tween from `none` jumping;
-- CSS `@keyframes` drifting in an mp4;
+- CSS `@keyframes` drifting, in png-sequence or mp4;
 - the render's audio coming out quieter. Integrated loudness is unchanged; true peak rose 1.1 dB on a test tone, which
   is inside `spot-audio-assembly`'s −2.4 dBTP master margin for a −1 dBTP delivery.
 
@@ -189,9 +202,13 @@ the render host's engine brings one back:
   200 px type is relative to 16 px. Write px.
 - A visibility gate on an eased value fires early when the ease is solved numerically, because bisection returns about
   1e-9 at 0. Gate on time or on tween progress, and make a hand-written ease return exactly 0 and 1 at its ends.
+- At an exact repeat boundary GSAP renders the cycle's END, so a loop whose end differs from its start never shows its
+  start pose after the first cycle: a 0 → 200 px sawtooth sat at 200 on every wrap frame (measured). Make a loop
+  seamless, its end equal to its start.
 - From the `bang-motion` upstream (2026-09):
   - a more specific selector defeats an element's initial `opacity: 0`: keep the hidden state on the least specific
-    selector, and `immediateRender: false` leaves the CSS holding it;
+    selector, and a `fromTo` with `immediateRender: false` leaves the CSS holding it (a `from()` with it freezes beside a
+    `repeat: -1`, § Silent traps);
   - an SVG filter's default region (110 %) clips the tail of a blur: set x and y to −70 % and width and height to 240 %;
   - directional motion blur is `feGaussianBlur stdDeviation="x y"` (CSS `blur()` reads as out of focus), and the
     filter is detached when the tween ends;
@@ -219,22 +236,30 @@ python3 ~/.claude/skills/designed-elements/scripts/det_check.py prove hyper/<nam
 `source` reads the composition's own script (comments ignored) for `Math.random`, `Date`, `performance.now`, crypto
 randomness, `requestAnimationFrame`, `setTimeout` / `setInterval` and a bare `getContext('2d')`; a deliberate use carries
 `det-ok: <reason>` in a comment on its line. It reads the CSS too (`<style>`, `style=""`, the project's own `.css`): a
-`transition` FAILs, while an opacity `@keyframes` and a `will-change: transform` WARN. Any PNG carrying a colour chunk
-WARNs (§ Silent traps). It cannot see an accumulation, and a path with no `index.html` exits 2 rather than pass. `prove`
-renders twice as a png-sequence,
+`transition` FAILs and a `will-change: transform` WARNs; so does a `from()` with `immediateRender: false` in a script
+that also holds a `repeat: -1`. Any PNG carrying a colour chunk WARNs (§ Silent traps). It cannot see an accumulation,
+and a path with no `index.html` exits 2 rather than pass. `prove` renders twice as a png-sequence,
 compares every frame on the decoded pixels on the host, and reports each scene's first, middle and last frame and where
 in the frame each difference lies. A frame off by at most 2 code values on at most 0.01 % of its pixels is reported as
-NOISE and does not fail: Chromium's antialiasing at a worker's first frame after a blur (4 px off by 1 code value,
-measured on 0.8.18). A large bare canvas's seam at a worker's first frame (§ index.html) is many times wider than the
-band, and still fails. The where matters: a clip that spans the whole film is named as the scene of every differing frame. The proof
-frames stay on the host under `<remote-dir>/.det/<name>/<stamp>/`; it refuses a project whose `frames/` holds PNGs, and
-`--no-push` renders a copy already on the host (the push mirrors the local project with `--delete`).
+NOISE and does not fail — the size of Chromium's antialiasing (a blur left 4 px off by 1 code value at a worker's first
+frame, measured on 0.8.18). A large bare canvas's seam at a worker's first frame (§ index.html) is many times wider than
+the band, and still fails. The where matters: a clip that spans the whole film is named as the scene of every differing frame.
+The proof frames stay on the host under `<remote-dir>/.det/<name>/<stamp>/`; it refuses a project whose `frames/` holds
+PNGs, and `--no-push` renders a copy already on the host (the push mirrors the local project with `--delete`).
+
+A png-sequence frame is transparent wherever only the root's or the page's background lies (a `#000` root rendered
+alpha 0), and it stores straight alpha: a faint edge keeps its full colour under a low alpha, so a pixel going from
+alpha 0 to alpha 3 differs by 255 stored code values. Each DIFF line therefore also gives the difference as it looks
+composited, and any read of a png frame composites it first (colour × alpha) — its colour alone shows a fade at full
+strength. Plain text shrinking, with no `will-change`, varies between render RUNS on its glyphs' bottom edge row while
+it moves: 0 to 6 frames per pair of runs, up to 50 levels composited on at most 7 px a frame — five pairs measured on
+0.8.18, one of them identical, at the same worker count and across counts. The proof reports such a difference as a
+FAIL like any other; it is recorded here so its frames are read, not excused.
 
 The proof compares png-sequence frames because they are lossless: two mp4 encodes cannot isolate one cell, since a
 cell that really differs spreads encoder noise across the frame. Without such a cell, two mp4s at different worker
-counts decoded bit-identical. The mp4 capture path differs from the png one in one measured way (an opacity
-`@keyframes`). So a passing proof speaks for the composition, and the delivered mp4 is still read on the delivered frame
-(SKILL § 4).
+counts decoded bit-identical, and no measured cell renders differently between the two capture paths. So a passing
+proof speaks for the composition, and the delivered mp4 is still read on the delivered frame (SKILL § 4).
 
 Measured 2026-09-29 on the render host, hyperframes 0.8.18, `--workers 1` against `--workers 3`:
 
