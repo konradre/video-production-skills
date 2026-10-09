@@ -255,7 +255,13 @@ strength. Plain text shrinking, with no `will-change`, varies between render RUN
 it moves, up to 50 levels composited on at most 7 px a frame, and the first render of a project after a push is the run
 that differs: of eight pairs of runs measured on 0.8.18, every pair holding such a first render differed (1 to 8
 frames), and pairs of later renders differed by 0, 0 and 1. `prove` pushes before its first render, so expect a comp
-with shrinking text to FAIL on those rows. The FAIL stands; its frames are read, not excused.
+with shrinking text to FAIL on those rows. Such a FAIL counts as passed when its ONE-ROW line shows every separate
+difference one pixel row high — that line names every differing frame with its rows, where the DIFF lines stop at
+twelve — each of those rows is the bottom edge of a text shrinking in that frame, every one of those frames is read at
+its rows, and the finding — the frames, the rows, the proof's `.det/` stamp — is written in the project beside the
+composition. A FAIL with no ONE-ROW line, or with a row that is not such an edge, fails as before. No warm-up render is
+added to dodge it: a delivered render can be a first render too. Nor does a `--no-push` re-run replace the first
+proof's verdict: both of its renders are warm, so it mostly matches where the first proof did not.
 
 The proof compares png-sequence frames because they are lossless: two mp4 encodes cannot isolate one cell, since a
 cell that really differs spreads encoder noise across the frame. Without such a cell, two mp4s at different worker

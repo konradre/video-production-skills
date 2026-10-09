@@ -99,7 +99,9 @@ python3 ~/.claude/skills/designed-elements/scripts/det_check.py source <p>      
 
 **Done when:** the operator approved the pilot, every scene exists, the timeline wrote the slots, BEATS and captions
 (TIMELINE PASS), `literal_audit.py` passes, `slide_structure_audit.py` passes or each flag has been answered on the
-composition, `det_check.py source` passes (and `prove` passed on the pilot), and `npx hyperframes lint` reports 0 errors
+composition, `det_check.py source` passes (and `prove` passed on the pilot — a FAIL whose ONE-ROW line puts every
+difference on a shrinking text's bottom edge passes once its frames are read and the finding is written beside the
+composition, `designed-elements` HYPERFRAMES-CONTRACT § The determinism proof), and `npx hyperframes lint` reports 0 errors
 on the render host, and the report-only `check` summary `render_hyper.sh` prints was read — its ZONE lines, read against
 the band the project declares in `delivery-targets.json` (`video-production` SAFE-AREAS.md).
 

@@ -18,9 +18,12 @@ distance instead of an accumulation); this is the instrument that checks them.
            (data-start / data-duration in index.html, with --project) each difference falls in, where in the frame (its
            bounding box), how large it looks composited (a png-sequence frame stores straight alpha, so a faint edge
            going from alpha 0 to 3 differs by 255 stored code values and by 3 on screen), plus the status of each scene's
-           first, middle and last frame. A frame that differs by at most 2 stored code values on at most 0.01 % of its
-           pixels is NOISE, reported and not failed: the size of Chromium's antialiasing (measured 0.8.18: a blur left
-           4 px by 1 code value at a worker's first frame).
+           first, middle and last frame, and whether each separate difference (its pixels touching, diagonals
+           included) is one pixel row high: when every one is, a ONE-ROW line names each differing frame with its rows
+           (the DIFF lines stop at twelve), the line the proof's rule for a shrinking text's bottom edge reads
+           (HYPERFRAMES-CONTRACT § The determinism proof). A frame that differs by
+           at most 2 stored code values on at most 0.01 % of its pixels is NOISE, reported and not failed: the size of
+           Chromium's antialiasing (measured 0.8.18: a blur left 4 px by 1 code value at a worker's first frame).
   prove    source, then render the composition TWICE as a png-sequence on the render host with different --workers
            splits (default 1 and 3) and compare. Each worker is a fresh page that starts cold at its own frames, so a
            frame that depends on the frames drawn before it differs across the split, and a frame that reads a clock
@@ -242,14 +245,18 @@ def compare(dir_a, dir_b, fps=24.0, project=None, tol=0):
     bad, noise = [], []
     for i, (fa, fb) in enumerate(zip(A, B)):
         a, b = np.asarray(Image.open(fa)), np.asarray(Image.open(fb))
-        if a.shape != b.shape: bad.append((i, 255, 1.0, f'shape {a.shape} vs {b.shape}')); continue
+        if a.shape != b.shape: bad.append((i, 255, 1.0, f'shape {a.shape} vs {b.shape}', False, [])); continue
         if np.array_equal(a, b): continue
         dif = np.abs(a.astype(np.int16) - b.astype(np.int16)); mx = int(dif.max())
         if mx <= tol: continue
         m = (dif.max(axis=-1) if dif.ndim == 3 else dif) > tol; ys, xs = np.nonzero(m); n = int(m.sum())
         # where it differs, so a full-length clip named as the scene is not mistaken for the cause; and how much it shows
         box = (slice(ys.min(), ys.max() + 1), slice(xs.min(), xs.max() + 1)); vis = _composited(a[box], b[box])
-        hit = (i, mx, n / m.size, f'{n} px at x {xs.min()}-{xs.max()}, y {ys.min()}-{ys.max()}; {vis} level(s) as composited')
+        # each separate difference one pixel row high: no differing pixel touches one in the row above, diagonals included
+        up = m[:-1] | np.pad(m[:-1, 1:], ((0, 0), (0, 1))) | np.pad(m[:-1, :-1], ((0, 0), (1, 0)))
+        flat = not (m[1:] & up).any()
+        hit = (i, mx, n / m.size, f'{n} px at x {xs.min()}-{xs.max()}, y {ys.min()}-{ys.max()}; {vis} level(s) as composited',
+               flat, np.unique(ys).tolist() if flat else [])
         (noise if mx <= NOISE_MAX and n / m.size <= NOISE_FRAC else bad).append(hit)
     sc = scenes_of(project, fps) if project else []
     where = lambda i: next((n for n, f0, f1 in sc if f0 <= i <= f1), '-')
@@ -260,10 +267,19 @@ def compare(dir_a, dir_b, fps=24.0, project=None, tol=0):
         fm = (f0 + f1) // 2; k = sum(1 for i in idx if f0 <= i <= f1)
         st = ' '.join(f"{lab} f{f}={'DIFF' if f in idx else 'same'}" for lab, f in (('first', f0), ('middle', fm), ('last', f1)))
         print(f'  scene {n}: frames {f0}-{f1}, {k} differ · {st}')
-    for i, mx, frac, note in bad[:12]:
+    for i, mx, frac, note, *_ in bad[:12]:
         print(f'  DIFF frame {i} (T={i / fps:.3f} s, scene {where(i)}): max {mx} code values, {frac:.1%} of pixels{" — " + note if note else ""}')
     if len(bad) > 12: print(f'  … {len(bad) - 12} more')
-    for i, mx, frac, note in noise[:12]:
+    one = [(h[0], h[5]) for h in bad if h[4]]   # every frame, never the first twelve: the proof's one-row rule reads it
+    if bad and len(one) == len(bad):
+        print(f"  ONE-ROW: every difference is one pixel row high (frame@y: {', '.join(f'{i}@' + '+'.join(map(str, ys)) for i, ys in one)}) — "
+              'if each row is the bottom edge of a text shrinking in that frame, read every frame at its rows and write the '
+              'finding beside the composition: it counts as passed (HYPERFRAMES-CONTRACT § The determinism proof)')
+    elif bad:
+        many = [h[0] for h in bad if not h[4]]
+        print(f"  ROWS: {len(one)} of {len(bad)} differing frames hold only one-row differences; {len(many)} hold one spanning "
+              f"more rows (frames {', '.join(map(str, many[:24]))}{' …' if len(many) > 24 else ''}) — the FAIL stands")
+    for i, mx, frac, note, *_ in noise[:12]:
         print(f'  NOISE frame {i} (T={i / fps:.3f} s): max {mx} code value(s), {note} — inside the band ({NOISE_MAX} code values on '
               f'{NOISE_FRAC:.2%} of the frame): antialiasing-sized, not failed — read it where it lies')
     if len(noise) > 12: print(f'  … {len(noise) - 12} more NOISE frames')
@@ -425,6 +441,34 @@ def selftest():
         with contextlib.redirect_stdout(out): okf, idf = compare(os.path.join(T, 'F0'), os.path.join(T, 'F1'), 24)
         chk('a transparent pixel turning white at alpha 3: 255 stored code values, still a FAIL, reported as 3 levels composited',
             okf is False and idf == [0] and 'max 255 code values' in out.getvalue() and '3 level(s) as composited' in out.getvalue())
+        def rows(name, n, hits):   # a hit is a row y (pixels x 2-4) or (y, x0, x1)
+            d = os.path.join(T, name); os.makedirs(d)
+            for i in range(n):
+                a = np.full((8, 8, 4), 40, np.uint8)
+                for h in hits.get(i, ()):
+                    y, x0, x1 = h if isinstance(h, tuple) else (h, 2, 5); a[y, x0:x1] = 250
+                Image.fromarray(a, 'RGBA').save(os.path.join(d, f'frame_{i:06d}.png'))
+            return d
+        R0 = rows('R0', 6, {})
+        for nm, hits, want_idx, one_row, want, label in (
+                ('R1', {1: (5,), 4: (6,)}, [1, 4], True, 'every difference is one pixel row high (frame@y: 1@5, 4@6)',
+                 'two frames each differing on one pixel row → FAIL, the ONE-ROW line names each frame with its row'),
+                ('R2', {1: (5,), 4: (5, 6)}, [1, 4], False,
+                 '1 of 2 differing frames hold only one-row differences; 1 hold one spanning more rows (frames 4) — the FAIL stands',
+                 'one of them spanning two rows → no ONE-ROW line, the frame that spans more named'),
+                ('R5', {1: (1, 6)}, [1], True, '(frame@y: 1@1+6)',
+                 'two separate one-row differences in one frame (two lines shrinking at once) → ONE-ROW, both rows named'),
+                ('R6', {1: ((2, 2, 3), (3, 3, 4))}, [1], False, '(frames 1)',
+                 'two pixels touching on a diagonal → one difference two rows high, the FAIL stands'),
+                ('R7', {1: ((2, 4, 5), (3, 3, 4))}, [1], False, '(frames 1)',
+                 'two pixels touching on the other diagonal → the same')):
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out): okr, idr = compare(R0, rows(nm, 6, hits), 24)
+            chk(label, okr is False and idr == want_idx and want in out.getvalue() and ('ONE-ROW' in out.getvalue()) == one_row)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out): okt, idt = compare(rows('R3', 14, {}), rows('R4', 14, {i: (i % 8,) for i in range(14)}), 24)
+        chk('14 one-row frames: the DIFF lines stop at twelve ("… 2 more"), the ONE-ROW line names all 14, 13@5 last',
+            okt is False and len(idt) == 14 and '… 2 more' in out.getvalue() and ', 12@4, 13@5)' in out.getvalue())
     print(f"SELFTEST {'PASS' if ok else 'FAIL'}"); return 0 if ok else 1
 
 

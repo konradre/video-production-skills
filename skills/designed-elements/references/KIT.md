@@ -65,7 +65,7 @@ on generated motion**.
 
 ```
 turntable / display  → an EDL event (source designed, look cube), the closer over it, a layer of drift on top
-end card             → the endcard event, full 2.5 s, the signature at +0.02, no captions over it
+end card             → the endcard event at its full render length (2.5 s by default), the signature at +0.02, no captions over it
 wall                 → a post layer straddling a join; its opaque window decides the REVEAL marker
 drift                → a post layer over the turntable event
 composited burst     → a new hero file (<hero>-burst.mov) that replaces the event's src
