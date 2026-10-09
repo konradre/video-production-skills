@@ -12,6 +12,8 @@ An end card can go through a dozen rounds before it is right. Every rule below i
   glitch") — a threshold that names what the failure looks like lets a reviewer label the defect and pick
   the lever. Use them for every motion beat: an entrance, a ding, a sting, a burst.
 - Brand colour, one display face, the product's exact silhouette — the three things every element shares.
+- **A colour that moves between hues moves in OKLCH.** An sRGB blend passes through grey or mud (blue → yellow went
+  through 128,128,128); both ends written as `oklch()` keep the midpoint vivid (HYPERFRAMES-CONTRACT § Silent traps).
 
 ## Composition drivers — written as numbers beside the bans
 
@@ -174,7 +176,8 @@ SAFE-AREAS.md).
 | crop that FOLLOWS a world point through the camera | a foot or a held prop on a moving shot | no instrument yet: in a code-rendered scene, place the crop per frame with the scene's own camera transform |
 
 A sheet per shot, a strip for every key motion and transition, a crop for every face that carries the story
-(ClaudeAnimationBase's four-zoom loop).
+(ClaudeAnimationBase's four-zoom loop). A move that looks wrong at speed is read on its strip, frame by frame: an
+easing flaw invisible at full speed is plain there, the same thing a quarter-speed review shows.
 
 ## Numbers on screen
 
@@ -206,6 +209,11 @@ A sheet per shot, a strip for every key motion and transition, a crop for every 
 - **In and out are not the same length.** An entrance is slow and firm — 0.7–1.3 s on a strong ease-out; an exit is
   quick — 0.35–0.55 s on an ease-in. Matched durations read mechanical, and the exit is the half that usually gets
   copied from the entrance.
+- **A stagger exits by its LAST element**: the group is clear at start + (n − 1) × step + duration, and that is the time
+  that must fall before the cut, not the first element's end.
+- **Two words crossfading in one place dim the strokes they share**: two 50 % layers composite to 75 % at mid-fade
+  (1 − 0.5 × 0.5). Hold the characters both words share and fade only what changes. Two labels never fade over each
+  other: the first reaches zero before the second starts, or the frame prints both at once.
 
 ## Sound sync
 

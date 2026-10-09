@@ -7,10 +7,17 @@ distance instead of an accumulation); this is the instrument that checks them.
            own .js/.mjs — never node_modules, *.min.js or assets/) for the clock and random readers: Math.random,
            Date / Date.now, performance.now, crypto randomness, requestAnimationFrame, setTimeout / setInterval.
            Comments are ignored; a deliberate use carries `det-ok: <reason>` in a comment on its line. It CANNOT see
-           an accumulation (`x += v` in an onUpdate) — only the render proof can.
+           an accumulation (`x += v` in an onUpdate) — only the render proof can. Its CSS (<style> blocks, style=""
+           attributes, the project's own .css) is read for a `transition` (a FAIL: a cold worker starts it at its own
+           first frame), an `@keyframes` that animates opacity (a WARN: a png-sequence layer renders it at full opacity)
+           and a `will-change: transform` (a WARN: text scaled above its first size renders soft); every PNG outside
+           renders/ and frames/ for the colour chunks Chromium applies (gAMA, cHRM, iCCP, cICP — a WARN). Measured on
+           hyperframes 0.8.18, 2026-10-10 (HYPERFRAMES-CONTRACT § Silent traps). A path with no index.html exits 2.
   frames   compare two PNG sequences of one composition frame by frame on the decoded pixels, and say which scene
-           (data-start / data-duration in index.html, with --project) each difference falls in, plus the status of
-           each scene's first, middle and last frame.
+           (data-start / data-duration in index.html, with --project) each difference falls in, where in the frame (its
+           bounding box), plus the status of each scene's first, middle and last frame. A frame that differs by at most
+           2 code values on at most 0.01 % of its pixels is NOISE, reported and not failed: Chromium's antialiasing at a
+           worker's first frame after a blur (measured 0.8.18: 4 px by 1 code value).
   prove    source, then render the composition TWICE as a png-sequence on the render host with different --workers
            splits (default 1 and 3) and compare. Each worker is a fresh page that starts cold at its own frames, so a
            frame that depends on the frames drawn before it differs across the split, and a frame that reads a clock
@@ -27,11 +34,12 @@ distance instead of an accumulation); this is the instrument that checks them.
 one or two between runs; a 2D canvas or DOM composition holds 0). Exit 0 PASS, 1 FAIL, 2 unusable input. Sentinel
 DET-CHECK PASS|FAIL.
 """
-import argparse, datetime, glob, os, re, subprocess, sys, tempfile
+import argparse, datetime, glob, os, re, struct, subprocess, sys, tempfile, zlib
 import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.realpath(__file__))
+TRANSITION = 'a CSS transition — a cold render worker starts it at its own first frame, so frames differ after every split (measured 0.8.18): tween it on the timeline'
 RULES = [
     (r'\bMath\s*\.\s*random\b', 'unseeded random — draw from mulberry32(seed)'),
     (r'\bDate\s*\.\s*now\b|\bnew\s+Date\b|\bDate\s*\(', 'wall clock — pass the timeline time in'),
@@ -40,8 +48,22 @@ RULES = [
     (r'\brequestAnimationFrame\b', 'a draw loop outside the timeline — draw from the tweened progress'),
     (r'\bset(?:Interval|Timeout)\b', 'a wall-clock timer — tween the value instead'),
     (r'''\bgetContext\s*\(\s*['"]2d['"]\s*\)''', "a 2D canvas without {willReadFrequently:true} — Chrome changes its raster path after the first presented frame, so each worker's first frame differs"),
+    (r'''\bstyle\s*\.\s*transition\s*=(?!=)(?!\s*['"`](?:none|0s?)?['"`])''', TRANSITION),
 ]
+WILL_CHANGE = ('Chromium draws a will-change element once at the size it has when its layer is made and stretches '
+               'that bitmap: text scaled ABOVE that size renders soft (16 px scaled 3x lost its stencil cuts, measured 0.8.18); a '
+               'translation, or a scale down to rest, is unaffected')
+JS_WARN = [(r'''\bwillChange\s*=\s*['"`][^'"`]*\b(?:transform|scale)\b''', WILL_CHANGE)]
+# measured 2026-10-10, hyperframes 0.8.18: a 2 s transition set at 1.0 s read 191,0,64 at 1.5 s on one worker and 234,0,21 on
+# the worker that started at 1.33 s. @keyframes are seeked exactly in an mp4 render (spin, slide, colour, opacity, delay,
+# alternate), but in a png-sequence render every opacity keyframe animation read full opacity once it had started.
+CSS_RULES = [(r'(?<![\w-])(?:-webkit-)?transition(?:-(?:property|duration))?\s*:(?!\s*(?:none|0s?)\s*(?:[;}"\']|$))', TRANSITION)]
+KEYFRAMES_OPACITY = 'an @keyframes that animates opacity — a png-sequence (layer) render shows it at full opacity once it starts (an mp4 renders it right, measured 0.8.18): tween opacity on the timeline'
+COLOUR_CHUNKS = (b'gAMA', b'cHRM', b'iCCP', b'cICP')
+COLOUR_MSG = ('Chromium colour-manages a PNG carrying these chunks, so it renders off its own pixel values (a 128 grey with '
+              'gAMA=100000 rendered 188, measured 0.8.18; 45455 is 1/2.2 and shifts less) — save the art as plain sRGB values without them')
 SKIP_DIRS = {'node_modules', 'renders', 'frames', 'det', 'assets', '.git'}
+NOISE_MAX, NOISE_FRAC = 2, 0.0001   # Chromium antialiasing at a worker's first frame after a blur: 4 px by 1 code value (0.8.18)
 
 
 def _strip_js(code):
@@ -71,22 +93,84 @@ def _scripts(path):
         yield html.count('\n', 0, m.start(2)) + 1, m.group(2)
 
 
+def _strip_css(css):
+    """Blank /* comments */ but keep line numbers."""
+    return re.sub(r'/\*.*?\*/', lambda m: re.sub(r'[^\n]', ' ', m.group(0)), css, flags=re.S)
+
+
+def _styles(path):
+    """(first line number, css text) for each <style> block and each style="" attribute of a tag; HTML comments blanked."""
+    html = open(path, encoding='utf-8', errors='replace').read()
+    html = re.sub(r'<!--.*?-->', lambda m: re.sub(r'[^\n]', ' ', m.group(0)), html, flags=re.S)
+    for m in re.finditer(r'<style\b[^>]*>(.*?)</style>', html, flags=re.S | re.I):
+        yield html.count('\n', 0, m.start(1)) + 1, m.group(1)
+    for m in re.finditer(r'''<[A-Za-z][^<>]*?\sstyle\s*=\s*(["'])(.*?)\1''', html, flags=re.S):
+        yield html.count('\n', 0, m.start(2)) + 1, m.group(2)
+
+
+def _opacity_keyframes(css):
+    """[(offset, name)] for each @keyframes block whose body sets opacity."""
+    out = []
+    for m in re.finditer(r'@(?:-webkit-)?keyframes\s+([\w-]+)\s*\{', css):
+        depth, i = 1, m.end()
+        while i < len(css) and depth:
+            depth += {'{': 1, '}': -1}.get(css[i], 0); i += 1
+        if re.search(r'(?<![\w-])opacity\s*:', css[m.end():i]): out.append((m.start(), m.group(1)))
+    return out
+
+
+def png_colour_chunks(path):
+    """The colour chunks a PNG carries before its image data (gAMA with its value, cHRM, iCCP, cICP); [] for none or not a PNG."""
+    try:
+        with open(path, 'rb') as fh: b = fh.read(1 << 20)
+    except OSError: return []
+    if b[:8] != b'\x89PNG\r\n\x1a\n': return []
+    i, out = 8, []
+    while i + 8 <= len(b):
+        n, t = struct.unpack('>I', b[i:i + 4])[0], b[i + 4:i + 8]
+        if t in (b'IDAT', b'IEND'): break
+        if t == b'gAMA' and n == 4: out.append(f"gAMA={struct.unpack('>I', b[i + 8:i + 12])[0]}")
+        elif t in COLOUR_CHUNKS: out.append(t.decode())
+        i += 12 + n
+    return out
+
+
+def scan_assets(project):
+    """[(relative path, colour chunks)] for every PNG in the project outside renders/, frames/ and det/ that carries one."""
+    out = []
+    for root, dirs, files in os.walk(project):
+        dirs[:] = sorted(d for d in dirs if d not in {'node_modules', 'renders', 'frames', 'det', '.git'})
+        for f in sorted(files):
+            if f.lower().endswith('.png') and (ch := png_colour_chunks(os.path.join(root, f))):
+                out.append((os.path.relpath(os.path.join(root, f), project), ch))
+    return out
+
+
 def scan_source(project):
-    """Return (files scanned, findings [(file, line, rule, text, allowed-reason)])."""
-    units = []
+    """Return (files scanned, findings [(file, line, rule, text, allowed-reason, FAIL|WARN)])."""
+    units, css = [], []
     for root, dirs, files in os.walk(project):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         for f in sorted(files):
             p = os.path.join(root, f)
-            if f.endswith('.html'): units += [(p, ln, s) for ln, s in _scripts(p)]
+            if f.endswith('.html'): units += [(p, ln, s) for ln, s in _scripts(p)]; css += [(p, ln, s) for ln, s in _styles(p)]
+            elif f.endswith('.css') and not f.endswith('.min.css'): css.append((p, 1, open(p, encoding='utf-8', errors='replace').read()))
             elif f.endswith(('.js', '.mjs')) and not f.endswith('.min.js'): units.append((p, 1, open(p, encoding='utf-8', errors='replace').read()))
-    found, files = [], sorted({u[0] for u in units})
+    found, files = [], sorted({u[0] for u in units + css})
+    ok_on = lambda line: (lambda m: m.group(1).strip() if m else None)(re.search(r'det-ok:\s*(.+?)\s*(?:\*/)?\s*$', line))
     for p, ln0, raw in units:
         rl = raw.split('\n'); code = _strip_js(raw).split('\n')
         for i, line in enumerate(code):
-            for rx, why in RULES:
+            for rx, why, level in [(r, w, 'FAIL') for r, w in RULES] + [(r, w, 'WARN') for r, w in JS_WARN]:
                 for m in re.finditer(rx, line):
-                    ok = re.search(r'det-ok:\s*(.+)', rl[i]); found.append((os.path.relpath(p, project), ln0 + i, why, m.group(0), ok.group(1).strip() if ok else None))
+                    found.append((os.path.relpath(p, project), ln0 + i, why, m.group(0), ok_on(rl[i]), level))
+    for p, ln0, raw in css:
+        rl, code = raw.split('\n'), _strip_css(raw)
+        hits = [(m.start(), why, m.group(0).strip(), 'FAIL') for rx, why in CSS_RULES for m in re.finditer(rx, code)]
+        hits += [(off, KEYFRAMES_OPACITY, f'@keyframes {name}', 'WARN') for off, name in _opacity_keyframes(code)]
+        hits += [(m.start(), WILL_CHANGE, m.group(0).strip(), 'WARN') for m in re.finditer(r'(?<![\w-])will-change\s*:[^;}"\']*\b(?:transform|scale)\b', code)]
+        for off, why, txt, level in sorted(hits):
+            i = code.count('\n', 0, off); found.append((os.path.relpath(p, project), ln0 + i, why, txt, ok_on(rl[i]), level))
     return files, found
 
 
@@ -115,33 +199,44 @@ def compare(dir_a, dir_b, fps=24.0, project=None, tol=0):
     A, B = _pngs(dir_a), _pngs(dir_b)
     if not A or not B: return None, f'no PNG frames in {dir_a if not A else dir_b}'
     if len(A) != len(B): print(f'FAIL frame count differs: {len(A)} in {dir_a} vs {len(B)} in {dir_b}'); return False, []
-    bad = []
+    bad, noise = [], []
     for i, (fa, fb) in enumerate(zip(A, B)):
         a, b = np.asarray(Image.open(fa)), np.asarray(Image.open(fb))
         if a.shape != b.shape: bad.append((i, 255, 1.0, f'shape {a.shape} vs {b.shape}')); continue
         if np.array_equal(a, b): continue
         dif = np.abs(a.astype(np.int16) - b.astype(np.int16)); mx = int(dif.max())
-        if mx > tol: bad.append((i, mx, float((dif.max(axis=-1) if dif.ndim == 3 else dif).astype(bool).mean()), ''))
+        if mx <= tol: continue
+        m = (dif.max(axis=-1) if dif.ndim == 3 else dif) > tol; ys, xs = np.nonzero(m); n = int(m.sum())
+        # where it differs, so a full-length clip named as the scene is not mistaken for the cause
+        hit = (i, mx, n / m.size, f'{n} px at x {xs.min()}-{xs.max()}, y {ys.min()}-{ys.max()}')
+        (noise if mx <= NOISE_MAX and n / m.size <= NOISE_FRAC else bad).append(hit)
     sc = scenes_of(project, fps) if project else []
     where = lambda i: next((n for n, f0, f1 in sc if f0 <= i <= f1), '-')
-    print(f'{len(A)} frames @ {fps:g} fps compared on decoded pixels (tolerance {tol}): {len(bad)} differ')
+    print(f'{len(A)} frames @ {fps:g} fps compared on decoded pixels (tolerance {tol}): {len(bad)} differ'
+          + (f', {len(noise)} more within the noise band' if noise else ''))
     idx = {b[0] for b in bad}
     for n, f0, f1 in sc:
         fm = (f0 + f1) // 2; k = sum(1 for i in idx if f0 <= i <= f1)
         st = ' '.join(f"{lab} f{f}={'DIFF' if f in idx else 'same'}" for lab, f in (('first', f0), ('middle', fm), ('last', f1)))
         print(f'  scene {n}: frames {f0}-{f1}, {k} differ · {st}')
     for i, mx, frac, note in bad[:12]:
-        print(f'  DIFF frame {i} (T={i / fps:.3f} s, scene {where(i)}): max {mx} code values, {frac:.1%} of pixels{" " + note if note else ""}')
+        print(f'  DIFF frame {i} (T={i / fps:.3f} s, scene {where(i)}): max {mx} code values, {frac:.1%} of pixels{" — " + note if note else ""}')
     if len(bad) > 12: print(f'  … {len(bad) - 12} more')
+    for i, mx, frac, note in noise[:12]:
+        print(f'  NOISE frame {i} (T={i / fps:.3f} s): max {mx} code value(s), {note} — inside the band ({NOISE_MAX} code values on '
+              f'{NOISE_FRAC:.2%} of the frame): Chromium antialiasing at a worker\'s first frame after a blur, not the composition')
+    if len(noise) > 12: print(f'  … {len(noise) - 12} more NOISE frames')
     return not bad, sorted(idx)
 
 
 def report_source(project):
     files, found = scan_source(project)
-    live = [f for f in found if not f[4]]
-    print(f'source: {len(files)} file(s) with script scanned under {project}')
-    for rel, ln, why, txt, allowed in found:
-        print(f"  {'ALLOWED' if allowed else 'FAIL'} {rel}:{ln} {txt} — {why}{' (det-ok: ' + allowed + ')' if allowed else ''}")
+    live = [f for f in found if not f[4] and f[5] == 'FAIL']
+    print(f'source: {len(files)} file(s) with script or style scanned under {project}')
+    for rel, ln, why, txt, allowed, level in found:
+        print(f"  {'ALLOWED' if allowed else level} {rel}:{ln} {txt} — {why}{' (det-ok: ' + allowed + ')' if allowed else ''}")
+    for rel, chunks in scan_assets(project):
+        print(f"  WARN {rel}: {' '.join(chunks)} — {COLOUR_MSG}")
     if not files: print('  (no script found — nothing to read; the render proof still applies)')
     print('  accumulation (x += v in an onUpdate) is invisible to this scan — the render proof catches it')
     return not live
@@ -226,11 +321,41 @@ def selftest():
         _, found = scan_source(cv)
         chk("getContext('2d') bare → FAIL at line 2; with {willReadFrequently:true} → clean", [(f[1], f[4]) for f in found] == [(2, None)])
         chk('scenes from data-start/data-duration, the root excluded', scenes_of(clean, 24) == [('a', 0, 5), ('b', 6, 11)])
-        def seq(name, n, alter=None, delta=1):
+        miss = subprocess.run([sys.executable, os.path.realpath(__file__), 'source', os.path.join(T, 'no-such-project')], capture_output=True, text=True)
+        chk('source on a path with no index.html → exit 2, never a PASS', miss.returncode == 2 and 'PASS' not in miss.stdout)
+        css = proj('css', '''<style>
+  #a { transition: opacity 1s; }
+  #b { transition: none; }
+  /* #c { transition: all 1s; } */
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+<div id="d" style="transition: transform .2s"></div>
+<div id="e" style="color: red"></div>
+<script>
+  el.style.transition = 'none';
+  el.style.transition = 'opacity 1s';
+</script>
+<style> .w { will-change: transform; } .o { will-change: opacity; } </style>
+<script> el.style.willChange = 'transform'; </script>''', {'css/site.css': '.x {\n  -webkit-transition: left 1s;\n}\n', 'css/ok.css': '.y { transition: none }\n'})
+        _, found = scan_source(css)
+        got = sorted((f[0], f[1], f[5]) for f in found)
+        chk(f'CSS: a transition in <style>, style="" and a .css file and a JS assignment FAIL; none/0, a comment, a non-opacity '
+            f'@keyframes, will-change: opacity pass; an opacity @keyframes and will-change: transform (CSS and JS) WARN → {got}',
+            got == [('css/site.css', 2, 'FAIL'), ('index.html', 2, 'FAIL'), ('index.html', 5, 'WARN'), ('index.html', 8, 'FAIL'), ('index.html', 12, 'FAIL'),
+                    ('index.html', 14, 'WARN'), ('index.html', 15, 'WARN')])
+        Image.new('RGB', (4, 4), (128, 128, 128)).save(os.path.join(css, 'assets', 'plain.png'))
+        raw = open(os.path.join(css, 'assets', 'plain.png'), 'rb').read(); body = b'gAMA' + struct.pack('>I', 100000)
+        gama = raw[:33] + struct.pack('>I', 4) + body + struct.pack('>I', zlib.crc32(body) & 0xffffffff) + raw[33:]
+        for rel in ('assets/gama.png', 'renders/gama.png'):
+            os.makedirs(os.path.dirname(os.path.join(css, rel)), exist_ok=True); open(os.path.join(css, rel), 'wb').write(gama)
+        chk(f'a PNG asset with gAMA is listed with its value; a plain one and one under renders/ are not → {scan_assets(css)}',
+            scan_assets(css) == [('assets/gama.png', ['gAMA=100000'])])
+        def seq(name, n, alter=None, delta=1, size=8, npx=1):
             d = os.path.join(T, name); os.makedirs(d)
             for i in range(n):
-                a = np.full((8, 8, 4), (i * 20) % 256, np.uint8)
-                if alter == i: a[2, 3, 0] = (int(a[2, 3, 0]) + delta) % 256
+                a = np.full((size, size, 4), (i * 20) % 256, np.uint8)
+                if alter == i: a[2, 3:3 + npx, 0] = (a[2, 3:3 + npx, 0].astype(int) + delta) % 256
                 Image.fromarray(a, 'RGBA').save(os.path.join(d, f'frame_{i:06d}.png'))
             return d
         A, B, C = seq('A', 12), seq('B', 12), seq('C', 12, alter=8)
@@ -239,6 +364,10 @@ def selftest():
         ok3, _ = compare(A, C, 24, clean, tol=1); chk('the same difference inside --tolerance 1 → PASS', ok3 is True)
         ok4, _ = compare(A, seq('D', 11), 24); chk('a different frame count → FAIL', ok4 is False)
         ok5, msg = compare(A, os.path.join(T, 'nothing'), 24); chk('an empty side → unusable (None), never a pass', ok5 is None)
+        big = seq('E0', 4, size=128)
+        okn, idn = compare(big, seq('E1', 4, alter=2, size=128), 24); chk('1 px by 1 code value in a 128x128 frame (0.006 %) → NOISE, a PASS', okn is True and idn == [])
+        oka, ida = compare(big, seq('E2', 4, alter=2, delta=3, size=128), 24); chk('the same pixel by 3 code values → FAIL (over 2)', oka is False and ida == [2])
+        oke, ide = compare(big, seq('E3', 4, alter=2, size=128, npx=3), 24); chk('3 px by 1 code value (0.018 %) → FAIL (over 0.01 %)', oke is False and ide == [2])
     print(f"SELFTEST {'PASS' if ok else 'FAIL'}"); return 0 if ok else 1
 
 
@@ -253,6 +382,7 @@ def main():
     p.add_argument('--no-push', action='store_true', help='render the copy already on the host (the push mirrors the local project with --delete: never push a partial copy)')
     a = ap.parse_args()
     if a.cmd == 'source':
+        if not os.path.isfile(os.path.join(a.project, 'index.html')): print(f'no composition at {a.project}/index.html — nothing read, no verdict'); sys.exit(2)
         ok = report_source(a.project); print(f"DET-CHECK {'PASS' if ok else 'FAIL'} source"); sys.exit(0 if ok else 1)
     if a.cmd == 'frames':
         ok, _ = compare(a.dir_a, a.dir_b, a.fps, a.project, a.tolerance)

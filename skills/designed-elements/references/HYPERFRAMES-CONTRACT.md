@@ -45,6 +45,20 @@ spot that should carry the new one — the round ledger lists which spots carry 
 - Canvas elements draw from a tweened progress object inside the timeline, never from `requestAnimationFrame`
   or wall-clock time; images are loaded before the timeline is registered (`build()` after the last
   `onload`).
+- **The timeline is built synchronously and registered last.** A build that must wait — images, or fonts when text is
+  measured rather than computed — runs inside the wait (`document.fonts.ready`, the last `onload`), registers
+  `window.__timelines[id]` at the END of that callback and then calls `__hfForceTimelineRebind()`. Registering first
+  nests an empty timeline when the comp is a sub-composition (the engine's lint error
+  `gsap_timeline_registered_before_async_build`). Fit computed from an advance table never needs the font wait.
+- **Motion lives on the ONE timeline.** No CSS `transition`: it starts when its style changes, so a cold render worker
+  starts it at its own first frame and every worker split shows a different frame (measured, § Silent traps). CSS
+  `@keyframes` are seeked exactly in an mp4 render, but in a png-sequence LAYER an opacity keyframe animation renders at
+  full opacity once it starts — so a layer tweens opacity on the timeline. `det_check.py source` fails a transition and
+  warns on an opacity `@keyframes`.
+- **Things move by transform.** `x`/`y`/`scale`/`rotation`, never `top`/`left`/`width`/`height`/`margin`/`padding`,
+  `fontSize` or `letterSpacing`: layout values snap to whole pixels, so slow motion steps (the engine's lint error
+  `gsap_non_transform_motion` — it reads tween vars only, so an `onUpdate` writing `style.left`/`style.top` snaps the same
+  way and passes unflagged).
 - **Anything that flows is a tweened DISTANCE, never an accumulation.** `pos += speed * dt` per frame is the
   determinism hole the seeded PRNG does not close: the value depends on how many frames happened, so a scrub lands
   somewhere else than a playthrough and two renders of one composition differ. Tween the distance (`flow` to
@@ -65,7 +79,12 @@ spot that should carry the new one — the round ledger lists which spots carry 
 - Display copy lives in the HTML or in one `COPY = { … }` object in the script, whole — never assembled from fragments
   in code, which `literal_audit.py` cannot read.
 - No network at render for assets: fonts (`@font-face` from `assets/fonts/`), textures, cut-outs, sprites
-  all local. Text in a display face is DESIGNED here — packaging text from a generator corrupts ("WARNIGY").
+  all local. Text in a display face is DESIGNED here — packaging text from a generator corrupts ("WARNIGY"). GSAP is the
+  one exception: from the CDN at an EXACT version (`gsap@3.14.2`, as the scaffolds write it; never the engine docs'
+  floating `gsap@3`). Its tag is parser-blocking, so the timeline is never built before it loads.
+- **A PNG asset carries no colour chunk** (`gAMA`, `cHRM`, `iCCP`, `cICP`). Chromium colour-manages a PNG that has one,
+  so the render departs from the file's own pixel values: a 128 grey with `gAMA` 1.0 rendered 188 (measured, png and
+  mp4). Save the art as plain sRGB values; `det_check.py source` lists any PNG that still carries one.
 - The composition's sound sync is a constant (`T0`, e.g. 0.83 s): the burst fires on the audio signature's hit,
   and it is the constant that moves when the sound is re-timed, never the sound (`spot-audio-assembly` § signature).
 
@@ -104,6 +123,86 @@ render_hyper.sh --dir hyper --name <name> --format png-sequence --host <render h
 - A layer is verified with `layer_check.py` (contiguous frames, RGBA, the frame it becomes opaque); an
   event with `ffprobe` (raster, duration = `data-duration`, 24 fps).
 
+## Silent traps — what the render host's engine does, measured
+
+Measured 2026-10-10 on hyperframes 0.8.18 with GSAP 3.14.2, as png-sequence and mp4, at 1 and 3 workers. Every row
+failed silently: a plausible frame and no error. Re-measure after an engine upgrade before trusting a row.
+
+| trap | what the render shows | the rule | caught by |
+|---|---|---|---|
+| a CSS `transition` | a cold worker starts it at its own first frame, so each split shows another colour (191,0,64 against 234,0,21 at 1.5 s) | tween the change on the timeline | `det_check.py source`, FAIL |
+| an opacity `@keyframes` in a png-sequence layer | full opacity from the moment it starts; an mp4 renders the same animation exactly | a layer tweens opacity on the timeline | `det_check.py source`, WARN |
+| `will-change: transform` on text that scales up | drawn once at its first size, then stretched: 16 px text scaled 3× lost its stencil cuts (edge energy −22 %) | no `will-change` on anything that grows past its first size; translation and a scale down to rest are unaffected | `det_check.py source`, WARN |
+| a PNG carrying `gAMA`, `cHRM`, `iCCP` or `cICP` | colour-managed: a 128 grey with `gAMA` 1.0 renders 188 | plain sRGB values with no colour chunk (§ index.html) | `det_check.py source`, WARN |
+| a colour tween between hues, written in hex, `rgb()` or `hsl()` | interpolated in sRGB: blue → yellow passes through grey, 128,128,128 | write both ends as `oklch(L C H)`: GSAP tweens the three numbers (midpoint 0,207,189); the hue moves as a number, so write one end as H ± 360 to take the short way round | the eye |
+| a blur across a worker split | 4 px off by 1 code value at the second worker's first frame | none: Chromium's antialiasing | `det_check.py frames` reports it as NOISE |
+
+**The engine's own lint catches these.** `render_hyper.sh` runs `hyperframes check` before every render, and
+`check_summary.py` prints every lint error and the warnings marked below by message:
+
+- `gsap_cold_seek_hidden_fromto_missing_reveal` (error): an element the CSS starts hidden, made visible only in a
+  `fromTo`'s from-vars, stays invisible on a cold worker. Put `opacity: 1` in the destination. A non-opacity property
+  set only in the from-vars measured stable across splits.
+- `gsap_timeline_registered_before_async_build` and `gsap_non_transform_motion` (errors), in § index.html.
+- `gsap_animates_clip_element` (error): `autoAlpha`, `visibility` or `display` on a `.clip` fights the runtime's own
+  visibility control. Animate a child instead.
+- `gsap_css_transform_conflict` (error): GSAP overwrites a CSS `transform` on an element it transforms, a
+  `translate(-50%, -50%)` centring included. Centre with flex or `inset`, and give the start values in the `fromTo`.
+- `gsap_repeat_refresh_relative_value` and `gsap_relative_value_second_writer` (errors): a relative value accumulates
+  differently on a cold seek.
+- `html_dir_attribute_breaks_render` (error): `<html dir="…">` renders a blank video.
+- `font_family_without_font_face` (error) and `system_font_will_alias` (warning, printed): fonts are local
+  `@font-face` (§ Rendering).
+- `gsap_callback_dom_measurement` (warning, printed): DOM measured inside a callback runs again on every seek, against
+  that worker's own state. Measure once, at build; this contract computes text fit instead.
+- `subcomposition_blanks_before_host` (warning, printed): a sub-composition slot that ends before its host leaves the
+  frame blank.
+- `overlapping_gsap_tweens` (warning, printed): two tweens write one property at the same time.
+- `gsap_infinite_repeat` (warning): `repeat: -1` is clipped to a declared `data-duration` and renders deterministically.
+  `gsap_repeat_floor_unclamped` and `gsap_repeat_ceil_overshoot` (warnings, printed): a computed repeat that turns into
+  −1 or runs past the comp.
+
+**Reported elsewhere, not reproduced here** (png and mp4). Keep these out of this contract unless a new measurement on
+the render host's engine brings one back:
+- `background-clip: text` rendering invisible;
+- a font family named in an external stylesheet escaping its face (a local `@font-face` there renders the same as an
+  inline one);
+- a `mix-blend-mode` clip blending against nothing (over a clip and over a sub-composition, it blends);
+- a sub-composition whose timeline ends before its slot being hidden (the authored `data-duration` governs: a 1 s
+  timeline in a 4 s slot stays visible);
+- a font face first requested mid-film losing the load race on a cold worker (a local face renders on its first frame);
+- a `filter` tween from `none` jumping;
+- CSS `@keyframes` drifting in an mp4;
+- the render's audio coming out quieter. Integrated loudness is unchanged; true peak rose 1.1 dB on a test tone, which
+  is inside `spot-audio-assembly`'s −2.4 dBTP master margin for a −1 dBTP delivery.
+
+**CSS, SVG and GSAP behaviour every Chromium shares.** Each is silent and gives a plausible wrong frame:
+- A blend mode composites only inside its own stacking context: an ancestor with a `filter`, `opacity` below 1, a
+  `transform`, `isolation` or `will-change` cuts it off from what lies beneath. A blend inside a transparent LAYER has
+  only transparency beneath it, and the finisher composites the layer with plain alpha, so the blend never meets the
+  footage. A layer uses plain alpha.
+- A `filter` flattens the 3D space inside its element (a grouping property forces `transform-style: flat`). Blur or
+  warp each plane of a CSS-3D turntable, never the wrapper that holds the perspective.
+- Changing `transformOrigin` while an element is scaled or rotated moves it. Set the origin at build, or while the
+  transform is the identity.
+- `em` spacing beside big type resolves against the PARENT's font size: a `gap` in `em` in a flex container around
+  200 px type is relative to 16 px. Write px.
+- A visibility gate on an eased value fires early when the ease is solved numerically, because bisection returns about
+  1e-9 at 0. Gate on time or on tween progress, and make a hand-written ease return exactly 0 and 1 at its ends.
+- From the `bang-motion` upstream (2026-09):
+  - a more specific selector defeats an element's initial `opacity: 0`: keep the hidden state on the least specific
+    selector, and `immediateRender: false` leaves the CSS holding it;
+  - an SVG filter's default region (110 %) clips the tail of a blur: set x and y to −70 % and width and height to 240 %;
+  - directional motion blur is `feGaussianBlur stdDeviation="x y"` (CSS `blur()` reads as out of focus), and the
+    filter is detached when the tween ends;
+  - text split before `document.fonts.ready` measures the wrong advances;
+  - a running counter jitters its container unless it has `font-variant-numeric: tabular-nums` and a `min-width`;
+  - a dashed stroke cannot be drawn with `stroke-dashoffset` (it walks): open a `clip-path: inset()` from one side;
+  - a round linecap at dash length 0 shows a dot: hold opacity 0 until the draw starts;
+  - a child SVG's own `visibility="visible"` beats a hidden parent: remove the attribute;
+  - a blur tween writing `filter` overwrites a colour filter on the same element: colour filters go on the `<img>`;
+  - a group scale shrinks the type inside it (CRAFT § Readable time).
+
 ## The determinism proof
 
 A render is split across `--workers`: each worker is a fresh page that renders one contiguous run of frames, starting
@@ -119,10 +218,23 @@ python3 ~/.claude/skills/designed-elements/scripts/det_check.py prove hyper/<nam
 
 `source` reads the composition's own script (comments ignored) for `Math.random`, `Date`, `performance.now`, crypto
 randomness, `requestAnimationFrame`, `setTimeout` / `setInterval` and a bare `getContext('2d')`; a deliberate use carries
-`det-ok: <reason>` in a comment on its line. It cannot see an accumulation. `prove` renders twice as a png-sequence,
-compares every frame on the decoded pixels on the host, and reports each scene's first, middle and last frame. The proof
+`det-ok: <reason>` in a comment on its line. It reads the CSS too (`<style>`, `style=""`, the project's own `.css`): a
+`transition` FAILs, while an opacity `@keyframes` and a `will-change: transform` WARN. Any PNG carrying a colour chunk
+WARNs (§ Silent traps). It cannot see an accumulation, and a path with no `index.html` exits 2 rather than pass. `prove`
+renders twice as a png-sequence,
+compares every frame on the decoded pixels on the host, and reports each scene's first, middle and last frame and where
+in the frame each difference lies. A frame off by at most 2 code values on at most 0.01 % of its pixels is reported as
+NOISE and does not fail: Chromium's antialiasing at a worker's first frame after a blur (4 px off by 1 code value,
+measured on 0.8.18). A large bare canvas's seam at a worker's first frame (§ index.html) is many times wider than the
+band, and still fails. The where matters: a clip that spans the whole film is named as the scene of every differing frame. The proof
 frames stay on the host under `<remote-dir>/.det/<name>/<stamp>/`; it refuses a project whose `frames/` holds PNGs, and
 `--no-push` renders a copy already on the host (the push mirrors the local project with `--delete`).
+
+The proof compares png-sequence frames because they are lossless: two mp4 encodes cannot isolate one cell, since a
+cell that really differs spreads encoder noise across the frame. Without such a cell, two mp4s at different worker
+counts decoded bit-identical. The mp4 capture path differs from the png one in one measured way (an opacity
+`@keyframes`). So a passing proof speaks for the composition, and the delivered mp4 is still read on the delivered frame
+(SKILL § 4).
 
 Measured 2026-09-29 on the render host, hyperframes 0.8.18, `--workers 1` against `--workers 3`:
 
