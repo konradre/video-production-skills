@@ -10,7 +10,7 @@ operator corrects, never a taste of their own.
   closer line, its caption style and its music cues — reuse a proven device from a sibling spot.
 - **Shape**: hook inside the first 2 s (a knock, a line, a look) → setup → the reveal on a marker → the
   product beat (the product out, the hit) → the transformed state → the turntable with the closer 0.7 s
-  in → the end card, 2.5 s FULL, the audio signature at +0.02. A capper spot copies the delivered spots' events
+  in → the end card at its FULL render length (2.5 s by default), the audio signature at +0.02. A capper spot copies the delivered spots' events
   into a montage windowed on the disclaimer's word times.
 - **Cut-order checklist** (from the operator's reads of stitched cuts): cause before reaction; a
   sound-only event has its visual cause on screen; a reaction shot starts AFTER the turn; a line that sits "too late in the order" needs something

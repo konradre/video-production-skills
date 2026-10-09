@@ -156,9 +156,16 @@ SAFE-AREAS.md).
   a scene can pass its total while a line inside it fails. The reveal and the exit are not reading time, so a reveal
   that does not fit is shortened, never the hold — except a typewriter, whose hold counts from its first character,
   because the viewer reads along with it.
-- **A piece with no voice to set its length is summed at intake**: every line's hold plus its reveal and exit must fit
-  the length before anything is built (SKILL § 1). A script that needed 667 frames against a 600-frame spec was found
-  after animation and cost two full re-times (klik).
+- **A piece with no voice to set its length is summed at intake**: every line's hold, plus the reveals and exits around
+  it, must fit the length before anything is built (SKILL § 1) — a reveal or an exit that several lines share counts once. A script that needed 667 frames against a 600-frame spec was found
+  after animation and cost two full re-times (klik). The end card's 2.5 s is a default (`video-production` WHAT-VARIES):
+  two lines of about 19 characters hold 2.74 s, and with the kit card's ~0.4 s reveal they need ~3.15 s, so a new
+  two-line card is declared at the length its sum gives for its project, or sets one line; a card already delivered stays
+  as it is.
+- **Text that no voice reads aims longer.** A card that carries the message alone — a muted ad's card, a title card —
+  aims for about `0.5 s + characters ÷ 13` fully shown (showtime's rate for a caption read without the voice; klik's
+  cold-read target `0.3 s × words + 1.5 s` and AbubakrChan's `~0.35 s a word + 0.3 s, never under 1.2 s` sit near it).
+  It is a target, not a check: the floor above is what fails a piece.
 - **Small print** (a source line, a legal line, a price condition) holds **≥ 2.5 s at ≥ 50 % opacity**. Put it on
   the scene's FIRST beats, never its last: 40–70 characters on a last beat held 0.97–1.7 s, and eight lines were
   reworked in one film.

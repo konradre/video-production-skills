@@ -143,7 +143,7 @@ failed silently: a plausible frame and no error. Re-measure after an engine upgr
 |---|---|---|---|
 | a CSS `transition` | a cold worker starts it at its own first frame, so each split shows another colour (191,0,64 against 234,0,21 at 1.5 s) | tween the change on the timeline | `det_check.py source`, FAIL |
 | `will-change: transform` on text that scales | the layer is drawn once, at the scale it has when a worker first paints it, and every later frame resamples that bitmap: 16 px text scaled up 3× renders soft and lost its stencil cuts (edge energy −13.5 % in png, −19 % in mp4); text scaled DOWN to rest keeps the bigger bitmap — up to 143 levels off the same text without `will-change` on ~660 px — and rests differently at each worker split, so the proof fails it, with `immediateRender` true or false (measured on png; an mp4's own encoding noise between two identical cells, ~70 levels, hides all but its peak) | `will-change` only on what translates (a translation is unaffected); never on anything that scales | `det_check.py source`, WARN |
-| a `from()` with `immediateRender: false` in a timeline that also holds a `repeat: -1` | the tween never runs: the element holds its from-values the whole film, from frame 0, the same at every worker split, so the proof passes | write the entrance as a `fromTo`, or give the repeat a count: either one animates | `det_check.py source`, WARN |
+| a `from()` with `immediateRender: false` in a timeline that also holds a `repeat: -1` | the tween never runs: the element holds its from-values the whole film, from frame 0, the same at every worker split, so the proof passes; a `repeat: -1` in another sub-composition's timeline, in an earlier scene or one playing at the same time, leaves it running | write the entrance as a `fromTo`, or give the repeat a count: either one animates | `det_check.py source`, WARN |
 | a PNG carrying `gAMA`, `cHRM`, `iCCP` or `cICP` | colour-managed: a 128 grey with `gAMA` 1.0 renders 188 | plain sRGB values with no colour chunk (§ index.html) | `det_check.py source`, WARN |
 | a colour tween between hues, written in hex, `rgb()` or `hsl()` | interpolated in sRGB: blue → yellow passes through grey, 128,128,128 | write both ends as `oklch(L C H)`: GSAP tweens the three numbers (midpoint 0,207,189); the hue moves as a number, so write one end as H ± 360 to take the short way round | the eye |
 | a blur across a worker split | 4 px off by 1 code value at the second worker's first frame | none: Chromium's antialiasing | `det_check.py frames` reports it as NOISE |
@@ -252,9 +252,10 @@ alpha 0), and it stores straight alpha: a faint edge keeps its full colour under
 alpha 0 to alpha 3 differs by 255 stored code values. Each DIFF line therefore also gives the difference as it looks
 composited, and any read of a png frame composites it first (colour × alpha) — its colour alone shows a fade at full
 strength. Plain text shrinking, with no `will-change`, varies between render RUNS on its glyphs' bottom edge row while
-it moves: 0 to 6 frames per pair of runs, up to 50 levels composited on at most 7 px a frame — five pairs measured on
-0.8.18, one of them identical, at the same worker count and across counts. The proof reports such a difference as a
-FAIL like any other; it is recorded here so its frames are read, not excused.
+it moves, up to 50 levels composited on at most 7 px a frame, and the first render of a project after a push is the run
+that differs: of eight pairs of runs measured on 0.8.18, every pair holding such a first render differed (1 to 8
+frames), and pairs of later renders differed by 0, 0 and 1. `prove` pushes before its first render, so expect a comp
+with shrinking text to FAIL on those rows. The FAIL stands; its frames are read, not excused.
 
 The proof compares png-sequence frames because they are lossless: two mp4 encodes cannot isolate one cell, since a
 cell that really differs spreads encoder noise across the frame. Without such a cell, two mp4s at different worker
@@ -278,7 +279,7 @@ writes it.
 | element | EDL | notes |
 |---|---|---|
 | a designed event (turntable, display) | `{take: hyper/<name>/renders/<name>.mp4, in: 0, out: <dur>, source: designed, look: <cube>, handle_head: 0}` | plays its full length; graded by the cube (not pre-graded) |
-| the end card | the same + `role: endcard` | exactly one; 2.5 s FULL; ungraded; the sting at `tl[0] + 0.02` |
+| the end card | the same + `role: endcard` | exactly one; its FULL render length (2.5 s by default; a two-line card as long as its reading sum, CRAFT § Readable time); ungraded; the sting at `tl[0] + 0.02` |
 | a layer (wall, drift) | `post_layers: [{id, frames: hyper/<name>/frames/frame_%06d.png, at, dur}]` | composited at the mezzanine over the footage; a wall is placed `join − lead` so it is opaque across the join |
 
 The card's burst frame, the wall's opaque frame and the turntable's ding times are the numbers the edit

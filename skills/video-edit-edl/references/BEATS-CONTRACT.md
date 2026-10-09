@@ -35,7 +35,7 @@ to each shipped once before the gate did.
 | `vo_ends_before` | a MARKER name; every listed line must end at or before it (the narrator clears the hit) |
 | `music_end_at` / `music_start_at` | `[cue, marker]` — a cue edge within 2 ms of the marker; `"event"` = the beat's first event |
 | `layer_before_next` | `[layer id, lead]` — the layer starts `lead` s before the NEXT beat's first event |
-| `min_dur` | the beat's span floor (the card's full 2.5 s) |
+| `min_dur` | the beat's span floor (the card's full render length, 2.5 s by default) |
 | `optional` | the beat may be absent from this cut — but if any of its events is present, all must be |
 | `extra_vo` | lines that ride over an event without being a beat of their own (the closer over the turntable) |
 | `forbidden_events` | ids that must appear in neither events NOR layers, with the reason |

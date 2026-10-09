@@ -186,7 +186,9 @@ def scan_source(project):
             for rx, why, level in [(r, w, 'FAIL') for r, w in RULES] + [(r, w, 'WARN') for r, w in JS_WARN]:
                 for m in re.finditer(rx, line):
                     found.append((os.path.relpath(p, project), ln0 + i, why, m.group(0), ok_on(rl[i]), level))
-    by_file = {}   # one file = one timeline here: a repeat: -1 in any of its scripts freezes its from() calls
+    by_file = {}   # one file = one timeline here: a repeat: -1 in any of its scripts freezes its from() calls; one in another
+    #                sub-composition's file does not (measured 0.8.18: a scene-2 from() ran beside a scene-1 repeat: -1, the
+    #                scenes in sequence and playing at once)
     for p, ln0, raw in units: by_file.setdefault(p, []).append((ln0, raw))
     for p, parts in by_file.items():
         if not any(re.search(REPEAT_INF, _strip_js(raw)) for _, raw in parts): continue

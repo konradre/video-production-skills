@@ -56,7 +56,7 @@ gate follows the picks.
 
 ```
 generated event → src = the pre-graded hero, look none, handle_head = in   (the seek convention)
-designed event  → source designed, its own look, no src; the card = role endcard, 2.5 s FULL
+designed event  → source designed, its own look, no src; the card = role endcard, its FULL render length (2.5 s by default)
 native bed      → only when the keeper EARNED its sound; native_audio_from/to mute what it did not
 punch-in        → zoom + anchor keeps the wrong thing out of frame without a regen
 montage         → COPY delivered spots' events, window them on the disclaimer's word times
