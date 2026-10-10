@@ -72,7 +72,7 @@ def round_problems(items):
     for it in items:
         n, cls, kind, an = it.get('n'), it.get('class'), it.get('kind'), it.get('answer') or {}
         if not anchor_ok(it.get('anchor')): probs.append(f"note {n}: no anchor — the moment, stretch, spot, paragraph or whole version it is about")
-        if cls != 'APPROVE' and kind not in ('ERROR', 'TASTE'): probs.append(f"note {n}: kind {kind!r} — sort it ERROR or TASTE, or set its class to \"CHAT\" if it is no note (a greeting, a sign-off)")
+        if cls != 'APPROVE' and kind not in ('ERROR', 'TASTE'): probs.append(f"note {n}: kind {kind!r} — sort it ERROR or TASTE; if it approves the spot set its class to \"APPROVE\" (answer it frozen); if it is no note (a greeting, a sign-off) set its class to \"CHAT\"")
         if kind == 'ERROR' and not check_ok(it.get('check')):
             probs.append(f"note {n}: an ERROR with no check row — {{existing, missed}} for the check that passed it, or {{propose, how, owner}}")
         st, change, why = an.get('status'), (an.get('change') or '').strip(), (an.get('why') or '').strip()
@@ -206,7 +206,7 @@ def selftest():
                                      ('done "Addressed." refuses', vague, 'note 1: done needs exactly what changed'),
                                      ('not_done with no why refuses', no_why, 'note 2: not_done needs why'),
                                      ('an unmapped note in the round refuses, naming the CHAT fix', unmapped, 'misread as a note: set its class to "CHAT"'),
-                                     ('a kind still ? names the CHAT fix', [dict(good[0], kind='?')] + good[1:], 'or set its class to "CHAT"')):
+                                     ('a kind still ? names the APPROVE and CHAT fixes', [dict(good[0], kind='?')] + good[1:], 'set its class to "APPROVE" (answer it frozen); if it is no note (a greeting, a sign-off) set its class to "CHAT"')):
             r = run('--log', 'logs/run.txt', '--na', 'BEAT-SHEET: x', '--round', rec('t.json', items)); cases.append((label, r.returncode == 2 and needle in r.stderr))
         r_none = run('--log', 'logs/run.txt', '--na', 'BEAT-SHEET: x', '--round', rec('s02.json', [good[2]]))
         cases.append(('a spot the round holds no note for gets a line, never a refusal', r_none.returncode == 0 and "none of this round's notes names 'S01'" in r_none.stdout))

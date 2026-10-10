@@ -27,7 +27,10 @@ Pattern for the kind and the check row: mortiflix-oss harness/GATES.md § Readin
 spot-id pattern (default: S, two digits, an optional letter), so a note naming EP2 maps there. With --map, a #N the map
 lacks reads spot ? until it is mapped — never the previous note's spot. Every paragraph with a word in it is an item, a
 short note ("#3 perfect") included. A sign-off's signature block (name, title, company, contact lines — on its lines or
-in the paragraphs after it), a lone name after a bare thank-you, and a mail footer are CHAT. The file's head — the spot
+in the paragraphs after it), a lone name after a bare thank-you (or, there, a signature block that carries a phone, an
+email), and a mail footer are CHAT — a lone name passes the same guards as any pleasantry, and a pasted link stays a note.
+A bare "approved" is an approval unless it is negated ("not approved", "we don't approve") or the note also reports an
+error, a taste change or a request ("approved, though the intro drags"). The file's head — the spot
 mapping SKILL § 1 writes ("#5=S01, #6=S02") and a date line — is read as the map (an explicit --map wins) and is
 never listed.
   notes_triage.py --selftest
@@ -70,6 +73,17 @@ def sig_line(line):
 
 
 LONE_NAME = re.compile(r"[A-Z][\w'-]*(?: [A-Z][\w'-]*){0,2}")   # after a bare thank-you only this — one line, at most three words
+NEGATED_APPROVAL = re.compile(r"\b(?:not|never|no longer|\w+n't|cannot)\b(?:\W+\w+){0,2}\W+approved?\b|\b(?:un|dis)approv", re.I)
+CONTACT = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|\+?\d[\d\s().-]{7,}\d")   # a phone or an email — never a web address, which a note may carry
+
+
+def after_thanks(lines, ids=IDS):
+    """what may follow a bare thank-you as no note: a lone name that no note guard catches, or a signature block carrying a
+    contact line (a phone, an email, a web address) — never "S03 Perfect" or "Approved\""""
+    words = {w.strip(".,!'").lower() for l in lines for w in l.split()}
+    if guarded('\n'.join(lines), ids) or EVALUATIVE & words: return False
+    if len(lines) == 1 and LONE_NAME.fullmatch(lines[0].strip()): return True
+    return all(sig_line(l) for l in lines) and any(CONTACT.search(l) for l in lines)
 
 
 def valediction(line):
@@ -82,7 +96,7 @@ def valediction(line):
 
 def guarded(p, ids=IDS):
     """a question, a request word, a spot, a timecode or a note word: a note, never a pleasantry"""
-    return bool(REQUEST.search(p) or re.search(rf'#\d{{1,3}}(?!\w)|\b(?:{ids})\b', p) or anchor_from(p) is not None
+    return bool(REQUEST.search(p) or re.search(rf'#\d{{1,2}}(?!\w)|\b(?:{ids})\b', p) or anchor_from(p) is not None
                 or any(re.search(rx, p, re.I) for _, rx in CLASSES + KINDS))
 
 
@@ -94,7 +108,7 @@ def sig_para(p, ids=IDS):
 
 
 def pair_rx(ids):
-    return rf"#(?P<n>\d{{1,3}})(?!\w)\s*(?:=|:|→|->|—|–|-)\s*(?P<s>(?:{ids}))"
+    return rf"#(?P<n>\d{{1,2}})(?!\w)\s*(?:=|:|→|->|—|–|-)\s*(?P<s>(?:{ids}))"
 
 
 def head_line(line, ids=IDS):
@@ -125,7 +139,7 @@ def is_chat(p, ids=IDS):
     lines = [l.strip() for l in p.strip().splitlines() if l.strip()]
     v = next((i for i, l in enumerate(lines) if valediction(l)), None)
     rest = lines[v + 1:] if v is not None else []
-    if rest and (len(rest) == 1 and LONE_NAME.fullmatch(rest[0]) if valediction(lines[v]) == 'thanks'      # after thanks: a lone name, as ruled
+    if rest and (after_thanks(rest, ids) if valediction(lines[v]) == 'thanks'      # after thanks: a lone name or a block with a contact line
                  else all(sig_line(l) for l in rest) and not EVALUATIVE & {w.strip(".,!'").lower() for l in rest for w in l.split()}):
         p = '\n'.join(lines[:v + 1])   # "Kind regards," / name, title, company, phone, mail: the signature block
     body = SIGNATURE.sub('', ' '.join(p.split()))
@@ -173,7 +187,7 @@ def main():
         sys.exit(f"{rec_path} exists — the round record collects this round's answers and is never overwritten; a new triage is a new round (another --out)")
     text = open(a.notes, encoding='utf-8').read()
     m = {k.strip(): v.strip() for k, v in (kv.split('=', 1) for kv in a.map.split(',') if '=' in kv)}   # "#5=S01, #6=S02": spaces allowed
-    paras = [p.strip() for p in re.split(r'\n\s*\n|\n(?=\s*\(?\d+\))|\n(?=\s*#\d{1,3}(?!\w))', text) if re.search(r'[A-Za-z0-9]', p)]   # blank lines, "(1)" items, "#5" items; a short note is a note too
+    paras = [p.strip() for p in re.split(r'\n\s*\n|\n(?=\s*\(?\d+\))|\n(?=\s*#\d{1,2}(?!\w))', text) if re.search(r'[A-Za-z0-9]', p)]   # blank lines, "(1)" items, "#5" items; a short note is a note too
     head, k, head_lines = {}, 0, []
     while k < len(paras) and all(head_line(l, ids) for l in paras[k].splitlines() if l.strip()):   # the file's head: never a note
         for l in paras[k].splitlines():
@@ -185,15 +199,18 @@ def main():
     rows = []; spot = a.spot; sig_after = None   # 'sign-off': a signature block may follow · 'thanks': only a lone name
     for p in paras:
         quotes = re.findall(r'[“"]([^”"]{6,})[”"]', p); short = (quotes[0] if quotes else p).replace('\n', ' ')[:160]
-        signature = (sig_after == 'sign-off' and sig_para(p, ids)) or (sig_after == 'thanks' and bool(LONE_NAME.fullmatch(p.strip())))
+        signature = (sig_after == 'sign-off' and sig_para(p, ids)) or (sig_after == 'thanks' and after_thanks([l for l in p.splitlines() if l.strip()], ids))
         if signature or is_chat(p, ids):   # a greeting, a thank-you, a sign-off, its signature: no note — it neither takes nor passes on a spot
             rows.append({'spot': None, 'class': 'CHAT', 'kind': None, 'short': short, 'words': p, 'anchor': None})
             sig_after = ('sign-off' if sig_after == 'sign-off' else None) if signature else next((k for k in map(valediction, p.splitlines()) if k), None); continue
         sig_after = None
-        ref = re.search(r'#(\d{1,3})(?!\w)', p)   # a hex colour ("#1A1A1A", "#000000") is no spot number
+        ref = re.search(r'#(\d{1,2})(?!\w)', p)   # a hex colour ("#1A1A1A", "#000", "#000000") is no spot number
         if ref: spot = m.get('#' + ref.group(1), '?' if m else spot)   # with a map, a #N it lacks is unmapped — never the last note's spot
         for mm in re.finditer(rf'\b(?:{ids})\b', p): spot = mm.group(0)
         cls = next((c for c, rx in CLASSES if re.search(rx, p, re.I)), 'NOTE')
+        if cls == 'NOTE' and re.search(r'\bapproved?\b', p, re.I) and not NEGATED_APPROVAL.search(p.replace('’', "'")) and not REQUEST.search(p) \
+                and not any(re.search(rx, p, re.I) for _, rx in KINDS):
+            cls = 'APPROVE'   # "Approved" freezes its spot — never "not approved", "approved, but …" or "approved, though the intro drags"
         kind = None if cls == 'APPROVE' else next((k for k, rx in KINDS if re.search(rx, p, re.I)), '?')
         anc = {'whole': True} if cls == 'APPROVE' else anchor_from(p)
         rows.append({'spot': spot or '?', 'class': cls, 'kind': kind, 'short': short, 'words': p, 'anchor': anc})
@@ -242,6 +259,10 @@ def selftest():
         n6 = os.path.join(d, 'notes6.txt'); open(n6, 'w', encoding='utf-8').write('#5 the price is wrong\n\nmake the title #000000, the logo #1A1A1A\n\n'
                                                                               'Thanks!\n\nShorter Intro For Mobile\n\nThanks!\n\nBigger Logo\nShorter Intro\n')
         rec7 = load(subprocess.run([sys.executable, os.path.abspath(__file__), '--notes', n6, '--map', '#5=S01', '--out', os.path.join(d, 'r7.md')], capture_output=True, text=True), 'r7')
+        n7 = os.path.join(d, 'notes7.txt'); open(n7, 'w', encoding='utf-8').write('#5 the price is wrong\n\nThanks!\n\nS03 Perfect\n\nThanks!\n\nApproved\n\n'
+                                                                              'Thanks,\nSam Lee\nSenior Producer | Acme Media\n+1 555 0100\n\n#000 is too dark on #5\n\n'
+                                                                              'Thanks!\n\nReference Clip\nhttps://example.com/clip\n\n#5 approved, but the price is still wrong\n\nNot approved yet\n\nApproved, though the intro drags\n\nWe don’t approve this cut\n')
+        rec8 = load(subprocess.run([sys.executable, os.path.abspath(__file__), '--notes', n7, '--map', '#5=S01', '--out', os.path.join(d, 'r8.md')], capture_output=True, text=True), 'r8')
         rec4 = load(run4('r4'), 'r4'); rec5 = load(run4('r5', '--map', '#5=S09, #6=S08'), 'r5'); rec6 = load(run4('r6', '--map', '#5=S09'), 'r6')
     chat = [x for x in rec['items'] if x['class'] == 'CHAT']; it = {i: x for i, x in enumerate((x for x in rec['items'] if x['class'] != 'CHAT'), 1)}
     get = lambda n, k: (it.get(n) or {}).get(k)
@@ -267,6 +288,9 @@ def selftest():
             and not head_line('Subject: the logo looks off') and not head_line('Notes 2026-10-10: love it') and not head_line('Round 2')),
            ('a hex colour is no spot; after a bare thank-you only a lone name is CHAT — a longer or multi-line note stays a note',
             [(x['spot'], x['class']) for x in rec7.get('items', [])] == [('S01', 'NOTE'), ('S01', 'NOTE'), (None, 'CHAT'), ('S01', 'NOTE'), (None, 'CHAT'), ('S01', 'NOTE')]),
+           ('after thanks a spot or an approval is a note; a block with a contact line is a signature; #000 is no spot',
+            [(x['spot'], x['class']) for x in rec8.get('items', [])] == [('S01', 'NOTE'), (None, 'CHAT'), ('S03', 'APPROVE'), (None, 'CHAT'), ('S03', 'APPROVE'),
+                                                                        (None, 'CHAT'), ('S01', 'NOTE'), (None, 'CHAT'), ('S01', 'NOTE'), ('S01', 'NOTE'), ('S01', 'NOTE'), ('S01', 'NOTE'), ('S01', 'NOTE')]),
            ('an explicit --map wins over the head, spaces after its commas allowed; a #N it lacks reads ?',
             [x['spot'] for x in rec5.get('items', [])][:2] == ['S09', 'S08'] and [x['spot'] for x in rec6.get('items', [])][:2] == ['S09', '?']),
            ('--spot gives unnumbered notes the one video; --ids reads the project\'s own ids', [x['spot'] for x in rec2.get('items', [])] == [None, 'EP1', 'EP2', 'EP2']),
