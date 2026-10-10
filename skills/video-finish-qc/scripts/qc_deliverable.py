@@ -45,9 +45,14 @@
                audio.sfx cue found in the mix at its time by correlation · with qc.beat_data every on_beat cut within 3 frames
   motion       WARN lines (decoded_checks.py): one-frame pops (qc.accepted_flashes set aside) · one-frame steps off every
                frame the EDL changes on purpose (the joins, accepted_cuts, every caption's on and off, qc.accepted_flashes —
-               a worded card declares its own word lines in accepted_cuts) · and a judgement row: the general-flash rate
-               over the broadcast area (25 % of the whole frame; WCAG 2.3.1 counts 25 % of any 10° field, not read here), over 3 in any one second FAILS unless qc.accepted_flash_rate: "<why>" declares a
-               deliberate strobe (INFO, the reason printed on every run)
+               a worded card declares its own word lines in accepted_cuts) · and the flash rows (decoded_checks.flash_rows:
+               WCAG 2.2 flashes paired at the SAME place, a flash counted when the places flashing on one frame cover 25 % of
+               the area) — two judgement rows on the WHOLE frame: over 3 flashes in any one second FAILS, and 2–3 a second
+               held for 4 s of any 5 s FAILS (EA IRIS's extended failure, counted in flashes); WARN lines: IRIS's warning
+               at 2 a second, the phone 10° field over 3 (the W3C window printed as INFO), red flashes over 3 in the whole
+               frame or the phone field. qc.accepted_flash_rate: [{"from": s, "to": s, "note": "<why>"}] declares a
+               deliberate strobe — its flashes are set aside from the whole-frame rows and print as INFO with the reason on
+               every run
   phone band   INFO, with --phone-ref <real phone clips>: the delivered file's phone-texture band (phone_texture_probe.py —
                dead-flat 8×8 share, noise floor, median block sd) against the RANGE over every reference frame; a
                creator-style spot's read, never a failure — the operator judges the phone render beside the clean one
@@ -289,14 +294,16 @@ def main():
     g, _, _ = dc.motion_frames(D, efps)   # pops and steps are WARN lines, the frames decide (HYPERFRAMES-CONTRACT § Silent traps); the flash rate is a judgement row
     if len(g) >= 3:
         edges = dc.declared_edges(e, efps, '.'); fl = {round(float(t) * efps) for t in q.get('accepted_flashes') or []}
-        po, st = dc.pops(g, fl), dc.steps(g, set(edges)); on = [x for x in dc.steps(g) if x[0] in edges]; nf, fat, ntr = dc.flash_rate(g, efps)
+        po, st = dc.pops(g, fl), dc.steps(g, set(edges)); on = [x for x in dc.steps(g) if x[0] in edges]
         print(f"{'WARN' if po else 'INFO'} pops: " + (dc._fmt(po, efps, 'pops') + ' — read each frame and its neighbours; a designed one goes in qc.accepted_flashes' if po else 'none'))
         print(f"{'WARN' if st else 'INFO'} steps: " + (dc._fmt(st, efps, 'steps') + ' — read each; a worded card declares its word lines in its event\'s accepted_cuts' if st else 'none off the declared edges')
               + f" · on declared edges (INFO): {len(on)} — {sorted({w.split(' ')[0] for x in on for w in edges[x[0]]})}")
-        fdet = (f"{nf} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — at most 3 in any "
-                "one second, each over 25 % of the whole frame (the broadcast area; WCAG 2.3.1's 25 % of a 10° field is not read)")
-        if nf > 3 and q.get('accepted_flash_rate'): print(f"INFO flash rate: {fdet} — declared in qc.accepted_flash_rate: {q['accepted_flash_rate']}")
-        else: verdict(nf <= 3, 'flash rate', fdet)
+        wins, bad = dc.accepted_flash_windows(q)   # a deliberate strobe: time windows whose flashes the whole-frame rows set aside
+        for b in bad: print(f"WARN qc.accepted_flash_rate: {b}")
+        it, ffps, (fw, fh) = dc.flash_frames(D, efps)
+        for lvl, label, det in dc.flash_rows(dc.flash_read(it, ffps, fw, fh), wins):   # PASS/FAIL = judgement rows; WARN/INFO lines
+            if lvl in ('PASS', 'FAIL'): verdict(lvl == 'PASS', label, det)
+            else: print(f"{lvl} {label}: {det}")
     # ---- against the previous version (INFO; a verdict with --prev-expect) ----
     if a.prev:
         rows = prev_compare(D, a.prev, e['events'], efps); cls = {r[0]: classify(r) for r in rows}

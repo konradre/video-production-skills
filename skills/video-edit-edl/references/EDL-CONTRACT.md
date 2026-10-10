@@ -84,9 +84,12 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
 - `qc.grain_after` (optional, `true`) — the finish lays grain over the picture after the cut. No frozen shot gets under
   freezedetect's tolerance through grain, so the delivery QC's frozen row prints BLIND outright and the held shots are
   read by eye.
-- `qc.accepted_flash_rate` (optional, `"<why>"`) — a strobe the piece means to have: more than 3 general flashes a
-  second prints the delivery QC's flash row as INFO with this reason instead of failing it. The reason prints on every
-  run; declaring a seizure-risk strobe is the operator's judgement.
+- `qc.accepted_flash_rate` (optional, `[{"from": <s>, "to": <s>, "note": "<why>"}]`, timeline seconds; one object reads
+  as a one-item list) — a strobe the piece means to have, and where it is: the delivery QC sets the whole-frame flashes
+  inside each window aside from its whole-frame rows (the flash rate, sustained flashes, the warning) and prints them as
+  INFO with the note on every run; a flash outside every window still counts. The 10° and red rows read every flash.
+  The spot-wide string of the first form sets nothing aside and prints a WARN. Declaring a seizure-risk strobe is the
+  operator's judgement.
 
 ## markers — absolute timeline seconds, written by the builder
 

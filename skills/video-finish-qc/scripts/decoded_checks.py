@@ -20,8 +20,8 @@ thumbnail from frame 0), video-shotcraft's final review (every SFX audible in th
   beat_cuts   every event declaring on_beat: its cut within 3 frames of the nearest beat of qc.beat_data
               (spot-audio-assembly/scripts/beat_grid.py JSON — the checked grid, or the beat map)
 
-The motion rows read every frame on an area proxy (long side 320 px), whole frame — WARN lines here; the delivery QC
-(qc_deliverable.py) keeps pops and steps as WARN lines and fails the flash rate, a judgement row:
+The motion rows read every frame on an area proxy (long side 320 px) — WARN lines here; the delivery QC (qc_deliverable.py)
+keeps pops and steps as WARN lines and fails the flash rate and sustained flashes, judgement rows:
   pops        a one-frame flash: frame n unlike both neighbours while they match — min(d[n-1], d[n]) > 2.0 and
               mean|f[n+1] - f[n-1]| < 0.35 × that min (claude-motion-design's two-sided test; a cut cannot fire it).
               Measured floor: a step in the frame mean of ~2 levels — ~1.5 % of the frame at a 135-level flash in a
@@ -31,15 +31,29 @@ The motion rows read every frame on an area proxy (long side 320 px), whole fram
               changes on purpose is set aside on the EXACT frame (declared_edges: joins, accepted_cuts, captions on and
               off, qc.accepted_flashes); on three shipped spots that left only a worded card's own word lines, which
               the card's event declares as accepted_cuts
-  flash rate  WCAG 2.3.1 general flashes (showtime's flash_risk): a transition is a ≥ 0.1 change of relative
-              luminance over ≥ 25 % of the WHOLE frame with its darker side under 0.8 — the broadcast area: WCAG 2.3.1
-              counts 25 % of any 10° field (about 12 % of a 9:16 frame on a phone at 35 cm), not read here; a flash is a pair of opposite
-              transitions; more than 3 in any one second WARNs here and FAILS the delivery QC
+  flashes     WCAG 2.2 flashes paired at the SAME place, from the decoded RGB (flash_read): each place follows its relative
+              luminance between extremes, and a rise or fall of ≥ 0.1 from the last extreme is a transition however many
+              frames it takes (a smooth pulse counts), with its darker side under 0.8; the opposite transition at the same
+              place within one second completes a flash there. A flash EVENT is a frame on which the places completing a
+              flash cover ≥ 25 % of an area, so they happen at the same moment, as WCAG combines them. Red, WCAG 2.2: a
+              move toward or away from a saturated red (R/(R+G+B) ≥ 0.8, linear) with the colours > 0.2 apart in u′v′.
+              Areas: the WHOLE frame (the broadcast area) and a 10° field (flash_fields: the phone window, 0.94 × 0.53 of
+              a 9:16 frame at 35 cm; the W3C window, 341 × 256 on a 1024 × 768 screen). Rows (flash_rows):
+                flash rate         whole frame, more than 3 in any one second — a WARN here, a FAIL in the delivery QC
+                sustained flashes  EA IRIS's extended failure counted in flashes on the same read (IRIS counts transitions, two
+                                   to a flash): 2–3 a second held for 4 s of any 5 s — WARN here, FAIL there
+                flash warning      IRIS's warning, 2 or more flashes in a second — WARN
+                10° field          the phone window over 3 — WARN; the W3C window printed as INFO (per place it reads a
+                                   fine texture's swings: 17 a second on falling gravel, measured)
+                red flashes        the whole frame or the phone window over 3 — WARN; the W3C window INFO
+              qc.accepted_flash_rate's time windows set flashes aside from the whole-frame rows (qc_deliverable.py); the
+              10° and red rows read every flash
   floor       the frozen-frame row's blind spot (freeze_floor): freezedetect's statistic at sampled still frame pairs;
               over its −60 dB tolerance (0.26 code values) a frozen shot under that texture does not register
 
   decoded_checks.py motion <render.mp4 | frames-dir> [--fps 24] [--accepted s,s,… | <manifest.json> | <captions.html> | <timeline.json>]… [--tiles]
-      a designed render's motion read: pops, steps and the flash rate; --accepted (repeatable) = the element's own hard
+      a designed render's motion read: pops, steps and the flash rows; a frames-dir is read at the data-fps of the
+      composition beside it unless --fps is given (24 when neither says); --accepted (repeatable) = the element's own hard
       changes: its own seconds (a worded card's word lines — the numbers its EDL event declares as accepted_cuts), a
       caption manifest, an explainer's compositions/captions.html (each caption's show and hide) or its timeline.json
       (each scene cut); --tiles adds the
@@ -251,25 +265,196 @@ def tile_steps(g, skip=(), grid=4):
     return sorted(out)
 
 
-def flash_rate(g, fps):
-    """(the most general flashes in any one second, where it starts in s, transitions) — WCAG 2.3.1 on luma as an
-    approximate relative luminance ((v/255)^2.2)"""
-    dirs = []; prev = None
-    for i in range(len(g)):
-        cur = (g[i].astype(np.float32) / 255.0) ** 2.2
-        if prev is not None:
-            dl = cur - prev; dark = np.minimum(cur, prev) < FLASH_DARK
-            if float(((dl >= FLASH_DELTA) & dark).mean()) >= FLASH_AREA: dirs.append((i, 1))
-            elif float(((dl <= -FLASH_DELTA) & dark).mean()) >= FLASH_AREA: dirs.append((i, -1))
-        prev = cur
-    win = max(1, int(round(fps))); best, at = 0, None
-    for k, (i0, _) in enumerate(dirs):
-        seq = []
-        for i, dd in dirs[k:]:
-            if i - i0 >= win: break
-            if not seq or seq[-1] != dd: seq.append(dd)
-        if len(seq) // 2 > best: best, at = len(seq) // 2, i0
-    return best, (round(at / fps, 2) if at is not None else None), len(dirs)
+# ---- the flash rows: WCAG 2.2 general and red flashes, paired at the SAME place ----
+RED_RATIO, RED_UV = 0.8, 0.2                  # WCAG 2.2 red: one state R/(R+G+B) >= 0.8 (linear sRGB), the states > 0.2 apart in u'v'
+FLASH_FAIL, FLASH_WARN = 3, 2                 # over 3 flashes in any one second fails; 2 is EA IRIS's warning (WarningTransitions 4)
+EXT_LO, EXT_HI, EXT_HOLD, EXT_WINDOW = 2, 3, 4.0, 5.0   # IRIS's extended failure: 2-3 flashes (4-6 transitions) a second for 4 s of any 5 s
+_WP = (0.1978, 0.4683)                        # D65 in u'v': the colour given to a state too dark to have one
+
+
+def _lin(c):
+    c = c / 255.0; return np.where(c <= 0.04045, c / 12.92, ((c + 0.055) / 1.055) ** 2.4)
+
+
+def _flash_state(f):
+    """an RGB frame (0-255) → relative luminance, red ratio, u', v' per place (linear sRGB). A state under 1 % luminance
+    has no colour (ratio 0, the white point): colour is undefined at black, and decoded black is noisy — an assumption"""
+    r, g, b = _lin(f[..., 0]), _lin(f[..., 1]), _lin(f[..., 2]); L = 0.2126 * r + 0.7152 * g + 0.0722 * b; blk = L < 0.01
+    s = r + g + b; ratio = np.where(blk, 0.0, r / np.maximum(s, 1e-9))
+    X = 0.4124 * r + 0.3576 * g + 0.1805 * b; Z = 0.0193 * r + 0.1192 * g + 0.9505 * b; d = np.maximum(X + 15 * L + 3 * Z, 1e-9)
+    return L, ratio, np.where(blk, _WP[0], 4 * X / d), np.where(blk, _WP[1], 9 * L / d)
+
+
+def _swing_general(z, L):
+    """each place's luminance followed between its extremes: a rise or fall of FLASH_DELTA from the last extreme is a
+    transition however many frames it takes, kept when its darker side is under FLASH_DARK → (up, down) masks"""
+    T, P, lo, hi = z['T'], z['P'], z['lo'], z['hi']; u0 = T == 0      # before its first swing a place tracks its low and high
+    np.minimum(lo, L, out=lo, where=u0); np.maximum(hi, L, out=hi, where=u0)
+    ext = ((T == 1) & (L > P)) | ((T == -1) & (L < P)); P[ext] = L[ext]
+    bu, bd = np.where(u0, lo, P), np.where(u0, hi, P)
+    up, dn = ((T == -1) | u0) & (L - bu >= FLASH_DELTA), ((T == 1) | u0) & (bd - L >= FLASH_DELTA)
+    cu, cd = np.minimum(bu, L) < FLASH_DARK, np.minimum(bd, L) < FLASH_DARK
+    T[up], T[dn] = 1, -1; P[up | dn] = L[up | dn]; return up & cu, dn & cd
+
+
+def _swing_red(z, r, u, v):
+    """the same on the red ratio: a move toward red or away from it, the colours more than RED_UV apart in u'v' from the
+    last extreme, kept when one of the two states is saturated red → (toward, away) masks"""
+    T, P, U, V = z['T'], z['P'], z['U'], z['V']; u0 = T == 0
+    lo_, hi_ = u0 & (r < z['rlo']), u0 & (r > z['rhi'])
+    for k, x in (('rlo', r), ('ulo', u), ('vlo', v)): z[k][lo_] = x[lo_]
+    for k, x in (('rhi', r), ('uhi', u), ('vhi', v)): z[k][hi_] = x[hi_]
+    ext = ((T == 1) & (r > P)) | ((T == -1) & (r < P))
+    for a, b in ((P, r), (U, u), (V, v)): a[ext] = b[ext]
+    br, bu_, bv = np.where(u0, z['rlo'], P), np.where(u0, z['ulo'], U), np.where(u0, z['vlo'], V)      # toward red: from the low
+    ar, au, av = np.where(u0, z['rhi'], P), np.where(u0, z['uhi'], U), np.where(u0, z['vhi'], V)      # away: from the high
+    aw = ((T == 1) | u0) & (r < ar) & (np.hypot(u - au, v - av) > RED_UV)
+    to = ((T == -1) | u0) & (r > br) & (np.hypot(u - bu_, v - bv) > RED_UV) & ~aw
+    sat = r >= RED_RATIO; ct, ca = (br >= RED_RATIO) | sat, (ar >= RED_RATIO) | sat
+    T[to], T[aw] = 1, -1; fl = to | aw
+    for a, b in ((P, r), (U, u), (V, v)): a[fl] = b[fl]
+    return to & ct, aw & ca
+
+
+def _win_max(m, wh, ww):   # the largest share of True over every wh × ww window (an integral image)
+    c = np.pad(m.astype(np.int32).cumsum(0).cumsum(1), ((1, 0), (1, 0)))
+    return float((c[wh:, ww:] - c[:-wh, ww:] - c[wh:, :-ww] + c[:-wh, :-ww]).max()) / (wh * ww)
+
+
+def flash_fields(W, H):
+    """WCAG 2.3.1's 10° field as (width, height) fractions of the frame. phone: 10° at 35 cm (phones are held at 32-37 cm)
+    is 6.12 cm, 0.94 of a 6.5 cm-wide screen — 0.94 of the short side, 0.94 × short/long of the long side (0.94 × 0.53 of a
+    9:16 frame). w3c: W3C's 341 × 256 on a 1024 × 768 screen, the frame fitted to that screen first (0.79 × 0.33 of 9:16)"""
+    s_, l_ = min(W, H), max(W, H); k = 0.94 * s_ / l_; fit = min(1024 / W, 768 / H)
+    return {'phone': (0.94, k) if W <= H else (k, 0.94), 'w3c': (min(1.0, 341 / (W * fit)), min(1.0, 256 / (H * fit)))}
+
+
+def comp_fps(p):
+    """a PNG folder's frame rate from its composition (<composition>/frames → <composition>/index.html data-fps), or None"""
+    try: m = re.search(r'data-fps="([\d.]+)"', open(os.path.join(os.path.dirname(os.path.abspath(p.rstrip('/'))), 'index.html'), encoding='utf-8').read())
+    except OSError: return None
+    return float(m.group(1)) if m else None
+
+
+def flash_frames(p, fps=None):
+    """every frame as RGB (0-255, float32) on the area proxy, streamed — a video decoded with its tags honoured, or a folder
+    of PNG layers premultiplied over black → (frames, fps, (W, H))"""
+    if os.path.isdir(p):
+        from PIL import Image
+        fs = sorted(glob.glob(os.path.join(p, '*.png')))
+        if not fs: return iter(()), float(fps or 24.0), (0, 0)
+        W, H = Image.open(fs[0]).size; pw, ph = _proxy(W, H)
+
+        def png():
+            for f in fs:
+                a = np.asarray(Image.open(f).convert('RGBA'), np.float32); rgb = np.clip(a[..., :3] * (a[..., 3:] / 255.0) + 0.5, 0, 255)
+                yield np.asarray(Image.fromarray(rgb.astype(np.uint8)).resize((pw, ph), Image.BOX), np.float32)
+        return png(), float(fps or 24.0), (W, H)
+    st = json.loads(_run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', p]).stdout or b'{}').get('streams', [{}])[0]
+    W, H = int(st.get('width') or 0), int(st.get('height') or 0)
+    if not W: return iter(()), float(fps or 24.0), (0, 0)
+    pw, ph = _proxy(W, H); size = pw * ph * 3
+
+    def video():
+        pr = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', p, '-vf', f'scale={pw}:{ph}:flags=area,format=rgb24', '-f', 'rawvideo', '-'], stdout=subprocess.PIPE)
+        try:
+            while len(b := pr.stdout.read(size)) == size: yield np.frombuffer(b, np.uint8).reshape(ph, pw, 3).astype(np.float32)
+        finally: pr.stdout.close(); pr.wait()
+    return video(), float(fps or fps_of(p)), (W, H)
+
+
+def flash_read(frames, fps, W, H):
+    """WCAG 2.2 general and red flashes paired at the SAME place: a place's opposite transitions within one second are a
+    flash there. A flash EVENT is a frame on which the places completing a flash cover >= FLASH_AREA of an area — the whole
+    frame, or a 10° field anywhere in it — so the flashes happen at the same moment, as WCAG combines them →
+    {'n', 'fps', 'fields', 'general': {area: [frame…]}, 'red': {area: [frame…]}}"""
+    fields = flash_fields(W, H); win = max(1, int(round(fps))); z = None; n = 0
+    out = {k: {a: [] for a in ('frame', *fields)} for k in ('general', 'red')}
+    for i, f in enumerate(frames):
+        n += 1; L, ratio, u, v = _flash_state(f); h, w = L.shape
+        if z is None:
+            zr = {'T': np.zeros(L.shape, np.int8), 'P': ratio.copy(), 'U': u.copy(), 'V': v.copy()}
+            for e in ('lo', 'hi'): zr.update({'r' + e: ratio.copy(), 'u' + e: u.copy(), 'v' + e: v.copy()})
+            z = {'general': {'T': np.zeros(L.shape, np.int8), 'P': L.copy(), 'lo': L.copy(), 'hi': L.copy()}, 'red': zr,
+                 'd': {k: np.zeros(L.shape, np.int8) for k in out}, 't': {k: np.zeros(L.shape, np.int32) for k in out}}
+            continue
+        for k, (up, dn) in (('general', _swing_general(z['general'], L)), ('red', _swing_red(z['red'], ratio, u, v))):
+            d, t = z['d'][k], z['t'][k]; live = (i - t) < win
+            P = (up & (d == -1) & live) | (dn & (d == 1) & live)   # a place's pair completes: consumed, the next swing starts anew
+            d[P] = 0; nu, nd = up & ~P, dn & ~P; d[nu] = 1; t[nu] = i; d[nd] = -1; t[nd] = i
+            if not P.any(): continue
+            if float(P.mean()) >= FLASH_AREA: out[k]['frame'].append(i)
+            for a, (fw, fh) in fields.items():
+                if _win_max(P, max(1, round(fh * h)), max(1, round(fw * w))) >= FLASH_AREA: out[k][a].append(i)
+    return {'n': n, 'fps': float(fps), 'fields': fields, **out}
+
+
+def busiest(ev, win):
+    """(the most events inside any `win` frames, the frame that stretch starts at)"""
+    best, at, j = 0, None, 0
+    for k in range(len(ev)):
+        while ev[k] - ev[j] >= win: j += 1
+        if k - j + 1 > best: best, at = k - j + 1, ev[j]
+    return best, at
+
+
+def sustained(ev, n, fps):
+    """EA IRIS's tracker (electronicarts/IRIS src/TransitionTracker.cpp with config/appsettings.json, read 2026-10-11) on one
+    series of whole-frame flash events, counted in FLASHES — IRIS counts transitions, two to a flash, so its thresholds halve:
+    F = the flashes in the trailing second at each frame; an EXTENDED failure where F is 2-3 and the trailing 5 s hold 4 s of
+    frames with F at 2-3; a warning where F >= 2. On IRIS's own test clips this matches its fail and extended verdicts and
+    warns on two that IRIS passes: at 1.5 flashes a second, two flashes can complete inside one second →
+    {'max', 'extended', 'warn': the first frame of each or None, 'warn_s': the seconds with F >= 2}"""
+    win = max(1, int(round(fps))); F = np.zeros(max(1, n), np.int32)
+    for i in ev: F[i:min(len(F), i + win)] += 1
+    band = (F >= EXT_LO) & (F <= EXT_HI); ew, eh = int(round(EXT_WINDOW * fps)), int(round(EXT_HOLD * fps))
+    c = np.concatenate(([0], np.cumsum(band))); E = c[1:] - c[np.maximum(0, np.arange(1, len(F) + 1) - ew)]
+    first = lambda m: int(np.argmax(m)) if m.any() else None
+    return {'max': int(F.max()), 'extended': first(band & (E >= eh)), 'warn': first(F >= FLASH_WARN), 'warn_s': float((F >= FLASH_WARN).sum()) / fps}
+
+
+def accepted_flash_windows(q):
+    """the EDL's qc.accepted_flash_rate → ([(from s, to s, why)], [problem]): a list of {"from", "to", "note"} — one object
+    reads as a one-item list. The spot-wide string of the first form sets nothing aside and is named a problem"""
+    v = (q or {}).get('accepted_flash_rate')
+    if not v: return [], []
+    win, bad = [], []
+    for x in (v if isinstance(v, list) else [v]):
+        try: a, b, why = float(x['from']), float(x['to']), str(x.get('note') or '').strip()
+        except (TypeError, KeyError, ValueError): bad.append(f"{x!r} is not a time window {{\"from\", \"to\", \"note\"}} — nothing set aside (EDL-CONTRACT § qc)"); continue
+        if b > a and why: win.append((a, b, why))
+        else: bad.append(f"{x!r} needs from < to and a note — nothing set aside")
+    return win, bad
+
+
+def flash_rows(res, accepted=()):
+    """the flash rows of one flash_read(): [(level, label, detail)], level PASS/FAIL for the delivery QC's judgement rows
+    (the flash rate, sustained flashes) and WARN/INFO for the rest. Whole-frame flash events inside an accepted (from, to,
+    why) window are set aside from the whole-frame rows (the rate, sustained flashes, the warning) and each window prints
+    what it set aside; the 10° and red rows are WARN lines and read every flash, the declared ones included"""
+    fps, n = res['fps'], res['n']; win = max(1, int(round(fps))); rows = []
+    within = lambda i: any(a - 1e-6 <= i / fps <= b + 1e-6 for a, b, _ in accepted)
+    ev = {k: dict(res[k]) for k in ('general', 'red')}; ev['general']['frame'] = [i for i in res['general']['frame'] if not within(i)]
+    at = lambda f: f" from {f / fps:.2f} s" if f is not None else ''
+    for a, b, why in accepted:
+        sel = [i for i in res['general']['frame'] if a - 1e-6 <= i / fps <= b + 1e-6]; c, f = busiest(sel, win)
+        rows.append(('INFO', 'accepted flash rate', f"{a:g}–{b:g} s: {len(sel)} whole-frame flash(es) set aside, {c} in its busiest second{at(f)} — {why}"))
+    g = ev['general']['frame']; nf, f0 = busiest(g, win); s = sustained(g, n, fps)
+    rows.append(('PASS' if nf <= FLASH_FAIL else 'FAIL', 'flash rate', f"{nf} general flash(es) in the busiest second{at(f0)} — at most {FLASH_FAIL} in any one "
+                 "second; a flash is a place brightening and darkening (or the reverse) by 0.1 relative luminance within a second, counted when the "
+                 "places flashing on one frame cover 25 % of the WHOLE frame (the broadcast area)"))
+    rows.append(('PASS' if s['extended'] is None else 'FAIL', 'sustained flashes', (f"{EXT_LO}–{EXT_HI} flashes a second held for {EXT_HOLD:g} s of {EXT_WINDOW:g}{at(s['extended'])}"
+                 if s['extended'] is not None else f"no {EXT_HOLD:g} s of any {EXT_WINDOW:g} s at {EXT_LO}–{EXT_HI} flashes a second") + " — EA IRIS's extended failure, whole frame"))
+    rows.append(('WARN' if s['warn'] is not None else 'INFO', 'flash warning', (f"{s['warn_s']:.2f} s with {FLASH_WARN} or more flashes in the trailing second{at(s['warn'])}"
+                 if s['warn'] is not None else f"at most {s['max']} flash(es) in any second") + f" — EA IRIS warns at {FLASH_WARN}, whole frame"))
+    (pw_, ph_), (ww_, wh_) = res['fields']['phone'], res['fields']['w3c']
+    p, pf = busiest(ev['general']['phone'], win); w3, wf = busiest(ev['general']['w3c'], win)
+    rows.append(('WARN' if p > FLASH_FAIL else 'INFO', 'flash rate in a 10° field', f"phone window {p}{at(pf)} — over {FLASH_FAIL} warns · W3C window {w3}{at(wf)} — INFO "
+                 f"(WCAG 2.3.1: 25 % of any 10° field; phone {pw_:.2f} × {ph_:.2f} of the frame at 35 cm, W3C {ww_:.2f} × {wh_:.2f})"))
+    rf, rff = busiest(ev['red']['frame'], win); rp, rpf = busiest(ev['red']['phone'], win); rw, rwf = busiest(ev['red']['w3c'], win)
+    rows.append(('WARN' if max(rf, rp) > FLASH_FAIL else 'INFO', 'red flashes', f"whole frame {rf}{at(rff)} · phone window {rp}{at(rpf)} — over {FLASH_FAIL} in either warns · "
+                 f"W3C window {rw}{at(rwf)} — INFO (WCAG 2.2: to or from a saturated red, R/(R+G+B) ≥ {RED_RATIO:g}, the colours more than {RED_UV:g} apart in u′v′)"))
+    return rows
 
 
 def declared_edges(edl, fps, root='.'):
@@ -348,25 +533,29 @@ def _fmt(rows, fps, kind):
 
 
 def motion_cli(argv):
-    ap = argparse.ArgumentParser(prog='decoded_checks.py motion', description='the motion read of a designed render: one-frame pops, one-frame steps, the WCAG flash rate; WARN lines, exit 0')
+    ap = argparse.ArgumentParser(prog='decoded_checks.py motion', description='the motion read of a designed render: one-frame pops, one-frame steps, the WCAG flash rows; WARN lines, exit 0')
     ap.add_argument('render', help='an mp4, or a folder of PNG layers (composited over black)')
-    ap.add_argument('--fps', type=float, default=None, help='the frame rate of a PNG folder (a video carries its own)')
+    ap.add_argument('--fps', type=float, default=None, help="the frame rate of a PNG folder (a video carries its own); default: the data-fps of the composition beside the folder, else 24")
     ap.add_argument('--accepted', action='append', default=[], help="the element's own hard changes, repeatable: its own seconds, comma-separated "
                     "(a worded card's word lines), a caption manifest.json, an explainer's compositions/captions.html (each caption's show and hide), or its timeline.json (each scene cut)")
     ap.add_argument('--tiles', action='store_true', help='add the per-tile step read (4×4): a lead, never a verdict')
     a = ap.parse_args(argv)
-    g, fps, (W, H) = motion_frames(a.render, a.fps)
+    rate, src = a.fps, '--fps'
+    if rate is None and os.path.isdir(a.render): rate = comp_fps(a.render); src = "the composition's data-fps" if rate else 'nothing declared it: 24 assumed, pass --fps'
+    g, fps, (W, H) = motion_frames(a.render, rate)
     if len(g) < 3: print(f'MOTION-READ: fewer than 3 frames decoded from {a.render}'); return 2
     try: per = [(s, accepted_frames([s], fps)) for s in a.accepted]
     except SystemExit as e: print(f'MOTION-READ: {e}'); return 2
     acc = set().union(*(f for _, f in per)) if per else set()
-    po, st = pops(g), steps(g, acc); held = [x for x in steps(g) if x[0] in acc]; fl, fat, ntr = flash_rate(g, fps)
-    print(f"motion read {a.render}: {W}x{H}, {len(g)} frames at {fps:g} fps, proxy {g.shape[2]}x{g.shape[1]}")
+    po, st = pops(g), steps(g, acc); held = [x for x in steps(g) if x[0] in acc]
+    print(f"motion read {a.render}: {W}x{H}, {len(g)} frames at {fps:g} fps" + (f" ({src})" if os.path.isdir(a.render) else '') + f", proxy {g.shape[2]}x{g.shape[1]}")
+    if os.path.isdir(a.render) and a.fps is None and rate is None: print(f"WARN fps: no --fps and no data-fps in {os.path.join(os.path.dirname(os.path.abspath(a.render.rstrip('/'))), 'index.html')} — read at 24 fps; times and the one-second windows are off unless that is right")
     for s, f in per: print(f"{'INFO' if f else 'WARN'} accepted {s}: {len(f)} frame(s) set aside" + ('' if f else ' — nothing read from it'))
     warn = 0
     print(f"{'WARN' if po else 'INFO'} pops: " + (_fmt(po, fps, 'pops') if po else 'none (floor: a ~2-level step in the frame mean)')); warn += bool(po)
     print(f"{'WARN' if st else 'INFO'} steps: " + (_fmt(st, fps, 'steps') if st else 'none off the declared changes') + (f" · declared (INFO): {[x[0] for x in held]}" if held else '')); warn += bool(st)
-    print(f"{'WARN' if fl > 3 else 'INFO'} flash rate: {fl} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — at most 3, each over 25 % of the whole frame (the broadcast area)"); warn += fl > 3
+    for lvl, label, det in flash_rows(flash_read(*flash_frames(a.render, fps)[:2], W, H)):   # a FAIL of the delivery QC is a WARN line here
+        bad = lvl in ('FAIL', 'WARN'); print(f"{'WARN' if bad else 'INFO'} {label}: {det}"); warn += bad
     if a.tiles:
         sx, sy = W / g.shape[2], H / g.shape[1]; hs, ws = g.shape[1] // 4, g.shape[2] // 4; ts = tile_steps(g, acc)
         print(f"{'WARN' if ts else 'INFO'} tile steps (a LEAD: designed slams, wipes, bar slashes and shakes fire it too — read each on its frames): " + (
@@ -419,12 +608,59 @@ def selftest():
         def small(k):
             a = np.full((128, 128), 40.0); a[10:22, 10:22] = 40.0 if k < 24 else 140.0; return a   # 0.9 % of the frame
         sm = clip(small)
-        strobe = clip(lambda k: np.full((128, 128), 255.0 if 12 <= k < 36 and k % 2 else 0.0))
         chk.append(('a one-frame flash is a pop, not a step', [x[0] for x in pops(flash)] == [24] and not steps(flash)))
         chk.append(('a value that jumps and stays is a step, not a pop', [x[0] for x in steps(step)] == [24] and not pops(step)))
         chk.append(('a step on a declared frame is set aside', not steps(step, {24})))
         chk.append(('a 0.9 % box step: missed whole-frame, found by its tile', not steps(sm) and [(x[0], x[1], x[2]) for x in tile_steps(sm)] == [(24, 0, 0)]))
-        chk.append(('a 24-transition second reads > 3 flashes; one flash reads 1', flash_rate(strobe, 24)[0] > 3 and flash_rate(flash, 24)[0] == 1))
+        # ---- the flash rows: known answers on a 9:16 proxy ----
+        sz, Wf, Hf = (56, 32), 1080, 1920
+
+        def rgb(c): return np.broadcast_to(np.array(c, np.float32), sz + (3,)).copy()
+
+        def code(L): return 255 * (1.055 * L ** (1 / 2.4) - 0.055) if L > 0.0031308 else 255 * 12.92 * L   # the sRGB code of a relative luminance
+
+        def rd(seq): return flash_read(iter(seq), 24.0, Wf, Hf)
+
+        def nf(res, k='general', a='frame'): return busiest(res[k][a], 24)[0]
+        r1 = rd([rgb((255,) * 3) if k % 2 else rgb((0,) * 3) for k in range(24)])
+        chk.append(('flash: a full-frame grey strobe reads >= 11 a second in every area and no red', all(nf(r1, 'general', a) >= 11 for a in ('frame', 'phone', 'w3c')) and nf(r1, 'red') == 0))
+        chk.append(('flash: one bright frame is one flash', nf(rd([rgb((40,) * 3)] * 5 + [rgb((120,) * 3)] + [rgb((40,) * 3)] * 5)) == 1))
+        chk.append(('flash: a black-red strobe reads >= 11 red flashes a second', nf(rd([rgb((255, 0, 0)) if k % 2 else rgb((0, 0, 0)) for k in range(24)]), 'red') >= 11))
+        r2 = rd([rgb((255, 0, 0)) if k % 2 else rgb((0, 148, 0)) for k in range(24)])
+        chk.append(('flash: an iso-luminant red-green strobe is red only (>= 11 red, 0 general)', nf(r2, 'red') >= 11 and nf(r2) == 0))
+        chk.append(('flash: a smooth 4 Hz pulse (no frame-to-frame step reaches 0.1) reads >= 4 a second', nf(rd([rgb((code(0.29 + 0.09 * np.sin(2 * np.pi * 4 * k / 24)),) * 3) for k in range(48)])) >= 4))
+
+        def band(k):
+            f = rgb((10,) * 3); x0 = int(k * 0.1 * sz[1]); f[:, x0:x0 + int(0.3 * sz[1])] = 255; return f
+        r3 = rd([band(k) for k in range(8)])
+        chk.append(('flash: a bright band moving across reads 0 in every area', all(nf(r3, 'general', a) == 0 for a in ('frame', 'phone', 'w3c'))))
+
+        def part(k, rows_, cols_):   # a block of the frame strobes 0.2 <-> 0.5 relative luminance every 2 frames: 6 a second
+            f = rgb((code(0.2),) * 3); f[:int(rows_ * sz[0]), :int(cols_ * sz[1])] = code(0.5 if (k // 2) % 2 else 0.2); return f
+        r4 = rd([part(k, 0.55, 0.55) for k in range(48)])
+        lv4 = {lb: lv for lv, lb, _ in flash_rows(r4)}; lv4a = {lb: lv for lv, lb, _ in flash_rows(r4, [(0.0, 2.0, 'the strobe the brief asks for')])}
+        chk.append(('flash: a 6 Hz strobe on 30 % of the frame FAILS the flash rate; an accepted window over it passes and prints INFO',
+                    nf(r4) >= 5 and lv4['flash rate'] == 'FAIL' and lv4a['flash rate'] == 'PASS' and lv4a.get('accepted flash rate') == 'INFO'))
+        r5 = rd([part(k, 0.16, 1.0) for k in range(48)])
+        lv5 = {lb: lv for lv, lb, _ in flash_rows(r5)}
+        chk.append(('flash: a strobe on 16 % of the frame passes the whole frame and WARNs in the phone 10° field', nf(r5) == 0 and nf(r5, 'general', 'phone') >= 5
+                    and lv5['flash rate'] == 'PASS' and lv5['flash rate in a 10° field'] == 'WARN'))
+        rd_ = flash_rows(rd([rgb((255, 0, 0)) if k % 2 else rgb((0, 0, 0)) for k in range(24)]))
+        chk.append(('flash: the red strobe WARNs the red row', {lb: lv for lv, lb, _ in rd_}['red flashes'] == 'WARN'))
+
+        def slow(k): return rgb((255 if (k // 5) % 2 else 0,) * 3)   # a flash every 10 frames: 2.4 a second
+        long_, short_ = {lb: lv for lv, lb, _ in flash_rows(rd([slow(k) for k in range(144)]))}, {lb: lv for lv, lb, _ in flash_rows(rd([slow(k) for k in range(72)]))}
+        chk.append(('flash: 2.4 flashes a second for 6 s FAILS sustained (IRIS extended), for 3 s only warns; neither fails the rate',
+                    long_['sustained flashes'] == 'FAIL' and short_['sustained flashes'] == 'PASS' and short_['flash warning'] == 'WARN' and long_['flash rate'] == short_['flash rate'] == 'PASS'))
+
+        def slower(k): return rgb((255 if (k // 8) % 2 else 0,) * 3)   # a transition every 8 frames: 1.5 flashes a second
+        sl = {lb: lv for lv, lb, _ in flash_rows(rd([slower(k) for k in range(144)]))}
+        chk.append(('flash: 1.5 flashes a second for 6 s warns and never fails (IRIS passes it outright: counted in flashes, two can complete in one second)',
+                    sl['flash warning'] == 'WARN' and sl['sustained flashes'] == 'PASS' and sl['flash rate'] == 'PASS'))
+        w_ok, w_bad = accepted_flash_windows({'accepted_flash_rate': {'from': 1, 'to': 2.5, 'note': 'a gag'}}), accepted_flash_windows({'accepted_flash_rate': 'a strobe'})
+        chk.append(('qc.accepted_flash_rate: a {from, to, note} window reads; the old spot-wide string sets nothing aside', w_ok == ([(1.0, 2.5, 'a gag')], []) and not w_bad[0] and len(w_bad[1]) == 1))
+        cd = os.path.join(r, 'comp'); os.makedirs(os.path.join(cd, 'frames')); open(os.path.join(cd, 'index.html'), 'w').write('<div id="root" data-fps="29.97" data-duration="2">')
+        chk.append(("a frames folder's rate comes from its composition's data-fps (29.97), and is None with no composition", comp_fps(os.path.join(cd, 'frames')) == 29.97 and comp_fps(os.path.join(r, 'caps')) is None))
         os.makedirs(os.path.join(r, 'caps'))
         json.dump([{'file': 'caps/c0.png', 'tl': [0.2, 0.6], 'text': 'A'}], open(os.path.join(r, 'caps', 'manifest.json'), 'w'))
         edl = {'events': [{'id': 'A', 'tl': [0.0, 1.0], 'in': 0}, {'id': 'B', 'tl': [1.0, 2.0], 'in': 0.5, 'accepted_cuts': [1.0]}],
