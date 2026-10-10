@@ -34,7 +34,8 @@ ids (**client numbering = delivery order**); quote every approval into the ledge
 words — an approved spot **freezes**, and a later idea for it becomes an alternate asset. The
 client's domain expertise decides what lands; their wording is exact; the operator sets the diction.
 
-**Done when:** the notes file exists, the mapping is written at its head, and each approval is a row
+**Done when:** the notes file exists, the mapping is written at its head (`#5=S01, #6=S02` — `notes_triage.py` reads it as the
+map), and each approval is a row
 in the ledger with its quote ([`references/ROUND-LEDGER.md`](references/ROUND-LEDGER.md)).
 
 ## 2. Locate every cited beat before anything moves
@@ -77,7 +78,9 @@ said as one when the notes are read back), a paragraph of the script, or the who
 round record beside the list (`prompts/CLIENT-ROUND-<date>.json`, never overwritten): each note's number, spot, class,
 suggested kind, the client's words, and an anchor wherever the words carry a timecode; the rest is filled in as the round
 goes (ROUND-PROTOCOL.md § The round record). A round about one video passes `--spot <id>`, the spot every note gets until
-one names another; a project whose ids are not `S01`-style passes its own pattern (`--ids 'EP\d+'`). A paragraph that is no note — a greeting, a thank-you, a sign-off — is
+one names another; a project whose ids are not `S01`-style passes its own pattern (`--ids 'EP\d+'`). With `--map`, a `#N`
+the map lacks reads spot `?` until it is mapped. Every paragraph with a word in it is an item, a short note included —
+the file's head (the mapping, a date line) and a sign-off's signature block aside. A paragraph that is no note — a greeting, a thank-you, a sign-off — is
 `CHAT`: no spot, no answer, and the ask and the compare page skip it; `notes_triage.py` suggests it only for a paragraph
 made wholly of a greeting, thanks or a sign-off, with no question, request word, spot, timecode or note word — "Hi, this
 one looks great!" stays a note to sort — and the list still shows it.
@@ -122,7 +125,8 @@ proposed for its errors. **Its checks are read, never retyped:** `--log` names t
 ask carries the last `EDL-CHECK` and `BEAT-SHEET` line printed for this EDL and the last `QC-DELIVERABLE` line for this
 file. The finish runs only the beat gate, so run `edl_check.py` and `beat_sheet.py` into the version's run log before the
 ask (`video-edit-edl` § 4; seconds, no render). A check with no line refuses the ask — re-run it, or `--na "BEAT-SHEET: <why>"` for one that does not apply. A FAIL
-is shown, never withheld: QC's judgement rows are the operator's call.
+is shown, never withheld: QC's judgement rows are the operator's call. Every paragraph read as `CHAT` is listed under
+"read as no note — check each", so a note misread as a greeting is seen, never skipped unseen.
 
 **A revision goes with its compare page** — the operator's review, never the client's:
 

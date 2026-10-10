@@ -72,7 +72,7 @@ def round_problems(items):
     for it in items:
         n, cls, kind, an = it.get('n'), it.get('class'), it.get('kind'), it.get('answer') or {}
         if not anchor_ok(it.get('anchor')): probs.append(f"note {n}: no anchor — the moment, stretch, spot, paragraph or whole version it is about")
-        if cls != 'APPROVE' and kind not in ('ERROR', 'TASTE'): probs.append(f"note {n}: kind {kind!r} — sort it ERROR or TASTE")
+        if cls != 'APPROVE' and kind not in ('ERROR', 'TASTE'): probs.append(f"note {n}: kind {kind!r} — sort it ERROR or TASTE, or set its class to \"CHAT\" if it is no note (a greeting, a sign-off)")
         if kind == 'ERROR' and not check_ok(it.get('check')):
             probs.append(f"note {n}: an ERROR with no check row — {{existing, missed}} for the check that passed it, or {{propose, how, owner}}")
         st, change, why = an.get('status'), (an.get('change') or '').strip(), (an.get('why') or '').strip()
@@ -112,7 +112,8 @@ def main():
     if a.round:
         R = json.load(open(a.round, encoding='utf-8')); items = [it for it in R.get('items', []) if it.get('class') != 'CHAT']   # a greeting or a sign-off is no note
         unmapped = [it.get('n') for it in items if it.get('spot') in (None, '', '?')]
-        if unmapped: refuse.append(f"notes {unmapped} have no spot — map the client's numbering (delivery order) before any ask of this round")
+        if unmapped: refuse.append(f"notes {unmapped} have no spot — map the client's numbering (delivery order) before any ask of this round;"
+                                   ' a greeting or a sign-off misread as a note: set its class to "CHAT"')
         notes = [it for it in items if it.get('spot') in (spot, '*')]
         refuse += round_problems(notes)
     if refuse:
@@ -125,6 +126,8 @@ def main():
     dur = float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', a.deliv], capture_output=True, text=True).stdout or 0)
     lines = [f"**{e.get('spot', '?')} v{e.get('version', '?')}** — `{win(a.deliv)}`", f"{dur:.1f} s · {mib:.1f} MiB ({size / 1e6:.1f} MB) · " + ('attached below' if mib <= a.chat_limit_mib else f'over {a.chat_limit_mib:.0f} MiB — open it at the path'), '']
     if a.changed: lines += ['**Changed since the previous version**'] + [f'- {c}' for c in a.changed] + ['']
+    chat = [it for it in R.get('items', []) if it.get('class') == 'CHAT'] if a.round else []
+    if chat: lines += [f"**Read as no note — check each** (`{a.round}`; a misread one: set its class back and sort it)"] + [f"- {it.get('n')} · «{' '.join((it.get('words') or '').split())[:110]}»" for it in chat] + ['']
     if a.round and not notes: lines += [f"**The client's notes** — none of this round's notes names {spot!r} (`{a.round}`)", '']
     if notes:
         lines += [f"**The client's notes, answered by number** (`{a.round}`)"]
@@ -196,13 +199,14 @@ def selftest():
                  ('the LAST line for this EDL counts, a FAIL is shown', 'EDL-CHECK PASS — `logs/run.txt`' in r_ok.stdout and 'QC-DELIVERABLE FAIL (judgement: duration)' in r_ok.stdout
                   and 'the operator decides' in r_ok.stdout),
                  ("only this spot's notes and the all-spots one, by number, with their answers — the CHAT paragraph skipped", '- **1** · 0:41 · ERROR' in r_ok.stdout and '- **2** · 0:12–0:20 · TASTE' in r_ok.stdout
-                  and '**3**' not in r_ok.stdout and '- **5** · whole · TASTE' in r_ok.stdout and '**6**' not in r_ok.stdout),
+                  and '**3**' not in r_ok.stdout and '- **5** · whole · TASTE' in r_ok.stdout and '**6**' not in r_ok.stdout and 'Read as no note' in r_ok.stdout and '- 6 · «Hi team, thanks for the quick turnaround!»' in r_ok.stdout),
                  ('the proposed check is listed', 'note 1 → video-finish-qc: a price on screen' in r_ok.stdout),
                  ('the compare page by its operator path', 'C:\\p\\review\\S01-v8-v9.html' in r_ok.stdout)]
         for label, items, needle in (('an ERROR with no check row refuses', bad_check, 'note 1: an ERROR with no check row'),
                                      ('done "Addressed." refuses', vague, 'note 1: done needs exactly what changed'),
                                      ('not_done with no why refuses', no_why, 'note 2: not_done needs why'),
-                                     ('an unmapped note in the round refuses', unmapped, 'notes [4] have no spot')):
+                                     ('an unmapped note in the round refuses, naming the CHAT fix', unmapped, 'misread as a note: set its class to "CHAT"'),
+                                     ('a kind still ? names the CHAT fix', [dict(good[0], kind='?')] + good[1:], 'or set its class to "CHAT"')):
             r = run('--log', 'logs/run.txt', '--na', 'BEAT-SHEET: x', '--round', rec('t.json', items)); cases.append((label, r.returncode == 2 and needle in r.stderr))
         r_none = run('--log', 'logs/run.txt', '--na', 'BEAT-SHEET: x', '--round', rec('s02.json', [good[2]]))
         cases.append(('a spot the round holds no note for gets a line, never a refusal', r_none.returncode == 0 and "none of this round's notes names 'S01'" in r_none.stdout))
