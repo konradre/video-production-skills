@@ -90,7 +90,8 @@ an accumulation or a raster-path change.
 **Done when:** the render probes at its declared length and raster, the layer check passes, `det_check.py source`
 passes (and `prove`, for a new composition — a FAIL whose ONE-ROW block puts every difference on a shrinking text's
 bottom edge counts as passed once those frames are read and the finding is written beside the composition,
-HYPERFRAMES-CONTRACT § The determinism proof), every `overlapping_gsap_tweens` warning in the check summary is
+HYPERFRAMES-CONTRACT § The determinism proof), every `det_check.py source` WARN is answered (fixed at the source, or
+read on its frames and recorded), every `overlapping_gsap_tweens` warning in the check summary is
 answered — one writer per property per element per window, or the overlap read on its frames and shown to draw nothing
 (HYPERFRAMES-CONTRACT § Silent traps: which tween wins flips on a `tl.call()` anywhere in the timeline) — and the sync
 numbers are handed to `video-edit-edl` and `spot-audio-assembly`.

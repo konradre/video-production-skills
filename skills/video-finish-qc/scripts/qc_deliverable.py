@@ -45,8 +45,9 @@
                audio.sfx cue found in the mix at its time by correlation · with qc.beat_data every on_beat cut within 3 frames
   motion       WARN lines (decoded_checks.py): one-frame pops (qc.accepted_flashes set aside) · one-frame steps off every
                frame the EDL changes on purpose (the joins, accepted_cuts, every caption's on and off, qc.accepted_flashes —
-               a worded card declares its own word lines in accepted_cuts) · and a judgement row: the WCAG general-flash
-               rate, over 3 in any one second FAILS
+               a worded card declares its own word lines in accepted_cuts) · and a judgement row: the general-flash rate
+               over the broadcast area (25 % of the whole frame; WCAG 2.3.1 counts 25 % of any 10° field, not read here), over 3 in any one second FAILS unless qc.accepted_flash_rate: "<why>" declares a
+               deliberate strobe (INFO, the reason printed on every run)
   phone band   INFO, with --phone-ref <real phone clips>: the delivered file's phone-texture band (phone_texture_probe.py —
                dead-flat 8×8 share, noise floor, median block sd) against the RANGE over every reference frame; a
                creator-style spot's read, never a failure — the operator judges the phone render beside the clean one
@@ -292,7 +293,10 @@ def main():
         print(f"{'WARN' if po else 'INFO'} pops: " + (dc._fmt(po, efps, 'pops') + ' — read each frame and its neighbours; a designed one goes in qc.accepted_flashes' if po else 'none'))
         print(f"{'WARN' if st else 'INFO'} steps: " + (dc._fmt(st, efps, 'steps') + ' — read each; a worded card declares its word lines in its event\'s accepted_cuts' if st else 'none off the declared edges')
               + f" · on declared edges (INFO): {len(on)} — {sorted({w.split(' ')[0] for x in on for w in edges[x[0]]})}")
-        verdict(nf <= 3, 'flash rate', f"{nf} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — WCAG 2.3.1: at most 3 in any one second")
+        fdet = (f"{nf} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — at most 3 in any "
+                "one second, each over 25 % of the whole frame (the broadcast area; WCAG 2.3.1's 25 % of a 10° field is not read)")
+        if nf > 3 and q.get('accepted_flash_rate'): print(f"INFO flash rate: {fdet} — declared in qc.accepted_flash_rate: {q['accepted_flash_rate']}")
+        else: verdict(nf <= 3, 'flash rate', fdet)
     # ---- against the previous version (INFO; a verdict with --prev-expect) ----
     if a.prev:
         rows = prev_compare(D, a.prev, e['events'], efps); cls = {r[0]: classify(r) for r in rows}

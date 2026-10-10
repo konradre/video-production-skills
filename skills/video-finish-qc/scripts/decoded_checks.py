@@ -32,15 +32,17 @@ The motion rows read every frame on an area proxy (long side 320 px), whole fram
               off, qc.accepted_flashes); on three shipped spots that left only a worded card's own word lines, which
               the card's event declares as accepted_cuts
   flash rate  WCAG 2.3.1 general flashes (showtime's flash_risk): a transition is a ≥ 0.1 change of relative
-              luminance over ≥ 25 % of the frame with its darker side under 0.8; a flash is a pair of opposite
+              luminance over ≥ 25 % of the WHOLE frame with its darker side under 0.8 — the broadcast area: WCAG 2.3.1
+              counts 25 % of any 10° field (about 12 % of a 9:16 frame on a phone at 35 cm), not read here; a flash is a pair of opposite
               transitions; more than 3 in any one second WARNs here and FAILS the delivery QC
   floor       the frozen-frame row's blind spot (freeze_floor): freezedetect's statistic at sampled still frame pairs;
               over its −60 dB tolerance (0.26 code values) a frozen shot under that texture does not register
 
-  decoded_checks.py motion <render.mp4 | frames-dir> [--fps 24] [--accepted s,s,… | <manifest.json> | <captions.html>]… [--tiles]
+  decoded_checks.py motion <render.mp4 | frames-dir> [--fps 24] [--accepted s,s,… | <manifest.json> | <captions.html> | <timeline.json>]… [--tiles]
       a designed render's motion read: pops, steps and the flash rate; --accepted (repeatable) = the element's own hard
       changes: its own seconds (a worded card's word lines — the numbers its EDL event declares as accepted_cuts), a
-      caption manifest, or an explainer's compositions/captions.html (each caption's show and hide); --tiles adds the
+      caption manifest, an explainer's compositions/captions.html (each caption's show and hide) or its timeline.json
+      (each scene cut); --tiles adds the
       per-tile step read (4×4), a LEAD: it reaches a small element's snap, and designed slams, wipes, bar slashes and
       shakes fire it too (on one kit every tile hit was designed; on one shipped card it caught one of three real snaps,
       5 % over its threshold)
@@ -296,14 +298,18 @@ def declared_edges(edl, fps, root='.'):
 
 def accepted_frames(specs, fps):
     """{frame} an element changes on purpose, from each --accepted spec: seconds, comma-separated (at round(t·fps)), a
-    caption manifest (.json, each card's tl) or an explainer's compositions/captions.html ([block, show, hide] in
-    seconds) — each caption's show and hide at the first frame at or after its time, as they are set"""
+    caption manifest (.json, each card's tl), an explainer's compositions/captions.html ([block, show, hide] in
+    seconds) — each caption's show and hide at the first frame at or after its time, as they are set — or an explainer's
+    timeline.json (each scene's start after 0: a cut, at the first frame at or after it)"""
     out = set(); up = lambda t: math.ceil(float(t) * fps - 1e-6)
     for s in (x.strip() for x in specs or []):
         if not s: continue
         if os.path.isfile(s):
             if s.endswith('.json'):
-                for c in json.load(open(s, encoding='utf-8')): out |= {up(c['tl'][0]), up(c['tl'][1])}
+                d = json.load(open(s, encoding='utf-8'))
+                if isinstance(d, dict): out |= {up(sc['start']) for sc in d.get('scenes') or [] if float(sc.get('start', 0)) > 0}
+                else:
+                    for c in d: out |= {up(c['tl'][0]), up(c['tl'][1])}
             else:
                 for a, b in re.findall(r'\[\d+, ([\d.]+), ([\d.]+)\]', open(s, encoding='utf-8').read()): out |= {up(a), up(b)}
             continue
@@ -346,7 +352,7 @@ def motion_cli(argv):
     ap.add_argument('render', help='an mp4, or a folder of PNG layers (composited over black)')
     ap.add_argument('--fps', type=float, default=None, help='the frame rate of a PNG folder (a video carries its own)')
     ap.add_argument('--accepted', action='append', default=[], help="the element's own hard changes, repeatable: its own seconds, comma-separated "
-                    "(a worded card's word lines), a caption manifest.json, or an explainer's compositions/captions.html (each caption's show and hide)")
+                    "(a worded card's word lines), a caption manifest.json, an explainer's compositions/captions.html (each caption's show and hide), or its timeline.json (each scene cut)")
     ap.add_argument('--tiles', action='store_true', help='add the per-tile step read (4×4): a lead, never a verdict')
     a = ap.parse_args(argv)
     g, fps, (W, H) = motion_frames(a.render, a.fps)
@@ -360,7 +366,7 @@ def motion_cli(argv):
     warn = 0
     print(f"{'WARN' if po else 'INFO'} pops: " + (_fmt(po, fps, 'pops') if po else 'none (floor: a ~2-level step in the frame mean)')); warn += bool(po)
     print(f"{'WARN' if st else 'INFO'} steps: " + (_fmt(st, fps, 'steps') if st else 'none off the declared changes') + (f" · declared (INFO): {[x[0] for x in held]}" if held else '')); warn += bool(st)
-    print(f"{'WARN' if fl > 3 else 'INFO'} flash rate: {fl} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — WCAG 2.3.1: at most 3"); warn += fl > 3
+    print(f"{'WARN' if fl > 3 else 'INFO'} flash rate: {fl} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — at most 3, each over 25 % of the whole frame (the broadcast area)"); warn += fl > 3
     if a.tiles:
         sx, sy = W / g.shape[2], H / g.shape[1]; hs, ws = g.shape[1] // 4, g.shape[2] // 4; ts = tile_steps(g, acc)
         print(f"{'WARN' if ts else 'INFO'} tile steps (a LEAD: designed slams, wipes, bar slashes and shakes fire it too — read each on its frames): " + (
@@ -425,8 +431,9 @@ def selftest():
                'post_layers': [{'id': 'L', 'at': 0.5, 'dur': 0.25}], 'audio': {'captions_dir': 'caps'}, 'qc': {'accepted_flashes': [1.75]}}
         chk.append(('declared edges: join 24, accepted cut 36, caption 5/15, flash 42 — a layer is not one', set(declared_edges(edl, 24, r)) == {24, 36, 5, 15, 42}))
         open(os.path.join(r, 'captions.html'), 'w').write('<script>\n  var C = [[0, 0.650, 1.100]];\n</script>')
-        acc = accepted_frames(['1.0,2.5', os.path.join(r, 'caps', 'manifest.json'), os.path.join(r, 'captions.html')], 24)
-        chk.append((f'--accepted: seconds 24/60, a manifest 5/15, a captions.html 16/27 → {sorted(acc)}', acc == {24, 60, 5, 15, 16, 27}))
+        json.dump({'scenes': [{'id': 's01', 'start': 0.0}, {'id': 's02', 'start': 2.0}]}, open(os.path.join(r, 'timeline.json'), 'w'))
+        acc = accepted_frames(['1.0,2.5', os.path.join(r, 'caps', 'manifest.json'), os.path.join(r, 'captions.html'), os.path.join(r, 'timeline.json')], 24)
+        chk.append((f'--accepted: seconds 24/60, a manifest 5/15, a captions.html 16/27, a timeline.json scene cut 48 → {sorted(acc)}', acc == {24, 60, 5, 15, 16, 27, 48}))
         enc = ['-c:v', 'libx264', '-crf', '1', '-pix_fmt', 'yuv420p']
         fm = os.path.join(r, 'flash.mp4'); pp = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gray', '-s', '128x128', '-r', '24', '-i', '-', *enc, fm], stdin=subprocess.PIPE)
         pp.stdin.write(flash.astype(np.uint8).tobytes()); pp.stdin.close(); pp.wait()

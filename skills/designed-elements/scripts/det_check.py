@@ -155,8 +155,8 @@ def _held_froms(code):
 # 4 decimals) — a fade-in ends in a one-frame snap, all three tubes of a shipped end card; the same fade, or a 6 px blur, on
 # the 2D wrapper that holds the perspective left the tube 3D
 FADE3D = ('an opacity under 1 or a filter on a transform-style: preserve-3d element flattens its 3D subtree, and it redraws '
-          'in 3D on the first frame the opacity is exactly 1 — a one-frame snap (measured 0.8.18) — fade or filter the 2D '
-          'wrapper that holds the perspective, never the preserve-3d element')
+          'in 3D on the first frame the opacity is exactly 1 — a one-frame snap (measured 0.8.18) — fade or filter a 2D '
+          'wrapper that holds the perspective, one per object that fades on its own, never the preserve-3d element')
 P3D = r'''transform-?[sS]tyle['"]?\s*[:=,]\s*['"`]?\s*preserve-3d'''
 FADE_KEY = r'''(?<![\w$.-])['"]?(opacity|autoAlpha|filter|webkitFilter)['"]?\s*:'''
 RESTORE = r'''\s*(?:1(?:\.0*)?|(['"`])\s*(?:1(?:\.0*)?|none)?\s*\1)\s*(?=[,;})\n]|$)'''   # a value that ends a fade: 1, '', none

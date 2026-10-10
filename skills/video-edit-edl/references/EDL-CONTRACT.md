@@ -84,6 +84,9 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
 - `qc.grain_after` (optional, `true`) — the finish lays grain over the picture after the cut. No frozen shot gets under
   freezedetect's tolerance through grain, so the delivery QC's frozen row prints BLIND outright and the held shots are
   read by eye.
+- `qc.accepted_flash_rate` (optional, `"<why>"`) — a strobe the piece means to have: more than 3 general flashes a
+  second prints the delivery QC's flash row as INFO with this reason instead of failing it. The reason prints on every
+  run; declaring a seizure-risk strobe is the operator's judgement.
 
 ## markers — absolute timeline seconds, written by the builder
 
