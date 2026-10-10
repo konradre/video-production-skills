@@ -155,7 +155,9 @@ and the delivered frame re-read.
   pushed or not), not the source: read each listed file at its rows and x ranges, write the finding beside the
   composition, and it counts as passed — no warm-up render, which would not help. The DIFF lines stop at twelve; the
   ONE-ROW block lists every frame by index and file (frame 29 is `frame_000030.png`). A one-row speck that is not such
-  an edge — a particle, a dither, an unseeded sparkle — fails as before.
+  an edge — a particle, a dither, an unseeded sparkle — fails as before. A FAIL is never re-rolled: a later proof that
+  passes without a source change does not clear it (two renders can match by chance); one that passes after the fix
+  does.
 - `slide_structure_audit.py` exits 2 (it could not segment the scenes) → the composition does not mark them the way
   the contract does (`data-start` + `data-duration`); fix the markup, never read the 2 as a pass.
 - A `slide_structure_audit.py` flag the composition confirms → the fix is structural (a world move at the cut, a text
