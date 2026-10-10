@@ -20,7 +20,8 @@ thumbnail from frame 0), video-shotcraft's final review (every SFX audible in th
   beat_cuts   every event declaring on_beat: its cut within 3 frames of the nearest beat of qc.beat_data
               (spot-audio-assembly/scripts/beat_grid.py JSON — the checked grid, or the beat map)
 
-The motion rows read every frame on an area proxy (long side 320 px), whole frame — WARN lines, never a FAIL:
+The motion rows read every frame on an area proxy (long side 320 px), whole frame — WARN lines here; the delivery QC
+(qc_deliverable.py) keeps pops and steps as WARN lines and fails the flash rate, a judgement row:
   pops        a one-frame flash: frame n unlike both neighbours while they match — min(d[n-1], d[n]) > 2.0 and
               mean|f[n+1] - f[n-1]| < 0.35 × that min (claude-motion-design's two-sided test; a cut cannot fire it).
               Measured floor: a step in the frame mean of ~2 levels — ~1.5 % of the frame at a 135-level flash in a
@@ -32,19 +33,20 @@ The motion rows read every frame on an area proxy (long side 320 px), whole fram
               the card's event declares as accepted_cuts
   flash rate  WCAG 2.3.1 general flashes (showtime's flash_risk): a transition is a ≥ 0.1 change of relative
               luminance over ≥ 25 % of the frame with its darker side under 0.8; a flash is a pair of opposite
-              transitions; more than 3 in any one second WARNs
+              transitions; more than 3 in any one second WARNs here and FAILS the delivery QC
   floor       the frozen-frame row's blind spot (freeze_floor): freezedetect's statistic at sampled still frame pairs;
               over its −60 dB tolerance (0.26 code values) a frozen shot under that texture does not register
 
-  decoded_checks.py motion <render.mp4 | frames-dir> [--fps 24] [--accepted s,s,…] [--tiles]
-      a designed render's motion read: pops, steps and the flash rate; --accepted = the element's own hard changes in its
-      own seconds (a worded card's word lines — the numbers its EDL event declares as accepted_cuts); --tiles adds the
+  decoded_checks.py motion <render.mp4 | frames-dir> [--fps 24] [--accepted s,s,… | <manifest.json> | <captions.html>]… [--tiles]
+      a designed render's motion read: pops, steps and the flash rate; --accepted (repeatable) = the element's own hard
+      changes: its own seconds (a worded card's word lines — the numbers its EDL event declares as accepted_cuts), a
+      caption manifest, or an explainer's compositions/captions.html (each caption's show and hide); --tiles adds the
       per-tile step read (4×4), a LEAD: it reaches a small element's snap, and designed slams, wipes, bar slashes and
       shakes fire it too (on one kit every tile hit was designed; on one shipped card it caught one of three real snaps,
       5 % over its threshold)
   decoded_checks.py --selftest
 """
-import argparse, glob, json, math, os, subprocess, sys, tempfile
+import argparse, glob, json, math, os, re, subprocess, sys, tempfile
 import numpy as np
 
 
@@ -292,6 +294,24 @@ def declared_edges(edl, fps, root='.'):
     return E
 
 
+def accepted_frames(specs, fps):
+    """{frame} an element changes on purpose, from each --accepted spec: seconds, comma-separated (at round(t·fps)), a
+    caption manifest (.json, each card's tl) or an explainer's compositions/captions.html ([block, show, hide] in
+    seconds) — each caption's show and hide at the first frame at or after its time, as they are set"""
+    out = set(); up = lambda t: math.ceil(float(t) * fps - 1e-6)
+    for s in (x.strip() for x in specs or []):
+        if not s: continue
+        if os.path.isfile(s):
+            if s.endswith('.json'):
+                for c in json.load(open(s, encoding='utf-8')): out |= {up(c['tl'][0]), up(c['tl'][1])}
+            else:
+                for a, b in re.findall(r'\[\d+, ([\d.]+), ([\d.]+)\]', open(s, encoding='utf-8').read()): out |= {up(a), up(b)}
+            continue
+        try: out |= {round(float(t) * fps) for t in s.split(',') if t.strip()}
+        except ValueError: raise SystemExit(f'--accepted {s}: neither seconds nor a readable file')
+    return out
+
+
 def freeze_floor(p, t0, t1, k=12):
     """(floor or None, tolerance, detail) — the frozen-frame row's blind spot. freezedetect calls a frame frozen when the
     mean |difference| over all planes, ÷ 2^bits, is ≤ 10^(n/20): 0.256 code values at −60 dB on 8 bits. The same
@@ -325,14 +345,18 @@ def motion_cli(argv):
     ap = argparse.ArgumentParser(prog='decoded_checks.py motion', description='the motion read of a designed render: one-frame pops, one-frame steps, the WCAG flash rate; WARN lines, exit 0')
     ap.add_argument('render', help='an mp4, or a folder of PNG layers (composited over black)')
     ap.add_argument('--fps', type=float, default=None, help='the frame rate of a PNG folder (a video carries its own)')
-    ap.add_argument('--accepted', default='', help="the element's own hard changes, its own seconds, comma-separated (a worded card's word lines)")
+    ap.add_argument('--accepted', action='append', default=[], help="the element's own hard changes, repeatable: its own seconds, comma-separated "
+                    "(a worded card's word lines), a caption manifest.json, or an explainer's compositions/captions.html (each caption's show and hide)")
     ap.add_argument('--tiles', action='store_true', help='add the per-tile step read (4×4): a lead, never a verdict')
     a = ap.parse_args(argv)
     g, fps, (W, H) = motion_frames(a.render, a.fps)
     if len(g) < 3: print(f'MOTION-READ: fewer than 3 frames decoded from {a.render}'); return 2
-    acc = {round(float(t) * fps) for t in a.accepted.split(',') if t.strip()}
+    try: per = [(s, accepted_frames([s], fps)) for s in a.accepted]
+    except SystemExit as e: print(f'MOTION-READ: {e}'); return 2
+    acc = set().union(*(f for _, f in per)) if per else set()
     po, st = pops(g), steps(g, acc); held = [x for x in steps(g) if x[0] in acc]; fl, fat, ntr = flash_rate(g, fps)
     print(f"motion read {a.render}: {W}x{H}, {len(g)} frames at {fps:g} fps, proxy {g.shape[2]}x{g.shape[1]}")
+    for s, f in per: print(f"{'INFO' if f else 'WARN'} accepted {s}: {len(f)} frame(s) set aside" + ('' if f else ' — nothing read from it'))
     warn = 0
     print(f"{'WARN' if po else 'INFO'} pops: " + (_fmt(po, fps, 'pops') if po else 'none (floor: a ~2-level step in the frame mean)')); warn += bool(po)
     print(f"{'WARN' if st else 'INFO'} steps: " + (_fmt(st, fps, 'steps') if st else 'none off the declared changes') + (f" · declared (INFO): {[x[0] for x in held]}" if held else '')); warn += bool(st)
@@ -400,6 +424,9 @@ def selftest():
         edl = {'events': [{'id': 'A', 'tl': [0.0, 1.0], 'in': 0}, {'id': 'B', 'tl': [1.0, 2.0], 'in': 0.5, 'accepted_cuts': [1.0]}],
                'post_layers': [{'id': 'L', 'at': 0.5, 'dur': 0.25}], 'audio': {'captions_dir': 'caps'}, 'qc': {'accepted_flashes': [1.75]}}
         chk.append(('declared edges: join 24, accepted cut 36, caption 5/15, flash 42 — a layer is not one', set(declared_edges(edl, 24, r)) == {24, 36, 5, 15, 42}))
+        open(os.path.join(r, 'captions.html'), 'w').write('<script>\n  var C = [[0, 0.650, 1.100]];\n</script>')
+        acc = accepted_frames(['1.0,2.5', os.path.join(r, 'caps', 'manifest.json'), os.path.join(r, 'captions.html')], 24)
+        chk.append((f'--accepted: seconds 24/60, a manifest 5/15, a captions.html 16/27 → {sorted(acc)}', acc == {24, 60, 5, 15, 16, 27}))
         enc = ['-c:v', 'libx264', '-crf', '1', '-pix_fmt', 'yuv420p']
         fm = os.path.join(r, 'flash.mp4'); pp = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gray', '-s', '128x128', '-r', '24', '-i', '-', *enc, fm], stdin=subprocess.PIPE)
         pp.stdin.write(flash.astype(np.uint8).tobytes()); pp.stdin.close(); pp.wait()

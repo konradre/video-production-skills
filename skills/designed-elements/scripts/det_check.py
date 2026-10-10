@@ -11,8 +11,12 @@ distance instead of an accumulation); this is the instrument that checks them.
            attributes, the project's own .css) is read for a `transition` (a FAIL: a cold worker starts it at its own
            first frame) and a `will-change: transform` (a WARN: text that scales renders from its first raster); the
            script for a from() with immediateRender: false in a file that also holds a repeat: -1 (a WARN: it never
-           runs); every PNG outside renders/ and frames/ for the colour chunks Chromium applies (gAMA, cHRM, iCCP, cICP —
-           a WARN). Measured on hyperframes 0.8.18, 2026-10-10 (HYPERFRAMES-CONTRACT § Silent traps). A path with no
+           runs); script and CSS for an opacity, autoAlpha or filter set or tweened on a transform-style: preserve-3d
+           element (a WARN: it flattens the element's 3D subtree and snaps back to 3D in one frame when the opacity reaches
+           1) — the element found by its CSS rule, an inline style, a class written in one class list with a 3D class
+           (`className = 'tube tube' + i` makes `.tube0` 3D), and the variables and arrays that hold it; every PNG
+           outside renders/ and frames/ for the colour chunks Chromium applies (gAMA, cHRM, iCCP, cICP — a WARN).
+           Measured on hyperframes 0.8.18, 2026-10-10/11 (HYPERFRAMES-CONTRACT § Silent traps). A path with no
            index.html exits 2.
   frames   compare two PNG sequences of one composition frame by frame on the decoded pixels, and say which scene
            (data-start / data-duration in index.html, with --project) each difference falls in, where in the frame (its
@@ -146,6 +150,178 @@ def _held_froms(code):
             if re.search(r'\bimmediateRender\s*:\s*false\b', _call_text(code, m.end() - 1))]
 
 
+# measured 2026-10-11, hyperframes 0.8.18: an opacity under 1 or any filter on a transform-style:
+# preserve-3d element flattens its subtree, and it redraws in 3D on the first frame its opacity is exactly 1 (GSAP writes
+# 4 decimals) — a fade-in ends in a one-frame snap, all three tubes of a shipped end card; the same fade, or a 6 px blur, on
+# the 2D wrapper that holds the perspective left the tube 3D
+FADE3D = ('an opacity under 1 or a filter on a transform-style: preserve-3d element flattens its 3D subtree, and it redraws '
+          'in 3D on the first frame the opacity is exactly 1 — a one-frame snap (measured 0.8.18) — fade or filter the 2D '
+          'wrapper that holds the perspective, never the preserve-3d element')
+P3D = r'''transform-?[sS]tyle['"]?\s*[:=,]\s*['"`]?\s*preserve-3d'''
+FADE_KEY = r'''(?<![\w$.-])['"]?(opacity|autoAlpha|filter|webkitFilter)['"]?\s*:'''
+RESTORE = r'''\s*(?:1(?:\.0*)?|(['"`])\s*(?:1(?:\.0*)?|none)?\s*\1)\s*(?=[,;})\n]|$)'''   # a value that ends a fade: 1, '', none
+CSS_FADE = r'''(?<![\w-])(?:opacity\s*:\s*(?:0*\.\d+|0+|\d{1,2}(?:\.\d+)?%)\s*(?=[;}!]|$)|(?:-webkit-)?filter\s*:\s*(?!none\b)[^\s;}])'''
+VAR = r'[A-Za-z_$][\w$]*(?:\s*\[[^\]\n]*\])*'
+LIT = r'''(['"])((?:\\.|(?!\1).)*)\1|`((?:\\.|[^`])*)`'''
+
+
+def _split_top(expr, sep):
+    """expr split at each top-level sep (strings and brackets respected)."""
+    out, depth, q, start, i = [], 0, None, 0, 0
+    while i < len(expr):
+        c = expr[i]
+        if q:
+            if c == '\\': i += 1
+            elif c == q: q = None
+        elif c in '"\'`': q = c
+        elif c in '([{': depth += 1
+        elif c in ')]}': depth -= 1
+        elif c == sep and not depth: out.append(expr[start:i]); start = i + 1
+        i += 1
+    return [x.strip() for x in out + [expr[start:]]]
+
+
+def _args(call):
+    """The top-level arguments of a call's text, '(' through its ')'."""
+    return [a for a in _split_top(call[1:-1] if call.endswith(')') else call[1:], ',') if a]
+
+
+def _str_expr(expr):
+    """The text a string expression builds — literals joined by +, a NUL where a run-time value joins in; None when no
+    top-level piece is a string (a call, a variable)."""
+    parts, lit = [], False
+    for piece in _split_top(expr, '+'):
+        m = re.fullmatch(LIT, piece, flags=re.S)
+        if m: parts.append(m.group(2) if m.group(1) else re.sub(r'\$\{[^}]*\}', '\0', m.group(3))); lit = True
+        elif piece: parts.append('\0')
+    return ''.join(parts) if lit else None
+
+
+def _sel_tokens(text):
+    """(kind, name, open) for the element each comma-separated selector selects — its last compound; open = a run-time
+    value joins the name (a NUL follows it)."""
+    out = set()
+    for part in text.split(','):
+        bits = [b for b in re.split(r'[\s>+~]+', part.strip()) if b]
+        if bits: out |= {(k, n, z == '\0') for k, n, z in re.findall(r'([.#])([\w-]+)(\0?)', bits[-1])}
+    return out
+
+
+def _class_tokens(text):
+    """(name, open) per class a class list holds; a token built wholly at run time is dropped."""
+    return {(t.split('\0')[0], '\0' in t) for t in text.split() if re.fullmatch(r'[\w-]+', t.split('\0')[0] or '!')}
+
+
+def _base(expr):
+    """The variable an element expression reads (`tubes[2]` → tubes), else None."""
+    m = re.fullmatch(r'\s*([A-Za-z_$][\w$]*)(?:\s*\[[^\]]*\])*\s*', expr)
+    return m.group(1) if m else None
+
+
+def _query_tokens(expr):
+    """Selector tokens of a querySelector/getElementById/getElementsByClassName/toArray call; None when expr is not one."""
+    m = re.search(r'\b(querySelector(?:All)?|getElementById|getElementsByClassName|toArray)\s*\(', expr)
+    if not m: return None
+    a = _args(_call_text(expr, m.end() - 1)); t = _str_expr(a[0]) if a else None
+    if t is None: return set()
+    if m.group(1) == 'getElementById': return {('#', t.split('\0')[0], '\0' in t)} if t.split('\0')[0] else set()
+    if m.group(1) == 'getElementsByClassName': return {('.', n, o) for n, o in _class_tokens(t)}
+    return _sel_tokens(t)
+
+
+class _Space3D:
+    """What the source makes preserve-3d: class names, class prefixes (a class built at run time from a prefix in one class
+    list with a 3D class: 'tube tube' + i), ids, and the script variables or arrays holding such an element. A class that
+    shares a class list with a 3D class counts: a fade by that selector reaches the 3D element too."""
+    def __init__(s): s.cls, s.pre, s.ids, s.vars = set(), set(), set(), set()
+    def size(s): return len(s.cls) + len(s.pre) + len(s.ids) + len(s.vars)
+    def tok(s, kind, name, open_):
+        if kind == '#': return any(i.startswith(name) for i in s.ids) if open_ else name in s.ids
+        if open_: return name in s.pre or any(c.startswith(name) and c != name for c in s.cls)
+        return name in s.cls or any(name.startswith(p) and name != p for p in s.pre)
+    def add(s, kind, name, open_): (s.ids if kind == '#' else s.pre if open_ else s.cls).add(name)
+    def target(s, expr):
+        e = expr.strip()
+        if e.startswith('[') and e.endswith(']'): return any(s.target(x) for x in _split_top(e[1:-1], ',') if x)
+        q = _query_tokens(e)
+        if q is not None: return any(s.tok(*t) for t in q)
+        sel = _str_expr(e)
+        if sel is not None: return any(s.tok(*t) for t in _sel_tokens(sel))
+        b = _base(e); return bool(b and b in s.vars)
+
+
+def _tags(path):
+    """(line, class tokens, id, style) for each tag in an HTML file — markup in script strings included."""
+    html = re.sub(r'<!--.*?-->', lambda m: re.sub(r'[^\n]', ' ', m.group(0)), open(path, encoding='utf-8', errors='replace').read(), flags=re.S)
+    attr = lambda a, t: (lambda m: m.group(2) if m else '')(re.search(r'\s' + a + r'''\s*=\s*(["'])(.*?)\1''', t, flags=re.S))
+    for m in re.finditer(r'<[A-Za-z][\w-]*\b([^<>]*)>', html):
+        cl = re.sub(r'\$\{[^}]*\}', '\0', attr('class', m.group(1)))
+        yield html.count('\n', 0, m.start()) + 1, _class_tokens(cl), attr('id', m.group(1)), attr('style', m.group(1))
+
+
+def _fade3d(project, units, css, htmls):
+    """WARN findings for an opacity, autoAlpha or filter set or tweened on a preserve-3d element (FADE3D)."""
+    sp, rel = _Space3D(), lambda p: os.path.relpath(p, project)
+    ok_on = lambda line: (lambda m: m.group(1).strip() if m else None)(re.search(r'det-ok:\s*(.+?)\s*(?:\*/)?\s*$', line))
+    rules = []   # (file, first line, raw, stripped, decl offset, selector tokens, declarations)
+    for p, ln0, raw in css:
+        code = _strip_css(raw)
+        for m in re.finditer(r'([^{}@;]+)\{([^{}]*)\}', code):
+            rules.append((p, ln0, raw, code, m.start(2), _sel_tokens(m.group(1)), m.group(2)))
+            if re.search(P3D, m.group(2)): [sp.add(*t) for t in _sel_tokens(m.group(1))]
+    tags = [(p, ln, cl, i, st) for p in htmls for ln, cl, i, st in _tags(p)]
+    js = [(p, ln0, raw, _strip_js(raw)) for p, ln0, raw in units]
+    calls = [(p, ln0, raw, code, m, _args(_call_text(code, m.end() - 1)))
+             for p, ln0, raw, code in js for m in re.finditer(r'\.\s*(to|from|fromTo|set)\s*\(', code)]
+    for _ in range(8):   # to a fixed point: a class co-written with a 3D class, a variable holding one, an array it joins
+        n0 = sp.size()
+        for p, ln, cl, i, st in tags:
+            if re.search(P3D, st) or (i and sp.tok('#', i, False)) or any(sp.tok('.', n, o) for n, o in cl):
+                [sp.add('.', n, o) for n, o in cl]; i and sp.add('#', i, False)
+        for p, ln0, raw, code in js:
+            for m in re.finditer(r'(' + VAR + r')\s*\.\s*(?:className\s*=(?!=)\s*([^;\n]+)|setAttribute\s*\(|classList\s*\.\s*add\s*\()', code):
+                if m.group(2) is not None: text = _str_expr(m.group(2).strip()) or ''
+                else:
+                    a = _args(_call_text(code, m.end() - 1))
+                    if 'setAttribute' in m.group(0): text = (_str_expr(a[1]) or '') if len(a) > 1 and _str_expr(a[0]) == 'class' else ''
+                    else: text = ' '.join(_str_expr(x) or '' for x in a)
+                cl, b = _class_tokens(text), _base(m.group(1))
+                if (b and b in sp.vars) or any(sp.tok('.', n, o) for n, o in cl):
+                    [sp.add('.', n, o) for n, o in cl]; b and sp.vars.add(b)
+            for m in re.finditer(r'(' + VAR + r')\s*\.\s*style\s*(?:\.\s*transformStyle\s*=|\.\s*setProperty\s*\()\s*[^;\n]*preserve-3d', code):
+                (b := _base(m.group(1))) and sp.vars.add(b)
+            for m in re.finditer(r'(' + VAR + r')\s*\.\s*push\s*\(', code):
+                if any(_base(x) in sp.vars for x in _args(_call_text(code, m.end() - 1))): (b := _base(m.group(1))) and sp.vars.add(b)
+            for m in re.finditer(r'(?:\b(?:var|let|const)\s+|^|[;{]\s*)([A-Za-z_$][\w$]*)(\s*\[[^\]\n]*\])?\s*=(?![=>])\s*([^;\n]+)', code, flags=re.M):
+                q = _query_tokens(m.group(3))
+                if (q and any(sp.tok(*t) for t in q)) or _base(m.group(3)) in sp.vars: sp.vars.add(m.group(1))
+        for p, ln0, raw, code, m, a in calls:
+            if len(a) > 1 and re.search(P3D, ', '.join(a[1:])):
+                sel = _str_expr(a[0])
+                if sel is not None: [sp.add(*t) for t in _sel_tokens(sel)]
+                elif _base(a[0]): sp.vars.add(_base(a[0]))
+        if sp.size() == n0: break
+    out = []
+    def hit(p, ln0, raw, code, off, txt):
+        i = code.count('\n', 0, off); out.append((rel(p), ln0 + i, FADE3D, txt, ok_on(raw.split('\n')[i]), 'WARN'))
+    for p, ln0, raw, code, m, a in calls:
+        if len(a) < 2: continue
+        rest = ', '.join(a[1:]); keys = list(re.finditer(FADE_KEY, rest))
+        live = [k for k in keys if not (m.group(1) == 'set' and re.match(RESTORE, rest[k.end():]))]
+        if live and sp.target(a[0]): hit(p, ln0, raw, code, m.start(), f'{m.group(1)}({a[0][:48]}, … {live[0].group(1)} …)')
+    for p, ln0, raw, code in js:
+        for m in re.finditer(r'(' + VAR + r''')\s*\.\s*style\s*(?:\.\s*(opacity|filter|webkitFilter)\s*=(?!=)|\[\s*['"](opacity|filter|-webkit-filter)['"]\s*\]\s*=(?!=)|\.\s*setProperty\s*\(\s*['"](opacity|filter|-webkit-filter)['"]\s*,)''', code):
+            if not re.match(RESTORE, code[m.end():]) and _base(m.group(1)) in sp.vars:
+                hit(p, ln0, raw, code, m.start(), f'{m.group(1).strip()}.style.{m.group(2) or m.group(3) or m.group(4)} = …')
+    for p, ln0, raw, code, d0, toks, decls in rules:
+        if any(sp.tok(*t) for t in toks):
+            for m in re.finditer(CSS_FADE, decls): hit(p, ln0, raw, code, d0 + m.start(), m.group(0).strip())
+    for p, ln, cl, i, st in tags:
+        if (re.search(P3D, st) or (i and sp.tok('#', i, False)) or any(sp.tok('.', n, o) for n, o in cl)) and (m := re.search(CSS_FADE, st)):
+            out.append((rel(p), ln, FADE3D, m.group(0).strip(), None, 'WARN'))
+    return sorted(set(out), key=lambda f: (f[0], f[1]))
+
+
 def png_colour_chunks(path):
     """The colour chunks a PNG carries before its image data (gAMA with its value, cHRM, iCCP, cICP); [] for none or not a PNG."""
     try:
@@ -175,12 +351,12 @@ def scan_assets(project):
 
 def scan_source(project):
     """Return (files scanned, findings [(file, line, rule, text, allowed-reason, FAIL|WARN)])."""
-    units, css = [], []
+    units, css, htmls = [], [], []
     for root, dirs, files in os.walk(project):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS)
         for f in sorted(files):
             p = os.path.join(root, f)
-            if f.endswith('.html'): units += [(p, ln, s) for ln, s in _scripts(p)]; css += [(p, ln, s) for ln, s in _styles(p)]
+            if f.endswith('.html'): units += [(p, ln, s) for ln, s in _scripts(p)]; css += [(p, ln, s) for ln, s in _styles(p)]; htmls.append(p)
             elif f.endswith('.css') and not f.endswith('.min.css'): css.append((p, 1, open(p, encoding='utf-8', errors='replace').read()))
             elif f.endswith(('.js', '.mjs')) and not f.endswith('.min.js'): units.append((p, 1, open(p, encoding='utf-8', errors='replace').read()))
     found, files = [], sorted({u[0] for u in units + css})
@@ -207,6 +383,7 @@ def scan_source(project):
         hits += [(m.start(), WILL_CHANGE, m.group(0).strip(), 'WARN') for m in re.finditer(r'(?<![\w-])will-change\s*:[^;}"\']*\b(?:transform|scale)\b', code)]
         for off, why, txt, level in sorted(hits):
             i = code.count('\n', 0, off); found.append((os.path.relpath(p, project), ln0 + i, why, txt, ok_on(rl[i]), level))
+    found += _fade3d(project, units, css, htmls)
     return files, found
 
 
@@ -426,6 +603,35 @@ def selftest():
         got = sorted((f[0], f[1], f[5]) for f in found)
         chk(f'a from() with immediateRender: false beside a repeat: -1 WARNs (another script in the file counts); a fromTo, a repeat: 7 '
             f'and a default from() pass → {got}', got == [('compositions/two.html', 2, 'WARN'), ('index.html', 3, 'WARN')])
+        f3 = proj('fade3d', '''<style>
+  .tube { position:absolute; transform-style:preserve-3d; }
+  .scene { position:absolute; perspective:6500px; }
+  .cyl { transform-style: preserve-3d; filter: blur(2px); }
+</style>
+<div class="spin t0" id="spin" style="transform-style:preserve-3d"></div>
+<div class="label" id="lab"></div>
+<script>
+  var tubes = [], scenes = [];
+  for (var ti = 0; ti < 3; ti++) {
+    var sc = document.createElement('div'); sc.className = 'scene'; scenes.push(sc);
+    var tube = document.createElement('div'); tube.className = 'tube tube' + ti; sc.appendChild(tube); tubes.push(tube);
+  }
+  tl.from('.tube0', { y: 220, opacity: 0, duration: 0.4 }, 0.18);
+  tl.to('.tube', { y: -14, duration: 0.08 }, 0.83);
+  tl.from(scenes[1], { opacity: 0 }, 0.3);
+  tl.from(tubes[2], { autoAlpha: 0 }, 0.3);
+  scenes[1].style.filter = 'blur(6px)'; tubes[2].style.filter = 'blur(6px)';
+  tl.set('.tube1', { opacity: 1 }, 1.2);
+  gsap.to('#spin', { filter: 'blur(4px)' });
+  gsap.to('#lab', { opacity: 0 });
+  tl.from('.tube2', { opacity: 0 }, 0.3); // det-ok: hidden behind the wall until 1.0 s
+</script>''')
+        _, found = scan_source(f3)
+        got = [(f[1], f[5], bool(f[4])) for f in found if f[2] == FADE3D]
+        chk(f'a fade or filter on a preserve-3d element WARNs — a class co-written with the 3D class at run time (.tube0), an '
+            f'array the element joins (tubes[2]), a style.filter, an id given preserve-3d inline, a filter in a 3D rule; the 2D '
+            f'wrapper, a y-only tween, a set back to 1 and a 2D label pass; det-ok allows → {got}',
+            got == [(4, 'WARN', False), (14, 'WARN', False), (17, 'WARN', False), (18, 'WARN', False), (20, 'WARN', False), (22, 'WARN', True)])
         Image.new('RGB', (4, 4), (128, 128, 128)).save(os.path.join(css, 'assets', 'plain.png'))
         raw = open(os.path.join(css, 'assets', 'plain.png'), 'rb').read(); body = b'gAMA' + struct.pack('>I', 100000)
         gama = raw[:33] + struct.pack('>I', 4) + body + struct.pack('>I', zlib.crc32(body) & 0xffffffff) + raw[33:]

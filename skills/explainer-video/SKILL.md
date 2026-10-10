@@ -119,9 +119,9 @@ The shots come from `timeline.json`. Read every SMALL, EMPTY, STILL and HOLD fla
 — the instrument sees luminance, so a hero that differs from the ground only in hue reads empty, and on a grain ground
 it prints BLIND where the grain lifts the still read above its threshold (a held shot there is read by eye). Then a
 contact sheet across the film (`contact_sheet.sh --beats <p>/timeline.json` puts a tile on every beat), every join,
-`video-finish-qc` `decoded_checks.py motion <render>` for one-frame pops, steps and flashes (a burned-in caption changing
-fires a step too: the captions' show and hide times are in `compositions/captions.html`), and the QC classes in
-[`references/QC.md`](references/QC.md).
+`video-finish-qc` `decoded_checks.py motion <render> --accepted <p>/compositions/captions.html` for one-frame pops, steps
+and flashes (it sets every caption's show and hide aside; a burned-in caption changing fires a step otherwise), and the
+QC classes in [`references/QC.md`](references/QC.md).
 
 **Done when:** the render probes at the declared raster, fps and length with an audio stream; every flag is fixed at
 the source or recorded as by design with its frame time; the QC list is written with severities.

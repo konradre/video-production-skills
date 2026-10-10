@@ -81,6 +81,9 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
 - `qc.accepted_flashes` (optional, timeline seconds, entered by hand) — a one-frame flash or snap the piece means to
   have: the delivery QC's pops and steps rows set those frames aside. The steps row reads the other frames the picture
   changes on purpose from the EDL itself: the joins, each event's `accepted_cuts`, every caption card's on and off.
+- `qc.grain_after` (optional, `true`) — the finish lays grain over the picture after the cut. No frozen shot gets under
+  freezedetect's tolerance through grain, so the delivery QC's frozen row prints BLIND outright and the held shots are
+  read by eye.
 
 ## markers — absolute timeline seconds, written by the builder
 

@@ -20,7 +20,10 @@
                default) inside the footage span, the longest run printed — the card holds by design, and a designed hold
                inside the footage is declared on its event as accepted_still: "<why>" and prints as INFO. Its floor is
                printed beside it: freezedetect's −60 dB tolerance is 0.26 code values, and on grain from a decoded σ of
-               0.66 a frozen shot never got under it — over the floor the row is BLIND (a WARN line; read held shots by eye)
+               0.66 a frozen shot never got under it — over the floor the row is BLIND (a WARN line; read held shots by eye).
+               The floor is the quietest still frame pair, so it misses two cases: a duplicate frame after the grain reads 0
+               and hides the grain, and grain on some shots only is listed, not flagged. qc.grain_after: true (the finish
+               lays grain over the picture) prints the row BLIND outright, without the floor read
   geometry     INFO: every hero take probed for SAR and rotation — a source whose display shape differs from its storage
                shape is listed (normalise before any crop: video-production/scripts/probe_sources.py); the eye check is a
                delivered frame beside the source's display frame at 1:1
@@ -42,7 +45,8 @@
                audio.sfx cue found in the mix at its time by correlation · with qc.beat_data every on_beat cut within 3 frames
   motion       WARN lines (decoded_checks.py): one-frame pops (qc.accepted_flashes set aside) · one-frame steps off every
                frame the EDL changes on purpose (the joins, accepted_cuts, every caption's on and off, qc.accepted_flashes —
-               a worded card declares its own word lines in accepted_cuts) · the WCAG general-flash rate, over 3 a second
+               a worded card declares its own word lines in accepted_cuts) · and a judgement row: the WCAG general-flash
+               rate, over 3 in any one second FAILS
   phone band   INFO, with --phone-ref <real phone clips>: the delivered file's phone-texture band (phone_texture_probe.py —
                dead-flat 8×8 share, noise floor, median block sd) against the RANGE over every reference frame; a
                creator-style spot's read, never a failure — the operator judges the phone render beside the clean one
@@ -253,8 +257,10 @@ def main():
     verdict(not nb, 'near-black events', f"{len(nb)} event window(s) read black at all three samples (< {a.black_luma:g}/255): {nb}" + (' — a source type the grade turns black? declare accepted_black only for a shot meant to be black' if nb else ''))
     src = '--max-still-s' if a.max_still_s is not None else ('the EDL qc.max_still_s' if 'max_still_s' in e.get('qc', {}) else 'the default')
     verdict(not frozen, 'frozen frames', f"{len(frozen)} still run(s) ≥ {mst:g} s inside the footage span 0–{foot_end:.2f} s at {[(round(s0, 2), round(d0, 2)) for s0, d0 in frozen]}; longest run {longest:.2f} s (threshold {mst:g} s from {src}; the end card is allowed to hold)")
-    fl_, tol_, det_ = dc.freeze_floor(D, 0.0, foot_end)
-    if fl_ is None: print(f"INFO frozen-frame floor: not read — {det_}")
+    if (e.get('qc') or {}).get('grain_after'): fl_, tol_, det_ = None, dc.FREEZE_TOL, None   # the finish lays grain over every frame
+    else: fl_, tol_, det_ = dc.freeze_floor(D, 0.0, foot_end)
+    if det_ is None: print(f"WARN frozen frames BLIND: the EDL declares qc.grain_after (the finish lays grain over the picture), so a frozen shot never gets under freezedetect's {tol_:.2f} — read the held shots by eye")
+    elif fl_ is None: print(f"INFO frozen-frame floor: not read — {det_}")
     elif fl_ > tol_: print(f"WARN frozen frames BLIND: {det_} — a frozen shot under this texture does not register; read the held shots by eye")
     else: print(f"INFO frozen-frame floor: {det_} — a frozen run registers")
     if card and not a.no_card:
@@ -279,14 +285,14 @@ def main():
     if e.get('poster_at') is not None: ok, det = dc.poster_flash(D); print(f"{'INFO' if ok else 'WARN'} poster flash: {det}")   # WARN only: the chosen thumbnail is kept
     for name, ok, det in dc.sfx(D, '.', e.get('audio', {}).get('sfx', {})): verdict(ok, f'sfx {name} in the mix', det)
     if q.get('beat_data'): ok, det = dc.beat_cuts(e['events'], q['beat_data'], efps, '.'); verdict(ok, 'beat cuts', det)
-    g, _, _ = dc.motion_frames(D, efps)   # WARN lines, never a FAIL: the frames decide (HYPERFRAMES-CONTRACT § Silent traps)
+    g, _, _ = dc.motion_frames(D, efps)   # pops and steps are WARN lines, the frames decide (HYPERFRAMES-CONTRACT § Silent traps); the flash rate is a judgement row
     if len(g) >= 3:
         edges = dc.declared_edges(e, efps, '.'); fl = {round(float(t) * efps) for t in q.get('accepted_flashes') or []}
         po, st = dc.pops(g, fl), dc.steps(g, set(edges)); on = [x for x in dc.steps(g) if x[0] in edges]; nf, fat, ntr = dc.flash_rate(g, efps)
         print(f"{'WARN' if po else 'INFO'} pops: " + (dc._fmt(po, efps, 'pops') + ' — read each frame and its neighbours; a designed one goes in qc.accepted_flashes' if po else 'none'))
         print(f"{'WARN' if st else 'INFO'} steps: " + (dc._fmt(st, efps, 'steps') + ' — read each; a worded card declares its word lines in its event\'s accepted_cuts' if st else 'none off the declared edges')
               + f" · on declared edges (INFO): {len(on)} — {sorted({w.split(' ')[0] for x in on for w in edges[x[0]]})}")
-        print(f"{'WARN' if nf > 3 else 'INFO'} flash rate: {nf} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — WCAG 2.3.1: at most 3")
+        verdict(nf <= 3, 'flash rate', f"{nf} general flash(es) in the busiest second" + (f" (from {fat} s)" if fat is not None else '') + f", {ntr} transition(s) — WCAG 2.3.1: at most 3 in any one second")
     # ---- against the previous version (INFO; a verdict with --prev-expect) ----
     if a.prev:
         rows = prev_compare(D, a.prev, e['events'], efps); cls = {r[0]: classify(r) for r in rows}
