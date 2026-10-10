@@ -17,7 +17,8 @@ to each shipped once before the gate did.
   { "beat": "S01B-09", "events": ["S01B-D"], "vo": ["L0"], "vo_ends_before": "HIT",
     "music_end_at": ["cue1", "HIT"], "layer_before_next": ["ELEM-WALL", 0.5], "script": "…she fires" },
   { "beat": "S01B-11b", "events": ["S01B-F2"], "optional": true, "script": "…fires another at him" },
-  { "beat": "S01B-14", "events": ["S01B-14"], "sfx": ["sting"], "min_dur": 2.5, "script": "end card" }
+  { "beat": "S01B-14", "events": ["S01B-14"], "sfx": ["sting"], "min_dur": 2.5,
+    "_note": "min_dur = this card's own render length; a two-line card is longer", "script": "end card" }
  ],
  "extra_vo": { "L3": ["S01B-13"] },
  "forbidden_events": { "S07-ALT": "an alternate the operator ruled out of every delivered spot" }
@@ -35,7 +36,7 @@ to each shipped once before the gate did.
 | `vo_ends_before` | a MARKER name; every listed line must end at or before it (the narrator clears the hit) |
 | `music_end_at` / `music_start_at` | `[cue, marker]` — a cue edge within 2 ms of the marker; `"event"` = the beat's first event |
 | `layer_before_next` | `[layer id, lead]` — the layer starts `lead` s before the NEXT beat's first event |
-| `min_dur` | the beat's span floor (the card's full render length, 2.5 s by default) |
+| `min_dur` | the beat's span floor (the card's full render length, 2.5 s by default — `edl_check` also holds the card's span to its whole file) |
 | `optional` | the beat may be absent from this cut — but if any of its events is present, all must be |
 | `extra_vo` | lines that ride over an event without being a beat of their own (the closer over the turntable) |
 | `forbidden_events` | ids that must appear in neither events NOR layers, with the reason |

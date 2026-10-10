@@ -86,7 +86,7 @@ def main():
     lines += [(mark(m), f"MARKER {m} {mark(m):.3f}") for m in B.get('markers', {})]
     for t, s in sorted(lines): print(f"   {t:7.3f} {s}")
     for r in rows + fails: print(' ', r)
-    print('BEAT-SHEET PASS' if not fails else f'BEAT-SHEET FAIL ({len(fails)})'); sys.exit(1 if fails else 0)
+    print(f"BEAT-SHEET {'PASS' if not fails else f'FAIL ({len(fails)})'} — {a.edl}"); sys.exit(1 if fails else 0)   # the EDL named: a PASS read from a run log is this file's
 
 
 if __name__ == '__main__':

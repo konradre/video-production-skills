@@ -17,14 +17,20 @@
 ## With the deliverable (`delivery_ask.py`)
 
 1. The spot and version, the full path, runtime and size.
-2. What changed since the previous version (one line per item, mapped to the client's numbered notes).
+2. What changed since the previous version (one line per item, mapped to the client's numbered notes) — in a round, every
+   note answered by its number from the round record (`--round`), and the checks proposed for its errors.
 3. The VO script as placed — every line verbatim with its time.
-4. The QC line (`QC-DELIVERABLE PASS`) and the beat sheet (`beat_sheet.py`) pasted so the cut is
-   read against the script without opening the file.
-5. **Residual doubts with frame times, in the note** — never "approve or re-roll over a fleck?" after a
+4. The checks, read from the run log, never retyped (`--log`; `--qc` counts as one): the last `EDL-CHECK` and `BEAT-SHEET`
+   line printed for this EDL and the last `QC-DELIVERABLE` line for this file. A check with no line refuses the ask;
+   `--na "<check>: <why>"` covers one that does not apply. A FAIL is shown, never withheld — QC's judgement rows are the
+   operator's call. The beat sheet (`beat_sheet.py`) is pasted as well, so the cut is read against the script without
+   opening the file.
+5. The compare page's path when the version revises an earlier one (`compare_versions.py`; `--compare`): N against N−1,
+   lined up by event.
+6. **Residual doubts with frame times, in the note** — never "approve or re-roll over a fleck?" after a
    final top-up; the operator decides whether the client sees them.
-6. What is frozen (approved spots, in the client's words).
-7. The decisions, numbered.
+7. What is frozen (approved spots, in the client's words).
+8. The decisions, numbered.
 
 ## Saving is not sending
 

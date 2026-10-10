@@ -8,10 +8,11 @@ becomes a change to the plan, not a hand edit of a time.
                [--stamp-derived] [--allow-stale-derived]
 
 Plan (full field list: references/EDL-CONTRACT.md § The plan):
-  events[]    {id, take, in, out, src?, look?, source?, role?, vol?, native_from?, native_to?, zoom?, anchor?,
+  events[]    {id, take, in, out, src?, look?, source?, role?, card_trim_note?, vol?, native_from?, native_to?, zoom?, anchor?,
                accepted_cuts?, accepted_cuts_note?, note}
               a generated event without src gets hero_pattern.format(stem=<take stem>, id=<id>) and look "none"
-              (pre-graded hero); a "designed" event keeps its own look and never gets a src; the card is role "endcard".
+              (pre-graded hero); a "designed" event keeps its own look and never gets a src; the card is role "endcard" and
+              spans its whole file (in 0, out its length) — card_trim_note says why when a trim is meant (edl_check).
               accepted_cuts = take seconds of cuts inside the window that the take COMPOSED and the operator kept.
   markers     {NAME: {event, take}} — MEASURED on the keeper (an RMS peak, a word onset), never guessed.
   vo / sfx    at = a time ref;  music tl = [ref, ref];  post_layers at = ref.
@@ -103,6 +104,7 @@ def main():
         if ev.get('source') == 'designed':
             x['source'] = 'designed'; x['look'] = ev.get('look', dlook)
             if ev.get('role'): x['role'] = ev['role']
+            if ev.get('card_trim_note'): x['card_trim_note'] = ev['card_trim_note']
         else:
             stem = os.path.splitext(os.path.basename(ev['take']))[0]
             x['src'] = ev.get('src') or hero.format(stem=stem, id=ev['id']); x['look'] = ev.get('look', 'none'); x['native_audio_vol'] = float(ev.get('vol', 1.0))

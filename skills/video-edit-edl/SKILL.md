@@ -23,7 +23,7 @@ sanction. Editorial notes are **cut notes first** — four re-cuts in an afterno
 a regen is the last rung of the repair ladder, never the first.
 
 **What varies.** The ad grammar's numbers — a hook inside 2 s, the closer 0.7 s into the turntable, the last line
-0.5 s before the hit, the card's 2.5 s — and its captions and card belong to one genre: film and music video carry their
+0.5 s before the hit, the card at its own render length (2.5 s by default) — and its captions and card belong to one genre: film and music video carry their
 own ([`references/GENRE-GRAMMAR.md`](references/GENRE-GRAMMAR.md)), and a brand's own spec overrides either. The
 derivation, the gate and the new-file rule do not move — `video-production/references/WHAT-VARIES.md`.
 
@@ -95,7 +95,8 @@ fits are written as new files recorded as derived from their take (`pick_gate.py
 them as ordinary takes; the fitted EDL is a new file.
 
 **Done when:** the builder prints the timeline, `scripts/edl_check.py` passes — with `--require-endcard` when the
-beat list has a card (contiguous `tl`, spans = out − in, files present, windows inside their takes, no short cue) —
+beat list has a card (contiguous `tl`, spans = out − in, files present, windows inside their takes, the end card spanning
+its whole file, no short cue) —
 no derived constant is stale, and re-running the builder reproduces the EDL.
 
 ## 3. Place the sound from the picture
@@ -191,6 +192,9 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
   prints every stale input — a layout to look at, never a version to finish.
 - A window crossing its take's own cut → a rogue frame, unless the take composed that cut and the operator kept it:
   declare it on the event (`accepted_cuts` + `accepted_cuts_note`); never drop `--cuts` to reach a PASS.
+- An end card spanning less than its file → the finisher plays the card from its first frame and cuts the master at
+  `runtime_s`, so the card's tail never plays and nothing else says so: span the whole file, or declare a meant trim on
+  the event (`card_trim_note`, printed as INFO). A card starting past 0 always fails — the finisher never seeks a card.
 - The project tree has no VCS: every writer drops a `.bak-<ts>-<why>` first, and a shipped EDL is never
   the file being edited.
 
@@ -199,8 +203,8 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
 | script | does |
 |---|---|
 | `edl_build.py --root --plan --out [--beats] [--stamp-derived] [--allow-stale-derived] [--no-lufs]` | the plan → EDL derivation; rewrites the beats markers; stamps and checks the input hashes of every derived constant (a stale one stops the build) |
-| `beat_sheet.py --root --edl [--beats]` | the script-fidelity gate; exit 1 on FAIL; prints the sheet |
-| `edl_check.py --root --edl [--require-endcard] [--cuts] [--fps]` | the structural read: continuity, files, windows, cues, the seek convention, rogue frames — a crossing the event declares in `accepted_cuts` prints INFO; a VO line with no `source` WARNs |
+| `beat_sheet.py --root --edl [--beats]` | the script-fidelity gate; exit 1 on FAIL; prints the sheet; the verdict line names the EDL |
+| `edl_check.py --root --edl [--require-endcard] [--cuts] [--fps]` | the structural read: continuity, files, windows, cues, the seek convention, rogue frames — a crossing the event declares in `accepted_cuts` prints INFO; a VO line with no `source` WARNs; an end card starting past 0 or spanning less than its file FAILs (a trim declared in `card_trim_note` prints INFO); the verdict line names the EDL |
 | `edl_insert.py --root --edl --after --id --take --in --out [--replace]` | insert or re-time an event, shifting everything downstream |
 | `fit_slots.py --root --slots --assign --edl --out [--slow-limit 0.2] [--fit-dir edit/fit] [--plan]` · `--selftest` | picture follows audio: each voiced slot's clip CUT, SLOWED (≤ 20 % short) or LOOPED to exactly the slot's frames, a slot with no clip or no recorded pick reported MISSING and left empty; fits recorded as derived from their take; writes a new EDL; exit 3 on a missing slot |
 | `av_sync_regress.py [--only offgrid,native,late,gap,vo] [--events 40] [--fps 24] [--grid] [--debug] [--keep <dir>]` | the A/V-sync regression suite for the cut path: off-grid cuts, the take's own audio, a late audio track, missing audio packets and VO placement, through the real finisher; exit 1 on any FAIL |

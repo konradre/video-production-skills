@@ -3,11 +3,14 @@
 ```
 notes (verbatim, dated, numbered by DELIVERY order)
   → locate every cited beat in the DELIVERED file, the EDL history and the script
-  → curate the numbered list — NO action — classified in the client's own words
+  → curate the numbered list — NO action — classified in the client's own words; each note ERROR or TASTE, anchored;
+    every ERROR's check row (the check that missed it, or a proposed one)
   → the operator answers per item (a number, a yes/no, "best judgement", "the original", "regen")
   → execute by the ladder: cut → recycle → re-voice + build the alternative → regen last
-  → a NEW version from a NEW EDL (shipped EDLs untouched); approved spots frozen; alternates as extra assets
-  → QC on the delivered file → the ask (numbered, costed, pathed) → the operator sends → wait
+  → a NEW version from a NEW EDL (shipped EDLs untouched); approved spots frozen; alternates as extra assets;
+    every note answered by its number in the round record
+  → QC on the delivered file → the compare page (N against N−1, lined up by event) → the ask (numbered, costed, pathed;
+    the notes answered by number; the checks read from the run log) → the operator sends → wait
 ```
 
 ## Receive
@@ -50,6 +53,61 @@ The client's **domain expertise defines what lands** for their audience — the 
 restored, not argued. The client's **wording is exact** and the operator sets the diction. Where the
 client separates what must be perfect from what may be loose, the shape rule is enforced where the
 object is STILL and VISIBLE.
+
+## Error or taste — and the check that missed it
+
+Sort each note on one more axis beside its class. An **ERROR** is objectively wrong whatever anyone likes: elements
+misaligned or overlapping, text cut off or touching the frame edge, a misspelled name, a wrong number or price, a click,
+a pop, clipping, a black or frozen frame, sound out of sync, the wrong size or aspect. **TASTE** is colour, pace, music,
+wording, feel. Fix both.
+
+An ERROR that reached the client got past every check we ran, so the round records the check that would have caught it —
+now, while the note is fresh, never weeks later in a retrospective:
+
+| the check row | when |
+|---|---|
+| `{"existing": "<the check>", "missed": "<why it passed this>"}` | a check ran and passed the defect — a threshold, a blind spot, a sample that missed the frame |
+| `{"propose": "<what it is>", "how": "<what it measures, on what>", "owner": "<skill>"}` | no check looks at this; the note is its example |
+
+A proposal becomes a `pending` row of the fold table (SKILL.md § 3) and lands in the owning skill only through that skill's
+next reviewed change.
+Never write it into an installed copy of a skill: an installed copy is replaced whole at the next update, and the proposal
+goes with it.
+
+## Anchor every note
+
+Every note points at what it is about, in the version the client saw:
+
+| anchor | points at |
+|---|---|
+| `{"at": 41.0}` | a moment — seconds in the delivered file |
+| `{"from": 12.0, "to": 20.0}` | a stretch ("it drags from 0:12 to 0:20") |
+| `{"at": 41.0, "x": 0.85, "y": 0.15, "estimate": true}` | a spot on the frame, as fractions of the width and height from the top left; read off a frame, it is an estimate and is said as one when the notes are read back |
+| `{"paragraph": 3}` | a paragraph of the script |
+| `{"whole": true}` | the whole version (an approval, "too busy overall") |
+
+The anchor is the spot § Locate before anything found — the delivered file, the EDL history, the script — never a guess
+from the words. `notes_triage.py` reads a timecode in the words as a first anchor (`from_text`), never an aspect ratio
+such as 9:16; confirm it against the file.
+
+## The round record — every note answered by its number
+
+`notes_triage.py --out prompts/CLIENT-ROUND-<date>.md` writes `prompts/CLIENT-ROUND-<date>.json` beside the list and never
+overwrites it: it collects the round's answers. Per note: `n` (its number in the list), `spot` (`*` for a note on every
+spot — answered once, shown in every spot's ask), `class`, `kind` (`ERROR` ·
+`TASTE`; `?` until sorted; none on an approval), `words` (verbatim), `anchor`, `check` (an ERROR's row), `decision` (the
+operator's answer to the item), and `answer`, written once the new version settles:
+
+| `answer.status` | needs |
+|---|---|
+| `done` | `change` — exactly what changed and where ("the price corrected to $1,250, 0:39–0:44"), never "addressed" |
+| `partly` · `not_done` | `why`, and `change` for whatever did move |
+| `frozen` | `why` — the spot is approved and stays; a new idea for it becomes an alternate asset |
+
+An approval starts anchored to the whole version and answered `frozen`. A paragraph that is no note — a greeting, a
+thank-you, a sign-off — is `class: "CHAT"`: no spot, no kind, no answer; the ask and the compare page skip it. The ask prints every note with its answer
+(`delivery_ask.py --round`) and refuses while a note has no anchor, a kind still `?`, an ERROR with no check row, or no
+answer. "Not done, because …" is an answer: the refusal only ever asks for the truth to be written down.
 
 ## The ladder
 

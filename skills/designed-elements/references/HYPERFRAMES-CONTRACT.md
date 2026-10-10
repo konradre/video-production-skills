@@ -264,7 +264,7 @@ the composition. Scattered specks (a particle, a dither, an unseeded sparkle) ma
 at each listed row is what tells them from an edge. A FAIL with no ONE-ROW block, or with a row that is not such an
 edge, fails as before. No warm-up render is added: it would not help, since any two renders can differ on those rows.
 A FAIL is read, never re-rolled: a later proof that passes without a source change does not clear it, since two
-renders can also match by chance (one of the eleven pairs did); a proof that passes after the source was fixed does.
+renders can also match by chance (one of the eleven pairs matched on those rows); a proof that passes after the source was fixed does.
 
 The proof compares png-sequence frames because they are lossless: two mp4 encodes cannot isolate one cell, since a
 cell that really differs spreads encoder noise across the frame. Without such a cell, two mp4s at different worker

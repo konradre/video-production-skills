@@ -13,4 +13,7 @@
   both, plus the credits the round cost.
 - **Locked placements** ("lock these in for now") are recorded so the next version keeps them.
 - **Finals** are a row per spot naming the exact version the client chose and the file in `deliver/final/`.
+- **The round record** (`prompts/CLIENT-ROUND-<date>.json`, written by `notes_triage.py`) holds each note's anchor, kind,
+  check row and answer by number; the ledger row carries its class, the operator's answer and the outcome, and the round
+  column names the record.
 - The ledger and the resume block carry status; STATUS tick-boxes in the shot script do not.

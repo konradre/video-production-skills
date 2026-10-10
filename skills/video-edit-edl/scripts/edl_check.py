@@ -7,7 +7,10 @@ handle_head == 0 is flagged (the seek convention that shipped four versions 0.3 
 least as long as its span (a short cue just ENDS mid-span — no loop, no fade); every VO line ends inside the runtime and
 records where its file came from (a WARN when `source` is absent); every EDL out-point sits at least one frame before the
 take's own next internal cut (rogue frames) when --cuts is given — except a cut the event DECLARES part of the keeper
-(`accepted_cuts` + `accepted_cuts_note`: a long generation composed it and the operator kept it), printed as INFO.
+(`accepted_cuts` + `accepted_cuts_note`: a long generation composed it and the operator kept it), printed as INFO; an
+end card spans its whole file — the finisher plays a card from its first frame and cuts the master at runtime_s, so a
+card starting past 0 FAILS, and a span shorter than the file by more than a frame FAILS unless the event declares the trim
+in `card_trim_note` (printed as INFO). The verdict line names the EDL, so a PASS read out of a run log is this file's.
 Exit 1 on any FAIL.
 
   edl_check.py --root <project> --edl edit/<SPOT>-EDL.json [--require-endcard] [--cuts cutlists.json] [--fps 24]
@@ -18,6 +21,13 @@ import argparse, glob, json, os, re, subprocess, sys
 
 def probe(p):
     return float(subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', p], capture_output=True, text=True).stdout or 0)
+
+
+def vprobe(p):
+    """the picture's own length — the finisher concatenates a card's video stream; an audio track may run longer"""
+    r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=duration', '-of', 'csv=p=0', p], capture_output=True, text=True).stdout.strip()
+    try: return float(r)
+    except ValueError: return probe(p)
 
 
 def first(pat):
@@ -50,6 +60,13 @@ def main():
         d = dd.setdefault(x['take'], probe(x['take']))
         if not (0 <= x['in'] < x['out'] <= d + 1 / a.fps + 1e-6): fail(f"{x['id']}: [{x['in']}, {x['out']}] outside the take ({d:.3f} s)")
         if x.get('src') and not first(x['src']): fail(f"{x['id']}: src missing {x['src']} (no alternative exists)")
+        if x.get('role') == 'endcard':   # the finisher plays the card FILE from its first frame and cuts the master at runtime_s
+            vd = vprobe(x['take'])
+            if x['in'] > 1e-6: fail(f"{x['id']}: the end card starts at {x['in']} s into its file — the finisher plays a card from its first frame; set in 0")
+            elif x['out'] < vd - 1 / a.fps - 1e-6:
+                cut = f"{x['id']}: the end card spans {x['out'] - x['in']:.3f} s of its {vd:.3f} s file — the master is cut at runtime_s, so its last {vd - x['out']:.3f} s never plays"
+                if x.get('card_trim_note'): print(f"INFO {cut} (declared: {x['card_trim_note']})")
+                else: fail(cut + ' — span the whole file, or say why in card_trim_note')
         if x.get('source') != 'designed' and x['in'] > 0 and float(x.get('handle_head', 0)) == 0:
             warn(f"{x['id']}: in={x['in']} but handle_head=0 — a full-take hero needs handle_head=in (the source is assumed to START at the in-point)")
         acc = [float(c) for c in x.get('accepted_cuts', [])]   # cuts the take COMPOSED and the operator kept: presence is descriptive, consistency is the verdict
@@ -82,7 +99,7 @@ def main():
     for L in e.get('post_layers', []):
         if not glob.glob(re.sub(r'%0?\d*d', '*', L['frames'])): fail(f"layer {L['id']}: no frames at {L['frames']}")
         if L['at'] + L['dur'] > t + 1e-3: warn(f"layer {L['id']}: ends {L['at'] + L['dur']:.3f} past the runtime {t:.3f}")
-    print(f"EDL-CHECK {'FAIL (' + str(len(fails)) + ')' if fails else 'PASS'} — {len(ev)} events, runtime {t:.3f} s, {len(warns)} warning(s)")
+    print(f"EDL-CHECK {'FAIL (' + str(len(fails)) + ')' if fails else 'PASS'} — {a.edl} — {len(ev)} events, runtime {t:.3f} s, {len(warns)} warning(s)")
     sys.exit(1 if fails else 0)
 
 
