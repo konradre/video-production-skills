@@ -251,17 +251,18 @@ A png-sequence frame is transparent wherever only the root's or the page's backg
 alpha 0), and it stores straight alpha: a faint edge keeps its full colour under a low alpha, so a pixel going from
 alpha 0 to alpha 3 differs by 255 stored code values. Each DIFF line therefore also gives the difference as it looks
 composited, and any read of a png frame composites it first (colour × alpha) — its colour alone shows a fade at full
-strength. Plain text shrinking, with no `will-change`, varies between render RUNS on its glyphs' bottom edge row while
-it moves, up to 50 levels composited on at most 7 px a frame, and the first render of a project after a push is the run
-that differs: of eight pairs of runs measured on 0.8.18, every pair holding such a first render differed (1 to 8
-frames), and pairs of later renders differed by 0, 0 and 1. `prove` pushes before its first render, so expect a comp
-with shrinking text to FAIL on those rows. Such a FAIL counts as passed when its ONE-ROW line shows every separate
-difference one pixel row high — that line names every differing frame with its rows, where the DIFF lines stop at
-twelve — each of those rows is the bottom edge of a text shrinking in that frame, every one of those frames is read at
-its rows, and the finding — the frames, the rows, the proof's `.det/` stamp — is written in the project beside the
-composition. A FAIL with no ONE-ROW line, or with a row that is not such an edge, fails as before. No warm-up render is
-added to dodge it: a delivered render can be a first render too. Nor does a `--no-push` re-run replace the first
-proof's verdict: both of its renders are warm, so it mostly matches where the first proof did not.
+strength. Plain text shrinking, with no `will-change`, varies between renders on its glyphs' bottom edge rows while it
+moves — up to 50 levels composited, at most 7 px on each text's row a frame — and any two renders can differ there: of
+eleven pairs measured on 0.8.18 on one composition, ten differed on 1 to 5 such frames, pushed proofs, `--no-push`
+proofs and two renders back to back at one worker count alike. So expect a comp with shrinking text to FAIL on those
+rows in any proof. Such a FAIL counts as passed when its ONE-ROW block shows every separate
+difference one pixel row high — the block lists every differing frame, where the DIFF lines stop at twelve, each by its
+file (the render names its files from `frame_000001.png`, so frame 29 is `frame_000030.png`) with each row's x range and
+pixel count — each of those rows is the bottom edge of a text shrinking in that frame, every one of those frames is
+read at its rows, and the finding — the files, the rows, the proof's `.det/` stamp — is written in the project beside
+the composition. Scattered specks (a particle, a dither, an unseeded sparkle) make one-row differences too; the read
+at each listed row is what tells them from an edge. A FAIL with no ONE-ROW block, or with a row that is not such an
+edge, fails as before. No warm-up render is added: it would not help, since any two renders can differ on those rows.
 
 The proof compares png-sequence frames because they are lossless: two mp4 encodes cannot isolate one cell, since a
 cell that really differs spreads encoder noise across the frame. Without such a cell, two mp4s at different worker

@@ -87,7 +87,7 @@ renders the composition twice at different worker splits and compares every fram
 an accumulation or a raster-path change.
 
 **Done when:** the render probes at its declared length and raster, the layer check passes, `det_check.py source`
-passes (and `prove`, for a new composition — a FAIL whose ONE-ROW line puts every difference on a shrinking text's
+passes (and `prove`, for a new composition — a FAIL whose ONE-ROW block puts every difference on a shrinking text's
 bottom edge counts as passed once those frames are read and the finding is written beside the composition,
 HYPERFRAMES-CONTRACT § The determinism proof), and the sync numbers are handed to `video-edit-edl` and
 `spot-audio-assembly`.
@@ -150,11 +150,12 @@ and the delivered frame re-read.
   for a WebGL layer on a software rasteriser, and a deliberate clock or timer use carries `det-ok: <reason>` on its line
   instead. A NOISE line (a difference the size of Chromium's antialiasing) is not a failure. A DIFF line gives the
   difference as stored and as composited: a transparent layer stores straight alpha, so a faint edge can read 255 stored
-  code values and 3 on screen — it still fails; read its frames. A FAIL whose ONE-ROW line puts every difference on
-  the bottom edge of a text shrinking in that frame is the engine varying between runs (the first render after a push
-  is the odd one), not the source: read each listed frame at its rows, write the finding beside the composition, and
-  it counts as passed — never a warm-up render to hide it, and never a `--no-push` re-run in its place (both of its
-  renders are warm). The DIFF lines stop at twelve; the ONE-ROW line lists every frame.
+  code values and 3 on screen — it still fails; read its frames. A FAIL whose ONE-ROW block puts every difference on
+  the bottom edge of a text shrinking in that frame is the engine varying between renders (any two can differ there,
+  pushed or not), not the source: read each listed file at its rows and x ranges, write the finding beside the
+  composition, and it counts as passed — no warm-up render, which would not help. The DIFF lines stop at twelve; the
+  ONE-ROW block lists every frame by index and file (frame 29 is `frame_000030.png`). A one-row speck that is not such
+  an edge — a particle, a dither, an unseeded sparkle — fails as before.
 - `slide_structure_audit.py` exits 2 (it could not segment the scenes) → the composition does not mark them the way
   the contract does (`data-start` + `data-duration`); fix the markup, never read the 2 as a pass.
 - A `slide_structure_audit.py` flag the composition confirms → the fix is structural (a world move at the cut, a text
@@ -171,7 +172,7 @@ and the delivered frame re-read.
 | `render_hyper.sh --dir --name --format mp4\|png-sequence [--host --push --pull] [--keep-out <zone>]… [--check-only] [--no-check] [--check-timeout 600]` | runs `hyperframes check` REPORT-ONLY first — a `--caption-zone` run per zone of the project's declared safe band (`video-production` `safe_zones.py`; the strict ad union when none is declared), the full report alone and the other zones at once, each under the check timeout, then `check_summary.py`'s read — then renders locally (Node ≥ 22) or on the render host; `RENDER-END` only once the output exists, `RENDER-FAILED` and exit 1 otherwise |
 | `check_summary.py <check.json>…` · `--selftest` | the read of a `hyperframes check --json` report: per-section counts, every lint error, the lint warnings that are render traps by message (a blank slot, DOM measured in a callback, a substituted font, a runaway repeat, two tweens on one property) and every lint warning counted, LAYOUT NOT SAMPLED when lint stopped the layout audit, every zone hit (a warning, so `ok` stays true), a switched-off section as `off`; exits 0 on findings |
 | `layer_check.py --frames [--expect-dur]` | validates a PNG-sequence layer; prints its opaque window |
-| `det_check.py source <composition>` · `frames <A> <B> [--project]` · `prove <composition> [--host --workers 1,3 --no-push]` | the determinism proof: the script read for clock/random readers, a bare 2D canvas and a `from()` frozen by a `repeat: -1` (WARN), the CSS read (a transition FAILs; `will-change: transform` WARNs), the PNG colour-chunk read (WARN), exit 2 without an `index.html`; two renders at different worker splits compared frame by frame on the host, each difference located in the frame and sized as stored and as composited, a ONE-ROW line naming every differing frame and its rows when each separate difference is one pixel row high, and a NOISE band for Chromium's antialiasing (the proof frames stay there, under `<remote-dir>/.det/`); refuses a project whose `frames/` holds PNGs; `--selftest` |
+| `det_check.py source <composition>` · `frames <A> <B> [--project]` · `prove <composition> [--host --workers 1,3 --no-push]` | the determinism proof: the script read for clock/random readers, a bare 2D canvas and a `from()` frozen by a `repeat: -1` (WARN), the CSS read (a transition FAILs; `will-change: transform` WARNs), the PNG colour-chunk read (WARN), exit 2 without an `index.html`; two renders at different worker splits compared frame by frame on the host, each difference located in the frame and sized as stored and as composited, every listed frame named by its file, a ONE-ROW block giving every differing frame with each row's x range when each separate difference is one pixel row high, and a NOISE band for Chromium's antialiasing (the proof frames stay there, under `<remote-dir>/.det/`); refuses a project whose `frames/` holds PNGs; `--selftest` |
 | `asset_edge_repaint.py --src --dst --above --below --job …` | repaints a notch/speck at a fitted two-colour edge; 8× review crops |
 | `sprite_burst.py --root --in --out --bang --muzzle --dir --sheet` | the exact-silhouette burst composited on a hero, legibility floor |
 | `literal_audit.py <composition> --approved <copy> [--approved <script>] [--strict]` | every string the composition can put on screen, read from its SOURCE, against the approved copy (repeat `--approved` for each approved file); `--selftest` |
