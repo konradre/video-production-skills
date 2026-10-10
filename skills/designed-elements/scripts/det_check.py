@@ -6,7 +6,8 @@ distance instead of an accumulation); this is the instrument that checks them.
   source   read the composition's own script (inline <script> in index.html and compositions/**/*.html, the project's
            own .js/.mjs — never node_modules, *.min.js or assets/) for the clock and random readers: Math.random,
            Date / Date.now, performance.now, crypto randomness, requestAnimationFrame, setTimeout / setInterval.
-           Comments are ignored; a deliberate use carries `det-ok: <reason>` in a comment on its line. It CANNOT see
+           Comments are ignored; a deliberate use carries `det-ok: <reason>` in a comment on its line (an inline style
+           carries `/* det-ok: <reason> */` inside the style). It CANNOT see
            an accumulation (`x += v` in an onUpdate) — only the render proof can. Its CSS (<style> blocks, style=""
            attributes, the project's own .css) is read for a `transition` (a FAIL: a cold worker starts it at its own
            first frame) and a `will-change: transform` (a WARN: text that scales renders from its first raster); the
@@ -317,8 +318,9 @@ def _fade3d(project, units, css, htmls):
         if any(sp.tok(*t) for t in toks):
             for m in re.finditer(CSS_FADE, decls): hit(p, ln0, raw, code, d0 + m.start(), m.group(0).strip())
     for p, ln, cl, i, st in tags:
-        if (re.search(P3D, st) or (i and sp.tok('#', i, False)) or any(sp.tok('.', n, o) for n, o in cl)) and (m := re.search(CSS_FADE, st)):
-            out.append((rel(p), ln, FADE3D, m.group(0).strip(), None, 'WARN'))
+        if (re.search(P3D, st) or (i and sp.tok('#', i, False)) or any(sp.tok('.', n, o) for n, o in cl)) and (m := re.search(CSS_FADE, _strip_css(st))):
+            ok = re.search(r'det-ok:\s*(.+?)\s*\*/', st)   # an inline style carries its det-ok inside the style
+            out.append((rel(p), ln, FADE3D, m.group(0).strip(), ok.group(1) if ok else None, 'WARN'))
     return sorted(set(out), key=lambda f: (f[0], f[1]))
 
 
@@ -625,13 +627,16 @@ def selftest():
   gsap.to('#spin', { filter: 'blur(4px)' });
   gsap.to('#lab', { opacity: 0 });
   tl.from('.tube2', { opacity: 0 }, 0.3); // det-ok: hidden behind the wall until 1.0 s
-</script>''')
+</script>
+<div style="transform-style:preserve-3d; opacity:0.5; /* det-ok: a still copy, never faded */"></div>
+<div style="transform-style:preserve-3d; filter:blur(3px)"></div>''')
         _, found = scan_source(f3)
         got = [(f[1], f[5], bool(f[4])) for f in found if f[2] == FADE3D]
         chk(f'a fade or filter on a preserve-3d element WARNs — a class co-written with the 3D class at run time (.tube0), an '
             f'array the element joins (tubes[2]), a style.filter, an id given preserve-3d inline, a filter in a 3D rule; the 2D '
-            f'wrapper, a y-only tween, a set back to 1 and a 2D label pass; det-ok allows → {got}',
-            got == [(4, 'WARN', False), (14, 'WARN', False), (17, 'WARN', False), (18, 'WARN', False), (20, 'WARN', False), (22, 'WARN', True)])
+            f'wrapper, a y-only tween, a set back to 1 and a 2D label pass; det-ok allows, on a script line or inside an inline style → {got}',
+            got == [(4, 'WARN', False), (14, 'WARN', False), (17, 'WARN', False), (18, 'WARN', False), (20, 'WARN', False), (22, 'WARN', True),
+                    (24, 'WARN', True), (25, 'WARN', False)])
         Image.new('RGB', (4, 4), (128, 128, 128)).save(os.path.join(css, 'assets', 'plain.png'))
         raw = open(os.path.join(css, 'assets', 'plain.png'), 'rb').read(); body = b'gAMA' + struct.pack('>I', 100000)
         gama = raw[:33] + struct.pack('>I', 4) + body + struct.pack('>I', zlib.crc32(body) & 0xffffffff) + raw[33:]
