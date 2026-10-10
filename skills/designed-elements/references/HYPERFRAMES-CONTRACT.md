@@ -147,6 +147,8 @@ failed silently: a plausible frame and no error. Re-measure after an engine upgr
 | a PNG carrying `gAMA`, `cHRM`, `iCCP` or `cICP` | colour-managed: a 128 grey with `gAMA` 1.0 renders 188 | plain sRGB values with no colour chunk (§ index.html) | `det_check.py source`, WARN |
 | a colour tween between hues, written in hex, `rgb()` or `hsl()` | interpolated in sRGB: blue → yellow passes through grey, 128,128,128 | write both ends as `oklch(L C H)`: GSAP tweens the three numbers (midpoint 0,207,189); the hue moves as a number, so write one end as H ± 360 to take the short way round | the eye |
 | a blur across a worker split | 4 px off by 1 code value at the second worker's first frame | none: Chromium's antialiasing | `det_check.py frames` reports it as NOISE |
+| two tweens writing one property of one element at once | never a strobe (every frame of every overlap read). Which one wins depends on the rest of the timeline: with a `tl.call()` anywhere in it the LATER tween wins from its start; without one the EARLIER wins through its window (an `onUpdate` does not flip it), and the later then shows as a one-frame step when the earlier ends — or never, when it also ends inside the earlier's window. When the later wins, its start value is read at its first render, so a `to()` pair whose overlap spans a worker split renders differently per split (28 frames, up to 34 levels); a standalone pair with no `tl.call()` rendered the same at 1 and 5 workers, and inside a sub-composition — where the earlier won likewise — 12 frames differed after a split. A `fromTo` pair is split-safe but jumps in one frame at the second tween's start. Across scenes — two scenes writing one host element per frame — the later-mounted scene wins every frame of the overlap, split-safe, with a one-frame jump where it takes over | one writer per property per element per window: the next tween starts where the last one ends, or the property moves in one place. A host element is reachable from a sub-composition by a per-frame lookup (in an `onUpdate`), and two scenes writing it are two writers; a lookup by id at build returned null in one fixture (cause not isolated) | the lint `overlapping_gsap_tweens` (static ids and class selectors — not a writer reached through a `querySelectorAll` loop, nor a per-frame write from another scene); `det_check.py prove` (the split case only); a large element's step on the delivered frame (`video-finish-qc` `decoded_checks.py motion`). A tween hidden inside another's window leaves nothing in the frames |
+| `opacity` below 1, or any `filter`, on a `transform-style: preserve-3d` element (measured 2026-10-11) | a grouping property: the element's 3D subtree is flattened, so a CSS-3D object draws without its scene's perspective — straight rules, its label shifted sideways — and redraws in 3D on the frame its opacity is exactly 1: a one-frame snap of the whole object, 30–51 levels over a cylinder's label after 6–16 on the frame before. The snap is on the first frame whose opacity is exactly 1: GSAP rounds a CSS value to 4 decimals, so on an out ease that can be a frame BEFORE the tween ends, else the first frame after it; a fade staggered over three objects snaps each one on its own frame. Setting 0.9999 and back snaps both ways with nothing moving | fade the 2D wrapper that holds the perspective (give it `perspective` and `perspective-origin`; measured: the tube inside enters with no snap, and opacity 0.9999 there changes nothing), never the `preserve-3d` element; a fade stopped at 0.999 avoids the snap and leaves the object flat for good | the eye at 1:1, frame by frame through the fade's end. The opt-in per-tile read (`decoded_checks.py motion --tiles`) caught one of three such snaps on a shipped card, 5 % over its threshold; the whole-frame read caught none |
 
 **The engine's own lint catches these.** `render_hyper.sh` runs `hyperframes check` before every render, and
 `check_summary.py` prints every lint error and the warnings marked below by message:
@@ -170,7 +172,9 @@ failed silently: a plausible frame and no error. Re-measure after an engine upgr
   that worker's own state. Measure once, at build; this contract computes text fit instead.
 - `subcomposition_blanks_before_host` (warning, printed): a sub-composition slot that ends before its host leaves the
   frame blank.
-- `overlapping_gsap_tweens` (warning, printed): two tweens write one property at the same time.
+- `overlapping_gsap_tweens` (warning, printed): two tweens write one property at the same time — the table above has
+  what renders. Every one is answered before a render ships (SKILL § 3): one writer per property per window, or the
+  overlap read on its frames and shown to draw nothing.
 - `gsap_infinite_repeat` (warning): `repeat: -1` is clipped to a declared `data-duration` and renders deterministically,
   but it freezes a `from()` with `immediateRender: false` in the same timeline (the table above). `gsap_repeat_floor_unclamped` and `gsap_repeat_ceil_overshoot` (warnings, printed): a computed repeat that turns into
   −1 or runs past the comp.
@@ -187,7 +191,11 @@ the render host's engine brings one back:
 - a `filter` tween from `none` jumping;
 - CSS `@keyframes` drifting, in png-sequence or mp4;
 - the render's audio coming out quieter. Integrated loudness is unchanged; true peak rose 1.1 dB on a test tone, which
-  is inside `spot-audio-assembly`'s −2.4 dBTP master margin for a −1 dBTP delivery.
+  is inside `spot-audio-assembly`'s −2.4 dBTP master margin for a −1 dBTP delivery;
+- two tweens fighting over one property STROBING (the table above has what they do instead).
+
+**Untested here:** that a shared flash layer, or a class swap, sticks when a capture seeks BACKWARD. A render seeks
+forward only, so nothing above exercised it; a capture at named times that steps back is where it would show.
 
 **CSS, SVG and GSAP behaviour every Chromium shares.** Each is silent and gives a plausible wrong frame:
 - A blend mode composites only inside its own stacking context: an ancestor with a `filter`, `opacity` below 1, a

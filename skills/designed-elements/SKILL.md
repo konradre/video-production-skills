@@ -89,8 +89,10 @@ an accumulation or a raster-path change.
 **Done when:** the render probes at its declared length and raster, the layer check passes, `det_check.py source`
 passes (and `prove`, for a new composition — a FAIL whose ONE-ROW block puts every difference on a shrinking text's
 bottom edge counts as passed once those frames are read and the finding is written beside the composition,
-HYPERFRAMES-CONTRACT § The determinism proof), and the sync numbers are handed to `video-edit-edl` and
-`spot-audio-assembly`.
+HYPERFRAMES-CONTRACT § The determinism proof), every `overlapping_gsap_tweens` warning in the check summary is
+answered — one writer per property per element per window, or the overlap read on its frames and shown to draw nothing
+(HYPERFRAMES-CONTRACT § Silent traps: which tween wins flips on a `tl.call()` anywhere in the timeline) — and the sync
+numbers are handed to `video-edit-edl` and `spot-audio-assembly`.
 
 ## 4. Verify on the DELIVERED frame, at zoom
 
@@ -99,6 +101,12 @@ deliverable at 1:1 and 4× (`video-take-review` `window_frames.py`): the card's 
 notches, the wall's coverage across the join, the pieces' legibility (no sprite below ~40 px at a
 2160-wide raster; clusters only in the far field). A fix checked on the card render while the
 delivered frame keeps the defect is a rejected round.
+
+Motion is read on the frames too, never only at speed: `video-finish-qc` `decoded_checks.py motion <render>` lists every
+one-frame pop and one-frame step and the flash rate, with the element's own declared cuts (`--accepted`) set aside —
+its floor is a step of ~2 levels over the whole frame, so a small element's snap needs `--tiles`, a lead that designed
+slams, wipes and shakes also fire. Then the contact sheet at the element's beats (`video-take-review` `contact_sheet.sh
+--beats`, at phone size with `--phone`) and the frames either side of every flagged one.
 
 A composition that sets text is read at the source too: `literal_audit.py hyper/<name> --approved <approved copy>`
 lists every string it can put on screen that the approved copy does not carry — a counter's intermediate or a label

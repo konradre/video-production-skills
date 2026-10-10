@@ -38,7 +38,7 @@ Continuity first, the matrix and the self-tests do not move — `video-productio
 
 ```
 python3 scripts/qc_seed.py --out review --plate <accepted plate> takes/S02-G4-s1.mp4
-bash    scripts/contact_sheet.sh takes/S02-G4-s1.mp4 4 4
+bash    scripts/contact_sheet.sh takes/S02-G4-s1.mp4 4 4         # --at s,… · --beats <beat_grid / timeline JSON> · --phone (360 px, one a second)
 python3 scripts/speech_timing.py takes/S02-G4-s1.mp4 --wpm 230,250   # a take that SPEAKS; see the delivery row
 python3 scripts/seed_montage.py --out review/S02-G4-montage.jpg takes/S02-G4-s*.mp4   # every seed of the shot on ONE sheet
 python3 scripts/attach_proof.py --root <project> --take S02-G4-s1   # every gated reference was SENT — the attachment row

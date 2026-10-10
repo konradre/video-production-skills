@@ -28,7 +28,7 @@ this file is DERIVED by a builder — a typed number is a defect waiting for the
 | `zoom`, `anchor` | a punch-in: crop 1/zoom around `[ax, ay]` fractions | keeps a stale state out of a close-up without a regen |
 | `on_beat` | the cut at `tl[0]` is meant to land on the music's beat — `qc_deliverable.py` reads it against `qc.beat_data` (≤ 3 frames) | a cut declared on the beat and placed by eye |
 | `fit` | written by `fit_slots.py` in a voiced section: `{mode: cut\|slow\|loop\|missing, from, window, factor, why}` — picture follows audio; a `missing` slot keeps `take` null | a slot filled by hand after a MISSING verdict |
-| `accepted_cuts` | take seconds of cuts INSIDE the window that belong to the keeper — a long generation composed them and the operator kept them; `accepted_cuts_note` says why | cut presence is descriptive, consistency across the cut is the verdict (`video-take-review`); undeclared, `edl_check --cuts` and the delivery QC's leak row fail a keeper the operator chose |
+| `accepted_cuts` | take seconds of cuts INSIDE the window that belong to the keeper — a long generation composed them and the operator kept them; `accepted_cuts_note` says why. A designed card's own hard changes — a word line cutting in or out — are declared the same way, in the card file's seconds | cut presence is descriptive, consistency across the cut is the verdict (`video-take-review`); undeclared, `edl_check --cuts` and the delivery QC's leak row fail a keeper the operator chose, and the steps row WARNs on every word line of a worded card (declared, it prints them as INFO; `decoded_checks.py motion --accepted` takes the same seconds) |
 | `montage_of` | `{edl, event}` when the event is a COPY of a delivered spot's event | the window may run past the delivered event; `handle_head` shifts with the new in |
 | `note` | the script line it serves + the operator's words that shaped it | the note is the audit trail; keep the quote |
 
@@ -78,6 +78,9 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
 - `qc.frame0_bg` (optional, `#rrggbb`) — a designed piece's background: frame 0 decoded must sit within 2 code values of it.
 - `qc.loop` (optional) — the deliverable loops on the platform: the last→first seam is read.
 - `qc.beat_data` (optional) — `spot-audio-assembly/scripts/beat_grid.py` JSON; every `on_beat` event is read against it.
+- `qc.accepted_flashes` (optional, timeline seconds, entered by hand) — a one-frame flash or snap the piece means to
+  have: the delivery QC's pops and steps rows set those frames aside. The steps row reads the other frames the picture
+  changes on purpose from the EDL itself: the joins, each event's `accepted_cuts`, every caption card's on and off.
 
 ## markers — absolute timeline seconds, written by the builder
 

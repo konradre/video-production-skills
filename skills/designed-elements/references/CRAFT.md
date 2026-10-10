@@ -188,13 +188,14 @@ SAFE-AREAS.md).
 
 | view | what it answers | ours |
 |---|---|---|
-| contact sheet — each shot's first, middle, last frame | the shape of the piece | `video-take-review/scripts/contact_sheet.sh` |
+| contact sheet — each shot's first, middle, last frame | the shape of the piece | `video-take-review/scripts/contact_sheet.sh` (`--at` named times, `--beats` the beat grid or the timeline, `--phone` phone-size tiles) |
 | strip — EVERY frame of a moment | motion: anticipation, follow-through, pops, twinning | `video-take-review/scripts/window_frames.py` over the span |
 | crop — a region at full resolution | faces, hands, contacts, glows | `window_frames.py --box` |
 | crop that FOLLOWS a world point through the camera | a foot or a held prop on a moving shot | no instrument yet: in a code-rendered scene, place the crop per frame with the scene's own camera transform |
 
 A sheet per shot, a strip for every key motion and transition, a crop for every face that carries the story
-(ClaudeAnimationBase's four-zoom loop). A move that looks wrong at speed is read on its strip, frame by frame: an
+(ClaudeAnimationBase's four-zoom loop). Where to put the strips: `video-finish-qc` `decoded_checks.py motion` names the
+frames that pop, step or flash (a large element only, unless `--tiles` — HYPERFRAMES-CONTRACT § Silent traps). A move that looks wrong at speed is read on its strip, frame by frame: an
 easing flaw invisible at full speed is plain there, the same thing a quarter-speed review shows.
 
 ## Numbers on screen

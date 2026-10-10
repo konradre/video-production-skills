@@ -17,6 +17,10 @@ still   samples 0.1 s apart whose mean absolute grey difference over the box (lo
         --still-thr: the share of still samples and the longest still run. The longest run is classed by the
         share of box pixels that changed by more than 25 grey levels: under 0.12 % = TRUE-STILL (add an action),
         under 0.38 % = SMALL-MOTION (raise the moving element's amplitude, never add elements), above = ACTION.
+floor   the shot's quietest tenth of samples (their mean grey difference, printed). When it sits at or over --still-thr
+        while those samples changed almost no pixel by 25 levels (under 0.12 %), the difference is texture — grain, a
+        living ground — and STILL and HOLD cannot fire on that shot: flag BLIND, read its holds by eye. Measured: a held
+        hero read 0 % still from a decoded grain sigma of 4.1 fine and 2.0 coarse.
 Every frame is measured at a 720-px short side (downscaled with an area filter, never upscaled), the raster the
 thresholds were calibrated on; frames stream, so memory stays flat on a long file. Flags are JUDGEMENT rows: read
 the frames before acting on one. The still and empty rows bind narrated motion graphics — a slide walkthrough, a
@@ -175,6 +179,8 @@ def summarize(recs, name, a, b, dt, o):
             if run > best:
                 best, end = run, i
         res["still_pct"] = round(100 * sum(still) / len(still)); res["hold_s"] = round(best * dt, 2)
+        floor = float(np.percentile([r["d"] for r in D], 10)); res["still_floor"] = round(floor, 2)
+        quiet = [r["changed"] for r in D if r["d"] <= floor]
         if best:
             ch = float(np.median([r["changed"] for r in D[end - best + 1:end + 1]]))
             res["hold_class"] = "TRUE-STILL" if ch < TRUE_STILL else ("SMALL-MOTION" if ch < SMALL_MOTION else "ACTION")
@@ -183,6 +189,8 @@ def summarize(recs, name, a, b, dt, o):
             flags.append("STILL")
         if res["hold_s"] > o.hold_max:
             flags.append("HOLD")
+        if floor >= o.still_thr and quiet and float(np.median(quiet)) < TRUE_STILL:
+            flags.append("BLIND")
     res["flags"] = flags
     return res
 
@@ -198,13 +206,13 @@ def parse_shots(spec, start, end):
 
 def print_table(head, rows):
     print(head)
-    print(f"{'shot':10} {'span s':>13} {'hero med/min':>13} {'empty':>6} {'still':>6} {'hold':>6}  {'class':13} flags")
+    print(f"{'shot':10} {'span s':>13} {'hero med/min':>13} {'empty':>6} {'still':>6} {'floor':>6} {'hold':>6}  {'class':13} flags")
     for r in rows:
         if "error" in r:
             print(f"{r['shot']:10} {r['error']}"); continue
         span = f"{r['span'][0]:g}-{r['span'][1]:g}"
         print(f"{r['shot']:10} {span:>13} {r['hero_median']:>6.2f}/{r['hero_min']:<6.2f} {r['empty_s']:>5.1f}s "
-              f"{str(r.get('still_pct', '-')) + '%':>6} {str(r.get('hold_s', '-')) + 's':>6}  {r.get('hold_class', '-'):13} "
+              f"{str(r.get('still_pct', '-')) + '%':>6} {str(r.get('still_floor', '-')):>6} {str(r.get('hold_s', '-')) + 's':>6}  {r.get('hold_class', '-'):13} "
               f"{' '.join(r['flags']) or 'OK'}")
 
 
@@ -265,6 +273,11 @@ def selftest(o):
     r = summarize(measure(frames(lambda a, f: (box(a, 700, 150, 400, 300), box(a, 60 + 8 * f, 600, 40, 40, 60))), full, "auto", 120),
                   "small-motion", 0, 2, 0.1, o)
     check("small-motion", "HOLD" in r["flags"] and r.get("hold_class") == "SMALL-MOTION", r)
+    rng = np.random.default_rng(3)
+    r = summarize(measure(frames(lambda a, f: (a.fill(100), box(a, 100, 210, 400, 300, 230),        # a mid ground: no grain clipped away
+                                               a.__setitem__(slice(None), np.clip(a + rng.normal(0, 4, a.shape), 0, 255).astype(np.uint8)))), full, "auto", 120),
+                  "grain-hold", 0, 2, 0.1, o)
+    check("grain-hold", "BLIND" in r["flags"] and "STILL" not in r["flags"] and r["still_floor"] >= o.still_thr, r)
     with tempfile.TemporaryDirectory() as td:
         mp4 = Path(td) / "moving.mp4"
         p = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "640x360", "-r", "30",
