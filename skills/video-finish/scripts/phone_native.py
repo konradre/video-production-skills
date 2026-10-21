@@ -38,6 +38,14 @@ def probe_dims(path):
     return int(v.get('width', 0) or 0), int(v.get('height', 0) or 0), float((js.get('format') or {}).get('duration', 0) or 0), has_audio
 
 
+def in_matrix(path, w, h):
+    """the input's YUV → RGB matrix by its tag, else BT.709 at HD and above (video-finish-qc normalise_shots.py's rule)"""
+    p = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_space', '-of', 'csv=p=0', path],
+                       capture_output=True, text=True)
+    cs = (p.stdout or '').strip()
+    return cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if h >= 720 or w >= 1280 else 'bt601')
+
+
 def build(a, W, H, dur, cmdfile):
     """The filtergraph, in the tier's order: scale → denoise → WB drift → exposure drift + AE steps → shake → noise."""
     P = int(round(a.shake))
@@ -64,7 +72,11 @@ def build(a, W, H, dur, cmdfile):
         with open(cmdfile, 'w') as f:
             f.write('\n'.join(lines) + '\n')
         chain.append(f"sendcmd=f='{cmdfile}'")
+        # colortemperature is RGB-only: name BOTH matrices of the round trip, or ffmpeg re-encodes with BT.601 under the
+        # bt709 tag and saturated colour moves up to 42 levels (measured 2026-10-21; grey and white do not move)
+        chain.append(f"scale=in_color_matrix={getattr(a, 'in_matrix', 'bt709')}:in_range=tv,format=gbrp16le")
         chain.append('colortemperature=temperature=6500:mix=1')
+        chain.append('scale=out_color_matrix=bt709:out_range=tv,format=yuv444p')
     ph = a.seed * 0.61
     terms = [f'{a.drift:g}*sin(2*PI*t/{a.period:g}+{ph:.3f})'] if a.drift > 0 else []
     for i, c in enumerate(a.cut_list):
@@ -103,6 +115,7 @@ def render(a):
     iw, ih, dur, has_audio = probe_dims(a.inp)
     if not iw or dur <= 0:
         sys.exit(f'PHONE-NATIVE FAIL — cannot probe {a.inp}')
+    a.in_matrix = in_matrix(a.inp, iw, ih)
     cmdfile = a.out + '.wbcmds.txt'
     vf = build(a, W, H, dur, cmdfile)
     cmd = ['ffmpeg', '-v', 'error', '-y', '-i', a.inp, '-vf', vf] + encode_args(a, has_audio) + [a.out]

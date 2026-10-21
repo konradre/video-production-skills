@@ -62,6 +62,7 @@ def main():
         run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{a.handle:.4f}', '-t', f'{DUR:.4f}', '-i', a.hero, '-ss', f'{a.tin:.4f}', '-t', f'{DUR:.4f}', '-i', a.take,
              '-map', '0:v:0', '-map', '1:a:0', '-dn', '-vf', f'scale={W}:{H}:flags=lanczos,format=yuv420p', '-af', af, '-ar', '48000', '-shortest',
              '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-level', '4.1', '-g', '48',
+             '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',   # the deliverable says what it is: YUV → YUV here, no RGB step, so tags only
              '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-write_tmcd', '0', DELIV])   # -dn / -write_tmcd 0: the mov's timecode track would be re-muxed as a data track
         p = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_name,width,height,pix_fmt,r_frame_rate,sample_rate', '-show_entries', 'format=duration,size', '-of', 'default=nw=1', DELIV], capture_output=True, text=True).stdout
         e = subprocess.run(['ffmpeg', '-v', 'info', '-i', DELIV, '-af', 'ebur128=peak=true', '-f', 'null', '-'], capture_output=True, text=True).stderr

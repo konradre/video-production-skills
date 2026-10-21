@@ -36,6 +36,11 @@ def ff_path(p):
     return p
 
 
+TO709 = 'scale=out_color_matrix=bt709:out_range=tv'   # EVERY RGB → YUV step names its matrix: ffmpeg's default is BT.601 while the
+# files are tagged bt709, and a saturated patch read back up to 40 levels off (measured 2026-10-21). Grey, black and white do not
+# move, which is why no grey check saw it. `matrix_check.py` is the regression.
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--edl', required=True); ap.add_argument('--stage', default='all', choices=['cut', 'master', 'deliver', 'all'])
@@ -98,6 +103,14 @@ def main():
                 q = [float(n) / float(d) for n, d in (x.split('/') for x in r[:2])]; SFPS[p] = q[0] if len(q) == 2 and q[0] > 0 and abs(q[0] - q[1]) < 1e-3 else None
             except (ValueError, ZeroDivisionError): SFPS[p] = None
         return SFPS[p]
+    def src_matrix(p):
+        """the YUV → RGB matrix and range a cube's input is decoded with — named, never ffmpeg's BT.601 default: the tag, else
+        BT.709 at HD and above (normalise_shots.py's rule); an untagged upscale decoded as BT.601 and encoded by TO709 shifts"""
+        r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_space,color_range,width,height',
+                            '-of', 'json', p], capture_output=True, text=True).stdout
+        st = (json.loads(r or '{}').get('streams') or [{}])[0]; cs = st.get('color_space') or ''
+        m = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if st.get('height', 0) >= 720 or st.get('width', 0) >= 1280 else 'bt601')
+        return f"scale=in_color_matrix={m}:in_range={'pc' if st.get('color_range') == 'pc' else 'tv'}"
 
     # ---- 1. graded mezzanine cut (footage only, 0–FOOT_END) ----
     if a.stage in ('cut', 'all'):
@@ -120,7 +133,7 @@ def main():
             sf = src_fps(src)   # seek onto the source's own frame grid, a quarter frame early: at a half-frame offset the fps filter's
             if sf: ss = max(0.0, round(ss * sf) / sf - 0.25 / sf)   # nearest-frame choice flips on 1 ms timestamps (Matroska) → a frame shown twice
             inputs += ['-ss', f'{ss:.6f}', '-t', f'{(nfr + 2) / FPS:.6f}', '-i', src]
-            lut = f"format=gbrp16le,lut3d=file={ff_path(f'{a.cubes}/{look}_33.cube')}:interp=tetrahedral," if look != 'none' else ''   # look "none" = pre-graded hero (Resolve/Dehancer pass)
+            lut = f"{src_matrix(src)},format=gbrp16le,lut3d=file={ff_path(f'{a.cubes}/{look}_33.cube')}:interp=tetrahedral,{TO709}," if look != 'none' else ''   # look "none" = pre-graded hero (Resolve/Dehancer pass); both matrices named
             z = float(e.get('zoom', 1) or 1); zc = ''
             if z > 1.0001:                                                                                   # per-event punch-in: crop 1/z around the anchor, then the normal scale
                 ax, ay = e.get('anchor', [0.5, 0.5]); cw, ch = f'iw/{z:.4f}', f'ih/{z:.4f}'
@@ -128,7 +141,7 @@ def main():
             fc.append(f"[{i}:v]{zc}scale={W}:{H}:flags=lanczos,fps={FPS},tpad=stop_mode=clone:stop=2,trim=end_frame={nfr},setpts=N/({FPS}*TB),{lut}format=yuv422p10le,setsar=1[v{i}]")
             print(e['id'], 'src', src, 'ss', round(ss, 4), 'look', look, 'dur', dur, 'tl', e['tl'], 'frames', nfr)
         fc.append(''.join(f'[v{i}]' for i in range(len(ev))) + f'concat=n={len(ev)}:v=1:a=0[out]')
-        run(['ffmpeg', '-v', 'error', '-y'] + inputs + ['-filter_complex', ';'.join(fc), '-map', '[out]', '-c:v', 'prores_ks', '-profile:v', '3', '-vendor', 'apl0', '-pix_fmt', 'yuv422p10le', '-r', str(FPS), FOOT])
+        run(['ffmpeg', '-v', 'error', '-y'] + inputs + ['-filter_complex', ';'.join(fc), '-map', '[out]', '-c:v', 'prores_ks', '-profile:v', '3', '-vendor', 'apl0', '-pix_fmt', 'yuv422p10le', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv', '-r', str(FPS), FOOT])
         print(probe(FOOT))
     # ---- 2. master: composite layers + end card at the mezzanine raster, mix the audio ----
     if a.stage in ('master', 'all'):
@@ -138,7 +151,7 @@ def main():
         v = ([f"[1:v]scale={W}:{H}:flags=lanczos,format=yuv422p10le,setpts=PTS-STARTPTS[ec]"] if EC else []) + ["[0:v]format=yuv422p10le,tpad=stop_mode=clone:stop_duration=0.05[b0]"]; last = 'b0'
         for k, L in enumerate(edl.get('post_layers', [])):
             inp += ['-framerate', str(FPS), '-i', L['frames']]
-            v.append(f"[{n}:v]scale={W}:{H}:flags=lanczos,format=rgba,setpts=PTS-STARTPTS+{L['at']}/TB[ov{k}]"); n += 1
+            v.append(f"[{n}:v]scale={W}:{H}:flags=lanczos,{TO709},format=yuva422p10le,setpts=PTS-STARTPTS+{L['at']}/TB[ov{k}]"); n += 1   # RGBA → YUVA here, by the named matrix — never inside overlay
             v.append(f"[{last}][ov{k}]overlay=eof_action=pass:format=yuv422p10[b{k + 1}]"); last = f'b{k + 1}'
         v += ([f"[{last}]trim=0:{FOOT_END},setpts=PTS-STARTPTS[fo]", "[fo][ec]concat=n=2:v=1:a=0[vout]"] if EC
               else [f"[{last}]trim=0:{FOOT_END},setpts=PTS-STARTPTS[vout]"])
@@ -183,7 +196,7 @@ def main():
         # every gap between lines, and every later stage inherits a ride it cannot undo. The master is a static sum; deliver
         # sets the level once with one measured gain (spot-audio-assembly MIX-AND-QC.md § The delivery loudness pass).
         au.append(''.join(mix) + f"amix=inputs={len(mix)}:normalize=0,atrim=0:{RUN}[aout]")
-        run(['ffmpeg', '-v', 'error', '-y'] + inp + ['-filter_complex', ';'.join(v + au), '-map', '[vout]', '-map', '[aout]', '-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le', '-r', str(FPS), '-c:a', 'pcm_s24le', '-ar', '48000', '-t', f'{RUN}', MASTER])
+        run(['ffmpeg', '-v', 'error', '-y'] + inp + ['-filter_complex', ';'.join(v + au), '-map', '[vout]', '-map', '[aout]', '-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv', '-r', str(FPS), '-c:a', 'pcm_s24le', '-ar', '48000', '-t', f'{RUN}', MASTER])
         print(probe(MASTER)); print('audio inputs used:', json.dumps(used))
     # ---- 3. deliverable: downscale from the mezzanine, H.264 ----
     if a.stage in ('deliver', 'all'):
@@ -207,7 +220,7 @@ def main():
             # 2026-09-17, 24 fps, boundary t=1.0: with between() one frame showed both layers; with
             # gte()*lt() zero frames showed both AND zero showed neither. An epsilon trim is the wrong fix —
             # it trades a measure-zero double for a real uncovered window.
-            cin += ['-i', c['file']]; chain += f";[{last}][{k + 1}:v]overlay=0:0:enable='gte(t,{c['tl'][0]})*lt(t,{c['tl'][1]})'[v{k + 1}]"; last = f'v{k + 1}'
+            cin += ['-i', c['file']]; chain += f";[{k + 1}:v]{TO709},format=yuva420p[c{k}];[{last}][c{k}]overlay=0:0:enable='gte(t,{c['tl'][0]})*lt(t,{c['tl'][1]})'[v{k + 1}]"; last = f'v{k + 1}'   # the RGBA card converts by the named matrix first
         if edl.get('poster_at') is not None:   # the platform thumbnail is frame 0 (X, Slack, Discord): bake the chosen master frame there (brag)
             k = len(caps) + 1; cw, chh = edl.get("canvas", [1080, 1920]); pss = max(0.0, int(float(edl['poster_at']) * FPS + 1e-6) / FPS - 0.25 / FPS)   # the frame ON SCREEN at poster_at
             cin += ['-ss', f"{pss:.4f}", '-i', MASTER]

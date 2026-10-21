@@ -5,7 +5,7 @@
 #
 #   render_hyper.sh --dir <projects root> --name <comp> --format mp4|png-sequence [--fps 24] [--crf 12] [--workers 2]
 #                   [--host <ssh host>] [--remote-dir ~/hyper] [--push] [--pull] [--hf-version 0.8.18] [--timeout 1800]
-#                   [--keep-out "<zone>"]… [--check-only] [--no-check] [--check-timeout 600]
+#                   [--keep-out "<zone>"]… [--check-only] [--no-check] [--check-timeout 600] [--hf-matrix bt601|bt709]
 # --push rsyncs <dir>/<name> to <host>:<remote-dir>/<name> first (renders/ and frames/ excluded); --pull brings renders/ and
 # frames/ back. Output: <name>/renders/<name>.mp4 or <name>/frames/frame_%06d.png. A new length is a NEW project name.
 # Before the render: `hyperframes check` REPORT-ONLY, one run per zone of the project's safe band — read from the nearest
@@ -15,18 +15,28 @@
 # once a second, never at fewer than 11 points; every run stops at --check-timeout. Then check_summary.py's read; the
 # check never changes the exit code. A png-sequence layer is checked with --no-contrast. --check-only stops after the
 # read; --no-check skips it.
+# An mp4 is re-encoded once after the render with the BT.709 matrix NAMED: HyperFrames 0.8.18 encodes RGB → YUV with BT.601
+# while tagging bt709, so saturated colour played back up to 40 levels off (measured 2026-10-21). --hf-matrix names the matrix
+# the HyperFrames encode used (bt601, measured on 0.8.18; bt709 skips the re-encode). RE-MEASURE ON EVERY --hf-version CHANGE —
+# video-finish-qc/scripts/matrix_check.py card --html, render, measure; a fixed upstream re-encoded as bt601 shifts again.
+# The re-encode runs through 16-bit RGB with accurate rounding (3 levels worst; a direct YUV → YUV swap read 6). A
+# png-sequence is RGB and needs none.
 set -u
 DIR="."; NAME=""; FMT=""; FPS=24; CRF=12; WORKERS=2; HOST=""; RDIR="~/hyper"; PUSH=0; PULL=0; HFV="0.8.18"; TMO=1800; KO=(); CHKONLY=0; NOCHECK=0; SD=$(cd "$(dirname "$0")" && pwd)
-CTMO=600; KD=(); KL=(); SEEK="seek=0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1"
+CTMO=600; HFM=bt601; KD=(); KL=(); SEEK="seek=0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1"
 while [ $# -gt 0 ]; do case "$1" in
   --dir) DIR="$2"; shift 2;; --name) NAME="$2"; shift 2;; --format) FMT="$2"; shift 2;; --fps) FPS="$2"; shift 2;; --crf) CRF="$2"; shift 2;; --workers) WORKERS="$2"; shift 2;;
   --host) HOST="$2"; shift 2;; --remote-dir) RDIR="$2"; shift 2;; --push) PUSH=1; shift;; --pull) PULL=1; shift;; --hf-version) HFV="$2"; shift 2;; --timeout) TMO="$2"; shift 2;;
-  --keep-out) KO+=("$2"); shift 2;; --check-only) CHKONLY=1; shift;; --no-check) NOCHECK=1; shift;; --check-timeout) CTMO="$2"; shift 2;;
-  -h|--help) sed -n '2,17p' "$0"; exit 0;; *) echo "unknown arg $1"; exit 2;; esac; done
+  --keep-out) KO+=("$2"); shift 2;; --check-only) CHKONLY=1; shift;; --no-check) NOCHECK=1; shift;; --check-timeout) CTMO="$2"; shift 2;; --hf-matrix) HFM="$2"; shift 2;;
+  -h|--help) sed -n '2,23p' "$0"; exit 0;; *) echo "unknown arg $1"; exit 2;; esac; done
 [ -n "$NAME" ] && [ -n "$FMT" ] || { echo "--name and --format are required"; exit 2; }; [ -f "$DIR/$NAME/index.html" ] || { echo "no composition at $DIR/$NAME/index.html"; exit 2; }
-if [ "$FMT" = mp4 ]; then OUT="renders/$NAME.mp4"; ARGS="--format mp4 --fps $FPS --output $OUT --crf $CRF"; else OUT="frames"; ARGS="--format png-sequence --fps $FPS --output frames"; fi
+case "$HFM" in bt601|bt709) ;; *) echo "--hf-matrix must be bt601 or bt709"; exit 2;; esac; CONV=""
+if [ "$FMT" = mp4 ]; then OUT="renders/$NAME.mp4"; HFOUT="renders/$NAME.hf.mp4"; ARGS="--format mp4 --fps $FPS --output $HFOUT --crf $CRF"
+  if [ "$HFM" = bt709 ]; then CONV="mv -f $HFOUT $OUT"
+  else CONV="ffmpeg -v error -y -i $HFOUT -map 0:v:0 -map 0:a? -vf scale=in_color_matrix=bt601:in_range=tv:flags=accurate_rnd+full_chroma_int,format=gbrp16le,scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p -c:v libx264 -preset slow -profile:v high -crf $CRF -c:a copy -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -movflags +faststart $OUT && rm -f $HFOUT"; fi
+else OUT="frames"; ARGS="--format png-sequence --fps $FPS --output frames"; fi
 [ -n "$HOST" ] || RDIR="$DIR"   # a local render works in place; CMD below is built from RDIR
-CMD="export PATH=\$HOME/.local/bin:\$PATH; cd $RDIR/$NAME || exit 1; mkdir -p renders frames; [ $FMT = png-sequence ] && rm -f frames/*.png; echo \"===== RENDER $NAME \$(date +%H:%M:%S) =====\"; T=\$(command -v timeout || command -v gtimeout); [ -n \"\$T\" ] || echo \"no timeout or gtimeout on this host: the render runs without its $TMO s limit\"; \${T:+\$T $TMO} npx -y hyperframes@$HFV render $ARGS --workers $WORKERS > render.log 2>&1; rc=\$?; echo \"exit=\$rc \$(date +%H:%M:%S)\"; grep -vE 'npm warn|^\s*\$' render.log | grep -E 'Failed|✓|✗|Rendered|rendered in|error' | cut -c1-160 | tail -3; ls -la renders 2>/dev/null | tail -3; ls frames 2>/dev/null | wc -l; exit \$rc"
+CMD="export PATH=\$HOME/.local/bin:\$PATH; cd $RDIR/$NAME || exit 1; mkdir -p renders frames; [ $FMT = png-sequence ] && rm -f frames/*.png; echo \"===== RENDER $NAME \$(date +%H:%M:%S) =====\"; T=\$(command -v timeout || command -v gtimeout); [ -n \"\$T\" ] || echo \"no timeout or gtimeout on this host: the render runs without its $TMO s limit\"; \${T:+\$T $TMO} npx -y hyperframes@$HFV render $ARGS --workers $WORKERS > render.log 2>&1; rc=\$?; if [ \$rc = 0 ] && [ -n \"$CONV\" ]; then $CONV || rc=1; echo \"matrix: $HFM → BT.709 named (--hf-matrix $HFM)\"; fi; echo \"exit=\$rc \$(date +%H:%M:%S)\"; grep -vE 'npm warn|^\s*\$' render.log | grep -E 'Failed|✓|✗|Rendered|rendered in|error' | cut -c1-160 | tail -3; ls -la renders 2>/dev/null | tail -3; ls frames 2>/dev/null | wc -l; exit \$rc"
 # the render's output must EXIST — the sentinel prints only then (a mis-quoted remote command once ran nothing and still ended in RENDER-END)
 if [ "$FMT" = mp4 ]; then CHECK="test -s $RDIR/$NAME/$OUT"; else CHECK="ls $RDIR/$NAME/frames/*.png > /dev/null 2>&1"; fi
 VP="$SD/../../video-production/scripts/safe_zones.py"   # the project's declared band, read here from the local composition
