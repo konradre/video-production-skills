@@ -30,6 +30,22 @@ import argparse, json, os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))   # resolved before main() changes directory
 
 
+TO709 = 'scale=out_color_matrix=bt709:out_range=tv'   # the delivery is tagged bt709, so a hero in another matrix is converted, never relabelled
+
+
+def to709(p):
+    """'' for a BT.709 tv-range YUV hero (it passes untouched); otherwise the named conversion to BT.709 — an RGB hero by
+    TO709, a BT.601 / untagged-SD / full-range YUV hero through 16-bit RGB. Untagged: BT.709 at HD, BT.601 below."""
+    r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,pix_fmt,color_space,color_range,width,height',
+                        '-of', 'json', p], capture_output=True, text=True).stdout
+    st = (json.loads(r or '{}').get('streams') or [{}])[0]; cs = st.get('color_space') or ''
+    m = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if st.get('height', 0) >= 720 or st.get('width', 0) >= 1280 else 'bt601')
+    rng = 'pc' if st.get('color_range') == 'pc' else 'tv'; pf = st.get('pix_fmt') or ''
+    if st.get('codec_name') == 'png' or pf.startswith(('rgb', 'bgr', 'gbr', 'argb', 'abgr', '0rgb', '0bgr', 'pal')): return f'{TO709},'
+    if m == 'bt709' and rng == 'tv': return ''
+    return f'scale=in_color_matrix={m}:in_range={rng},format=gbrp16le,{TO709},'
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--hero', required=True); ap.add_argument('--take', required=True)
@@ -60,9 +76,9 @@ def main():
             lim = f"alimiter=limit={10 ** (tp / 20):.4f}:attack=5:release=60:level=false:latency=1"
             af = achain + f",volume={g:.3f}dB,aresample=192000,{lim},aresample=48000,{lim},asettb=1/48000,asetpts=N"   # the clock rebuilt from the samples after the last resample
         run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{a.handle:.4f}', '-t', f'{DUR:.4f}', '-i', a.hero, '-ss', f'{a.tin:.4f}', '-t', f'{DUR:.4f}', '-i', a.take,
-             '-map', '0:v:0', '-map', '1:a:0', '-dn', '-vf', f'scale={W}:{H}:flags=lanczos,format=yuv420p', '-af', af, '-ar', '48000', '-shortest',
+             '-map', '0:v:0', '-map', '1:a:0', '-dn', '-vf', f'scale={W}:{H}:flags=lanczos,{to709(a.hero)}format=yuv420p', '-af', af, '-ar', '48000', '-shortest',
              '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-level', '4.1', '-g', '48',
-             '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',   # the deliverable says what it is: YUV → YUV here, no RGB step, so tags only
+             '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',   # true by construction: to709() converted any non-BT.709 hero first
              '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-write_tmcd', '0', DELIV])   # -dn / -write_tmcd 0: the mov's timecode track would be re-muxed as a data track
         p = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_name,width,height,pix_fmt,r_frame_rate,sample_rate', '-show_entries', 'format=duration,size', '-of', 'default=nw=1', DELIV], capture_output=True, text=True).stdout
         e = subprocess.run(['ffmpeg', '-v', 'info', '-i', DELIV, '-af', 'ebur128=peak=true', '-f', 'null', '-'], capture_output=True, text=True).stderr

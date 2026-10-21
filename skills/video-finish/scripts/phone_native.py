@@ -39,11 +39,13 @@ def probe_dims(path):
 
 
 def in_matrix(path, w, h):
-    """the input's YUV → RGB matrix by its tag, else BT.709 at HD and above (video-finish-qc normalise_shots.py's rule)"""
-    p = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_space', '-of', 'csv=p=0', path],
+    """the input's YUV → RGB matrix and range by its tags; untagged: BT.709 at HD and above (normalise_shots.py's rule)"""
+    p = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_space,color_range', '-of', 'default=nw=1', path],
                        capture_output=True, text=True)
-    cs = (p.stdout or '').strip()
-    return cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if h >= 720 or w >= 1280 else 'bt601')
+    tg = dict(l.split('=', 1) for l in (p.stdout or '').split('\n') if '=' in l); cs = tg.get('color_space', '')
+    rng = 'pc' if tg.get('color_range') == 'pc' else 'tv'   # the range by its tag: a forced tv read clips a full-range input
+    m = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if h >= 720 or w >= 1280 else 'bt601')
+    return f'{m}:in_range={rng}'
 
 
 def build(a, W, H, dur, cmdfile):
@@ -74,7 +76,7 @@ def build(a, W, H, dur, cmdfile):
         chain.append(f"sendcmd=f='{cmdfile}'")
         # colortemperature is RGB-only: name BOTH matrices of the round trip, or ffmpeg re-encodes with BT.601 under the
         # bt709 tag and saturated colour moves up to 42 levels (measured 2026-10-21; grey and white do not move)
-        chain.append(f"scale=in_color_matrix={getattr(a, 'in_matrix', 'bt709')}:in_range=tv,format=gbrp16le")
+        chain.append(f"scale=in_color_matrix={getattr(a, 'in_matrix', 'bt709:in_range=tv')},format=gbrp16le")
         chain.append('colortemperature=temperature=6500:mix=1')
         chain.append('scale=out_color_matrix=bt709:out_range=tv,format=yuv444p')
     ph = a.seed * 0.61

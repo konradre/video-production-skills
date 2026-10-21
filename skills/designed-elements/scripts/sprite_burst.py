@@ -69,9 +69,11 @@ def main():
 
     # the RGB round trip names BOTH matrices: ffmpeg's default is BT.601 and the hero is bt709 — unnamed, a saturated
     # hero frame came back up to 43 levels off with no sprite drawn (measured 2026-10-21)
-    cs = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_space', '-of', 'csv=p=0', a.src], capture_output=True, text=True).stdout.strip()
+    cst = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_space,color_range', '-of', 'default=nw=1', a.src], capture_output=True, text=True).stdout
+    tg = dict(l.split('=', 1) for l in cst.split('\n') if '=' in l); cs = tg.get('color_space', '')
+    rng = 'pc' if tg.get('color_range') == 'pc' else 'tv'   # the range by its tag too: a forced tv read crushed a full-range hero's 16 and 235
     mi = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if H >= 720 or W >= 1280 else 'bt601')   # untagged: video-finish-qc normalise_shots.py's rule
-    dec = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', a.src, '-vf', f'scale=in_color_matrix={mi}:in_range=tv:flags=accurate_rnd+full_chroma_int', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], stdout=subprocess.PIPE)
+    dec = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', a.src, '-vf', f'scale=in_color_matrix={mi}:in_range={rng}:flags=accurate_rnd+full_chroma_int', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], stdout=subprocess.PIPE)
     enc = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', f'{W}x{H}', '-r', str(a.fps), '-i', '-', '-i', a.src, '-map', '0:v', '-map', '1:a?',
                             '-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv422p10le', '-c:v', 'dnxhd', '-profile:v', 'dnxhr_hqx', '-pix_fmt', 'yuv422p10le',
                             '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv', '-c:a', 'copy', a.out], stdin=subprocess.PIPE)

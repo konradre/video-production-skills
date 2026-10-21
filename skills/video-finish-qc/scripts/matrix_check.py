@@ -17,6 +17,8 @@ a caption, a cube), then measure what that path delivered.
                                                                            # exit 1 over --max, 2 when it cannot decode
   matrix_check.py --selftest                                               # a 709 encode passes; ffmpeg's default FAILS;
                                                                            # finish_spot's three RGB steps pass
+  matrix_check.py --finish-e2e [--keep <dir>]                              # the REAL finish_spot.py, one event per colour
+                                                                           # branch, overlays over grey; exit 1 on any FAIL
 
 `--as tag` (the default) reads the stream's `color_space`: bt709 → BT.709; smpte170m / bt470bg → BT.601; anything
 else exits 2 rather than guess. A patch is read on its inner half, away from chroma-subsampled edges; a correct 8-bit
@@ -38,16 +40,19 @@ def cell(i, W, H):
     return (i % 4) * W // 4, (i // 4) * H // 4, W // 4, H // 4
 
 
-def card_png(path, W, H):
-    rows = []
+def card_png(path, W, H, gutter=0):
+    """the card as an RGB PNG; with gutter > 0 an RGBA PNG whose cells are opaque and whose gutters are transparent"""
+    rows = []; cw, ch = W // 4, H // 4
     for y in range(H):
         r = bytearray(b'\x00')
         for x in range(W):
-            r += bytes(SRC[(y * 4 // H) * 4 + x * 4 // W])
+            px = bytes(SRC[(y * 4 // H) * 4 + x * 4 // W])
+            if gutter: px += b'\x00' if (x % cw < gutter or x % cw >= cw - gutter or y % ch < gutter or y % ch >= ch - gutter) else b'\xff'
+            r += px
         rows.append(bytes(r))
     def chunk(t, d): return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
     with open(path, 'wb') as f:
-        f.write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', W, H, 8, 2, 0, 0, 0))
+        f.write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', W, H, 8, 6 if gutter else 2, 0, 0, 0))
                 + chunk(b'IDAT', zlib.compress(b''.join(rows), 6)) + chunk(b'IEND', b''))
 
 
@@ -164,52 +169,63 @@ def selftest():
 
 
 def finish_e2e(keep=None):
-    """The REAL finish_spot.py on the card, all stages: a look through a cube (one source tagged bt709, one untagged), a
-    look-"none" event, the card as a post_layer, the card as a caption. Each path is measured on the file it wrote."""
+    """The REAL finish_spot.py on the card, all stages. Every branch that converts colour gets its own event: a cube on a
+    tagged and an untagged source; look none on a BT.709, a BT.601-tagged and an RGB (png-codec) source; an RGBA post
+    layer and an RGBA caption, each over FLAT GREY so an overlay that never composited reads grey and fails; an RGB end
+    card. Each row is measured on the file the finisher wrote."""
     W, H, FPS = 1280, 720, 24   # 720p: an untagged source is BT.709 by the HD rule
     here = os.path.dirname(os.path.abspath(__file__)); SK = os.path.abspath(os.path.join(here, '..', '..'))
     d = keep or tempfile.mkdtemp(prefix='matrix-e2e-'); os.makedirs(d, exist_ok=True)
     def ff(args): subprocess.run(['ffmpeg', '-v', 'error', '-y'] + args, check=True, cwd=d)
     for p in ('edit/layers/card', 'edit/captions', 'takes', 'cubes'): os.makedirs(os.path.join(d, p), exist_ok=True)
-    card_png(os.path.join(d, 'card.png'), W, H)
+    card_png(os.path.join(d, 'card.png'), W, H); card_png(os.path.join(d, 'card-rgba.png'), W, H, gutter=12)
     tag = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709']
-    enc = ['-loop', '1', '-t', '4', '-r', str(FPS), '-i', 'card.png', '-f', 'lavfi', '-t', '4', '-i', 'anullsrc=r=48000:cl=stereo',
-           '-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p', '-c:v', 'libx264', '-crf', '10', '-c:a', 'aac', '-shortest']
-    ff(enc + tag + ['takes/tagged.mp4'])
-    ff(enc + ['-bsf:v', 'h264_metadata=matrix_coefficients=2:colour_primaries=2:transfer_characteristics=2', 'takes/untagged.mp4'])
-    for i in range(FPS): shutil_copy(os.path.join(d, 'card.png'), os.path.join(d, f'edit/layers/card/frame_{i:06d}.png'))
-    shutil_copy(os.path.join(d, 'card.png'), os.path.join(d, 'edit/captions/cap-00.png'))
+    still = ['-loop', '1', '-t', '4', '-r', str(FPS), '-i', 'card.png', '-f', 'lavfi', '-t', '4', '-i', 'anullsrc=r=48000:cl=stereo']
+    enc = ['-c:v', 'libx264', '-crf', '10', '-c:a', 'aac', '-shortest']
+    ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'] + enc + tag + ['takes/tagged.mp4'])
+    ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'] + enc
+       + ['-bsf:v', 'h264_metadata=matrix_coefficients=2:colour_primaries=2:transfer_characteristics=2', 'takes/untagged.mp4'])
+    ff(still + ['-vf', 'scale=out_color_matrix=bt601:out_range=tv,format=yuv420p'] + enc
+       + ['-colorspace', 'smpte170m', '-color_primaries', 'smpte170m', '-color_trc', 'smpte170m', 'takes/bt601.mp4'])
+    ff(still + ['-c:v', 'png', '-c:a', 'pcm_s16le', '-shortest', 'takes/rgb.mov'])
+    ff(['-f', 'lavfi', '-t', '4', '-i', f'color=0x808080:s={W}x{H}:r={FPS}', '-f', 'lavfi', '-t', '4', '-i', 'anullsrc=r=48000:cl=stereo',
+        '-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'] + enc + tag + ['takes/grey.mp4'])
+    for i in range(FPS): shutil_copy(os.path.join(d, 'card-rgba.png'), os.path.join(d, f'edit/layers/card/frame_{i:06d}.png'))
+    shutil_copy(os.path.join(d, 'card-rgba.png'), os.path.join(d, 'edit/captions/cap-00.png'))
     with open(os.path.join(d, 'cubes', 'idtest_33.cube'), 'w') as f:
         f.write('LUT_3D_SIZE 33\n' + ''.join(f'{r / 32:.6f} {g / 32:.6f} {b / 32:.6f}\n' for b in range(33) for g in range(33) for r in range(33)))
-    ev = [{'id': 'E00', 'take': 'takes/tagged.mp4', 'src': 'takes/tagged.mp4', 'in': 0.5, 'out': 2.0, 'tl': [0.0, 1.5], 'handle_head': 0.5, 'look': 'idtest'},
-          {'id': 'E01', 'take': 'takes/untagged.mp4', 'src': 'takes/untagged.mp4', 'in': 0.5, 'out': 2.0, 'tl': [1.5, 3.0], 'handle_head': 0.5, 'look': 'idtest'},
-          {'id': 'E02', 'take': 'takes/tagged.mp4', 'src': 'takes/tagged.mp4', 'in': 0.5, 'out': 2.0, 'tl': [3.0, 4.5], 'handle_head': 0.5, 'look': 'none'}]
-    E = {'spot': 'MX', 'deliver_base': 'MX', 'runtime_s': 4.5, 'canvas': [W, H], 'events': ev,
-         'post_layers': [{'frames': 'edit/layers/card/frame_%06d.png', 'at': 3.25}],
+    plan = [('tagged', 'idtest'), ('untagged', 'idtest'), ('tagged', 'none'), ('bt601', 'none'), ('rgb', 'none'), ('grey', 'none'), ('grey', 'none')]
+    ev = []
+    for k, (src, look) in enumerate(plan):
+        f = f'takes/{src}.mp4' if src != 'rgb' else 'takes/rgb.mov'
+        ev.append({'id': f'E{k:02d}', 'take': f, 'src': f, 'in': 0.5, 'out': 2.0, 'tl': [1.5 * k, 1.5 * k + 1.5], 'handle_head': 0.5, 'look': look})
+    T = 1.5 * len(plan)
+    ev.append({'id': 'EC', 'role': 'endcard', 'source': 'designed', 'take': 'takes/rgb.mov', 'in': 0.0, 'out': 1.5, 'tl': [T, T + 1.5]})
+    E = {'spot': 'MX', 'deliver_base': 'MX', 'runtime_s': T + 1.5, 'canvas': [W, H], 'events': ev,
+         'post_layers': [{'frames': 'edit/layers/card/frame_%06d.png', 'at': 7.75}],
          'audio': {'vo': {'stem': 'edit/mix/MX-vo-stem.wav', 'peak_cap_dbfs': -1.0, 'target_lufs': -16.0}, 'sfx': {}, 'music': {},
                    'loudnorm': {'I': -16, 'TP': -1.5, 'LRA': 11}, 'captions_dir': 'edit/captions'}}
     os.makedirs(os.path.join(d, 'edit'), exist_ok=True); json.dump(E, open(os.path.join(d, 'edit', 'MX-EDL.json'), 'w'), indent=1)
     stub = os.path.join(d, 'caps.py')
     with open(stub, 'w') as f:
-        f.write("import json; json.dump([{'file': 'edit/captions/cap-00.png', 'tl': [1.75, 2.75]}], open('edit/captions/manifest.json', 'w'))\n")
+        f.write("import json; json.dump([{'file': 'edit/captions/cap-00.png', 'tl': [9.25, 10.25]}], open('edit/captions/manifest.json', 'w'))\n")
     r = subprocess.run([sys.executable, os.path.join(SK, 'video-finish-qc', 'scripts', 'finish_spot.py'), '--root', d, '--edl', 'edit/MX-EDL.json',
                         '--stage', 'all', '--look', 'idtest', '--cubes', os.path.join(d, 'cubes'), '--canvas', f'{W}x{H}', '--fps', str(FPS), '--no-gate',
                         '--min-free-gb', '0', '--stem-builder', os.path.join(SK, 'spot-audio-assembly', 'scripts', 'build_vo_stem.py'),
                         '--captions-builder', stub], capture_output=True, text=True)
     if r.returncode != 0 or 'FINISH-END' not in r.stdout:
         print('FINISH-E2E CANNOT: finish_spot.py failed\n' + (r.stdout + r.stderr)[-1200:]); return 2
-    rows = [('look, tagged bt709 source', 'edit/mezz/MX-footage-graded.mov', 0.75),
-            ('look, untagged HD source', 'edit/mezz/MX-footage-graded.mov', 2.25),
-            ('look none', 'edit/mezz/MX-footage-graded.mov', 3.1),
-            ('post_layer over look none', f'edit/mezz/MX-master-{W}x{H}.mov', 3.75),
-            ('caption over the deliverable', 'deliver/MX-v1.mp4', 2.25),
-            ('deliverable, look tagged', 'deliver/MX-v1.mp4', 0.75)]
+    M, Mm, Dv = 'edit/mezz/MX-footage-graded.mov', f'edit/mezz/MX-master-{W}x{H}.mov', 'deliver/MX-v1.mp4'
+    rows = [('cube, tagged bt709 source', M, 0.75), ('cube, untagged HD source', M, 2.25), ('look none, bt709 source', M, 3.75),
+            ('look none, bt601-tagged source', M, 5.25), ('look none, RGB (png) source', M, 6.75),
+            ('RGBA post_layer over grey', Mm, 8.25), ('RGB end card', Mm, T + 0.75),
+            ('RGBA caption over grey, delivered', Dv, 9.75), ('cube path, delivered', Dv, 0.75)]
     ok = True
     for name, f, at in rows:
         res = measure(os.path.join(d, f), at, 'tag', W, H)
-        if res.get('ok') is None: print(f'e2e {name:30s} CANNOT {res["reason"]}'); ok = False; continue
+        if res.get('ok') is None: print(f'e2e {name:34s} CANNOT {res["reason"]}'); ok = False; continue
         good = res['max_err'] <= 6; ok &= good
-        print(f"e2e {name:30s} max err {res['max_err']:3d} {'PASS' if good else 'FAIL'} ({os.path.basename(f)} @ {at}s, as {res['decoded_as']})")
+        print(f"e2e {name:34s} max err {res['max_err']:3d} {'PASS' if good else 'FAIL'} ({os.path.basename(f)} @ {at}s, as {res['decoded_as']})")
     print('FINISH-E2E', 'OK' if ok else 'FAILED', '' if keep else '(scratch removed)')
     if not keep: shutil_rmtree(d)
     return 0 if ok else 1
