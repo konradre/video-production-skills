@@ -31,6 +31,19 @@ keeps pops and steps as WARN lines and fails the flash rate and sustained flashe
               changes on purpose is set aside on the EXACT frame (declared_edges: joins, accepted_cuts, captions on and
               off, qc.accepted_flashes); on three shipped spots that left only a worded card's own word lines, which
               the card's event declares as accepted_cuts
+  edge frames a stray frame at an event's edge: a change INSIDE the first or last 7 frames of a footage event (the join
+              itself set aside) over 10 levels, over 4 × the event's median change and over 3 × the larger change beside
+              it (an isolated spike: a pan or a gesture is a run of similar changes) — a frame of the take's neighbouring
+              shot or card, or a black first frame, sitting at the cut. Cut lists are read off the take, before the seek
+              and the hold that decide which frames reach the render, and a 1 fps tile cannot see one frame; this reads the
+              render. Measured on one compilation of supplied clips (2026-10-22), so the 10 / 4 × / 3 × are leads:
+              two frames of the next camera angle at a bite's tail (a seek printed 0.3 µs past its frame's start) read 56
+              against a median 1.2 on a real excerpt that otherwise reads nothing; the whole render's 31 footage events
+              read nothing — without the spike test, two heads that move on purpose (a card's photo panning from its
+              first frame, an interviewer's hands crossing the frame: 10–13 against medians 0.8–1.8) read as stray.
+              `edges` reads the finisher's cut mezzanine as well as the delivered file — run it after `--stage cut` and
+              a stray frame is found before the master and the deliver are paid for. An event's accepted_edge_frames
+              {head|tail: why} declares a meant change; designed events and the end card are not read
   flashes     WCAG 2.2 flashes paired at the SAME place, from the decoded RGB (flash_read): each place follows its relative
               luminance between extremes, and a rise or fall of ≥ 0.1 from the last extreme is a transition however many
               frames it takes (a smooth pulse counts), with its darker side under 0.8; the opposite transition at the same
@@ -481,6 +494,45 @@ def declared_edges(edl, fps, root='.'):
     return E
 
 
+EDGE_N, EDGE_T, EDGE_RATIO, EDGE_SPIKE = 7, 10.0, 4.0, 3.0
+
+
+def edge_frames(g, edl, fps, declared=None, n=EDGE_N, T=EDGE_T, ratio=EDGE_RATIO, spike=EDGE_SPIKE):
+    """[(event id, side, frame, change, event median, why)] — a hard change INSIDE the first or last n frames of a footage
+    event, over T, over ratio × the event's median change, and over spike × the larger change beside it inside the event: a
+    stray frame at the cut is an isolated spike, where a pan or a gesture is a run of similar changes. The join's own
+    change is outside the window and never a neighbour; a frame in `declared` (declared_edges) is set aside; why = the
+    event's accepted_edge_frames[side] when it declares that side (a meant change — printed, never failed), else None.
+    Designed events and the end card are skipped."""
+    d = frame_changes(g); out = []; dec = declared or {}
+    for x in edl.get('events') or []:
+        if x.get('role') == 'endcard' or x.get('source') == 'designed' or x.get('designed'): continue
+        f0, f1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps) - 1   # the event's first and last frame
+        if f1 - f0 < 2 or f1 >= len(g): continue
+        med = float(np.median(d[f0:f1])) + 0.5   # d[k - 1] is the change INTO frame k; d[f0:f1] = every change inside the event
+        acc = x.get('accepted_edge_frames') or {}
+        seen = set()
+        for side, ks in (('head', range(f0 + 1, min(f0 + n, f1) + 1)), ('tail', range(max(f1 - n + 1, f0 + 1), f1 + 1))):
+            for k in ks:
+                c = float(d[k - 1]); nb = max([float(d[j]) for j in (k - 2, k) if f0 <= j <= f1 - 1] + [0.3])   # d[f0..f1-1]: the changes inside the event
+                if k not in seen and c > T and c > ratio * med and c > spike * nb and k not in dec:
+                    seen.add(k); out.append((x.get('id'), side, k, round(c, 2), round(med, 2), acc.get(side)))
+    return out
+
+
+def edges_cli(argv):
+    import argparse
+    ap = argparse.ArgumentParser(prog='decoded_checks.py edges', description='stray frames at the event edges of a render cut from an EDL')
+    ap.add_argument('render'); ap.add_argument('--edl', required=True); ap.add_argument('--root', default='.'); ap.add_argument('--fps', type=float)
+    a = ap.parse_args(argv); edl = json.load(open(os.path.join(a.root, a.edl), encoding='utf-8'))
+    fps = a.fps or float(edl.get('fps') or fps_of(a.render)); g, _, _ = motion_frames(a.render, fps)
+    ef = edge_frames(g, edl, fps, declared_edges(edl, fps, a.root)); bad = [x for x in ef if not x[5]]
+    for i, side, k, c, med, why in ef:
+        print(f"{'ok* ' if why else 'FAIL'} {i} {side} frame {k} ({k / fps:.2f} s): change {c} vs the event median {med}" + (f' — accepted: {why}' if why else ''))
+    print(f"EDGE-FRAMES {'PASS' if not bad else 'FAIL'} {a.render}: {len(bad)} undeclared stray frame(s) at event edges · {len(ef) - len(bad)} declared")
+    return 1 if bad else 0
+
+
 def accepted_frames(specs, fps):
     """{frame} an element changes on purpose, from each --accepted spec: seconds, comma-separated (at round(t·fps)), a
     caption manifest (.json, each card's tl), an explainer's compositions/captions.html ([block, show, hide] in
@@ -670,6 +722,22 @@ def selftest():
         json.dump({'scenes': [{'id': 's01', 'start': 0.0}, {'id': 's02', 'start': 2.0}]}, open(os.path.join(r, 'timeline.json'), 'w'))
         acc = accepted_frames(['1.0,2.5', os.path.join(r, 'caps', 'manifest.json'), os.path.join(r, 'captions.html'), os.path.join(r, 'timeline.json')], 24)
         chk.append((f'--accepted: seconds 24/60, a manifest 5/15, a captions.html 16/27, a timeline.json scene cut 48 → {sorted(acc)}', acc == {24, 60, 5, 15, 16, 27, 48}))
+        rs = np.random.default_rng(3); ga = [100 + rs.normal(0, 1.0, (32, 32)) for _ in range(48)] + [160 + rs.normal(0, 1.0, (32, 32)) for _ in range(48)]
+        ga[47] = ga[50].copy(); ga[48] = np.zeros((32, 32))   # A's last frame is B's shot; B's first frame is black
+        ga = np.clip(np.stack(ga), 0, 255).astype(np.uint8)
+        ee = {'events': [{'id': 'A', 'tl': [0.0, 2.0]}, {'id': 'B', 'tl': [2.0, 4.0]}, {'id': 'T', 'tl': [4.0, 4.0], 'role': 'endcard'}]}
+        got = [(i, s_, k) for i, s_, k, *_ in edge_frames(ga, ee, 24)]
+        ee['events'][1]['accepted_edge_frames'] = {'head': 'a flash frame the cut was built on'}
+        acc_ = [(i, s_, k, w) for i, s_, k, _, _, w in edge_frames(ga, ee, 24)]
+        clean = np.clip(np.stack([100 + rs.normal(0, 1.0, (32, 32)) for _ in range(48)] + [160 + rs.normal(0, 1.0, (32, 32)) for _ in range(48)]), 0, 255).astype(np.uint8)
+        pan = clean.copy().astype(np.float32)
+        for k in range(48, 56): pan[k] = np.roll(np.tile(np.linspace(60, 220, 32), (32, 1)), 3 * (k - 48), axis=1)   # B opens on a fast pan: a run of ~equal changes
+        pan = np.clip(pan, 0, 255).astype(np.uint8)
+        chk.append(('edge frames: a fast pan over B\'s first 8 frames is motion, not a stray frame', not edge_frames(pan, {'events': ee['events'][:2]}, 24)))
+        chk.append((f'edge frames: the neighbouring shot on A\'s last frame (47) and B\'s black first frame (change into 49) — the join (48) is not one → {got}',
+                    got == [('A', 'tail', 47), ('B', 'head', 49)]))
+        chk.append(('edge frames: accepted_edge_frames.head declares B\'s; a clean join reads nothing', acc_ == [('A', 'tail', 47, None), ('B', 'head', 49, 'a flash frame the cut was built on')]
+                    and not edge_frames(clean, {'events': ee['events'][:2]}, 24) and not edge_frames(ga, ee, 24, {47: ['caption on'], 49: ['caption off']})))
         enc = ['-c:v', 'libx264', '-crf', '1', '-pix_fmt', 'yuv420p']
         fm = os.path.join(r, 'flash.mp4'); pp = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gray', '-s', '128x128', '-r', '24', '-i', '-', *enc, fm], stdin=subprocess.PIPE)
         pp.stdin.write(flash.astype(np.uint8).tobytes()); pp.stdin.close(); pp.wait()
@@ -697,4 +765,5 @@ def selftest():
 if __name__ == '__main__':
     if '--selftest' in sys.argv: sys.exit(selftest())
     if len(sys.argv) > 1 and sys.argv[1] == 'motion': sys.exit(motion_cli(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == 'edges': sys.exit(edges_cli(sys.argv[2:]))
     print(__doc__)

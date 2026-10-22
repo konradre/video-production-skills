@@ -102,3 +102,4 @@ Each number lives, with its sample size, where its rule lives; this list says wh
 | the upscale tier's head size | `video-finish` § 1 and its EVIDENCE.md | one shot through both arms at the new raster |
 | the mode table's rows | `video-gen-cost-gate` § 1 | a same-seed A/B on the new model |
 | the ad grammar's timings | `video-edit-edl` GENRE-GRAMMAR.md | the operator's reads of this project's first cut |
+| the cut-edge levels and read windows (speech within 15 dB of the event's p90, quiet 22 dB under it or the bed + 6 dB; 20 ms before an out, 10 ms after an in, 30 ms before it; the delivered read's 10 ms skip either side of a join) | `video-edit-edl` `edge_audit.py --help` (measured 2026-10-22: 58 edges of one compilation, one bitten word heard, 16 read) | on the project's own takes: one edge the ear calls clean and one it calls bitten, read with the audit before trusting its verdict |

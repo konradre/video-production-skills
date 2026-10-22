@@ -9,12 +9,13 @@ the EDL has one) → mix → downscale → encode. Three stages, each re-runnabl
                                                       aresample 48k → alimiter again (the limiting the target costs is printed);
                                                       captions overlaid AFTER the downscale; H.264 High CRF 17 slow, AAC 192k,
                                                       faststart, the length capped at runtime_s
-The script-fidelity gate (beat_sheet.py) runs BEFORE stage 1 when the beats file exists: a FAIL = no finish. A spot with no
+The script-fidelity gate (beat_sheet.py) runs BEFORE stage 1 when the beats file exists: a FAIL = no finish. So does the
+cut-edge gate (video-edit-edl edge_audit.py) wherever a take's own sound plays: a word bitten at an edge = no finish. A spot with no
 role:"endcard" event (a beat list may forbid a card) cuts its footage at the runtime.
 
   finish_spot.py --root <project> --edl edit/<SPOT>-EDL.json [--stage cut|master|deliver|all] [--look ads-clean]
                  [--in-dir edit/upscale-out] [--tag=-v3] [--cubes <dir of <look>_33.cube>] [--canvas 2160x3840] [--fps 24]
-                 [--beat-gate <beat_sheet.py>] [--stem-builder <build_vo_stem.py>] [--captions-builder <build_captions.py>] [--no-gate]
+                 [--beat-gate <beat_sheet.py>] [--edge-gate <edge_audit.py>] [--stem-builder <build_vo_stem.py>] [--captions-builder <build_captions.py>] [--no-gate]
 Sources per event: designed → its own render at native raster; generated → <in-dir>/<id>.mov | <id>__*.mov | <id>.mp4,
 or the event's own `src` (a hero under a fresh name), sought by handle_head (a FULL-TAKE hero needs handle_head = in).
 Prints FINISH-END <stage> as the sentinel; a log without it is a failure whatever the file sizes say.
@@ -49,6 +50,7 @@ def main():
     ap.add_argument('--canvas', default='2160x3840'); ap.add_argument('--fps', type=int, default=24); ap.add_argument('--handle', type=float, default=None, help='default head handle for upscaled sources (default 4 frames)')
     ap.add_argument('--beat-gate', default=f'{SK}/video-edit-edl/scripts/beat_sheet.py'); ap.add_argument('--stem-builder', default=f'{SK}/spot-audio-assembly/scripts/build_vo_stem.py')
     ap.add_argument('--captions-builder', default=f'{SK}/spot-audio-assembly/scripts/build_captions.py'); ap.add_argument('--no-gate', action='store_true')
+    ap.add_argument('--edge-gate', default=f'{SK}/video-edit-edl/scripts/edge_audit.py', help='the cut-edge gate: no word bitten where a take\'s sound plays')
     ap.add_argument('--min-free-gb', type=float, default=40.0, help='the HOST drive floor under which the finish warns before it runs (or 3x the spot\'s mezzanine footprint, whichever is larger); --min-free-gb 0 skips the read')
     argv = sys.argv[1:]
     for i, x in enumerate(argv[:-1]):   # --tag -final: a value that starts with '-' must be joined for argparse
@@ -80,6 +82,16 @@ def main():
     if not a.no_gate and os.path.exists(beats):
         subprocess.run([sys.executable, os.path.expanduser(a.beat_gate), '--root', '.', '--edl', a.edl, '--beats', beats], check=True)   # SCRIPT-FIDELITY GATE: FAIL = no finish
     elif not a.no_gate: print(f'WARNING no beats file at {beats} — the script-fidelity gate did not run', flush=True)
+    NATIVE_PROG = bool((edl.get('qc') or {}).get('native_programme'))   # the takes' own speech IS the programme: a bitten edge stops the finish
+    UNDECLARED = 'native_programme' not in (edl.get('qc') or {}) and not any('native_audio_vol' in e for e in ev)   # the EDL never says whose sound plays
+    if not a.no_gate and (UNDECLARED or any(e.get('source') != 'designed' and (NATIVE_PROG or float(e.get('native_audio_vol', 0) or 0) > 0) for e in ev)):
+        if not os.path.exists(os.path.expanduser(a.edge_gate)):
+            print(f'WARNING no cut-edge gate at {a.edge_gate} — a word bitten at an edge would not be caught before the render', flush=True)
+        elif NATIVE_PROG or UNDECLARED:   # undeclared: the gate exits 2 NOT READ when a take carries sound — no finish until the EDL says whose sound plays
+            subprocess.run([sys.executable, os.path.expanduser(a.edge_gate), '--root', '.', '--edl', a.edl], check=True)   # CUT-EDGE GATE: a bitten word = no finish
+        elif subprocess.run([sys.executable, os.path.expanduser(a.edge_gate), '--root', '.', '--edl', a.edl]).returncode:
+            print('WARNING cut edges: an earned native bed is cut through a sound (above) — the read is of SOUND, not words: listen at '
+                  'each flagged edge, declare a meant cut (a knock on its hit) in accepted_edges, move a bitten word', flush=True)
 
     def run(cmd): print('$', ' '.join(cmd)[:400], flush=True); subprocess.run(cmd, check=True)
 

@@ -86,6 +86,16 @@ internal shot change the operator kept is part of the keeper. Declare those on t
 plan MEASURED from files (a bed `vol`, a duck, a lip-synced `at`, a loudness target) carries a `derived` block with
 its inputs' hashes, and the build fails when an input changed (`EDL-CONTRACT.md` § Derived constants).
 
+**No cut bites a word.** Where a take's own sound plays, every edge is placed from that SOUND, never from word times:
+ASR word ends run early (one measured case: 0.19 s, the word's "-st" still sounding through the cut) and a speech-band
+filter misses the sibilant tail. `scripts/edge_audit.py` reads each audible edge on a broadband envelope against the
+event's own speech level and names the fix. Either the edge moves into a measured gap (`in`/`out`, or
+`native_audio_from`/`_to` where the picture must stay), or, when the picture has to change before the word ends, the
+tail is carried over the next shot (§ 3). A fade never sits over a word. A supplied source that itself starts or ends
+mid-word cannot be cut clean: declare it (`accepted_edges`) and tell the operator once. A builder whose takes ARE the
+programme (a compilation of supplied clips, each playing its own sound) declares `qc.native_programme: true`;
+without it the audit finds no audible edge and says so.
+
 **Picture follows audio in a voiced section.** Where a line is carried by cutaways, the voice sets the slots
 (`phrase_slots.py slots`, whole frames from the phrase onsets) and each slot's clip is fitted to its slot — never the voice
 to the clip (`fit_slots.py`): a longer window is cut, one short by ≤ 20 % is slowed (frames held, none invented), a shorter
@@ -134,7 +144,17 @@ operator specified.
 ```bash
 python3 ~/.claude/skills/video-edit-edl/scripts/beat_sheet.py --root <project> --edl edit/<SPOT>-EDL.json
 python3 ~/.claude/skills/video-edit-edl/scripts/edl_check.py --root <project> --edl edit/<SPOT>-EDL.json [--require-endcard] --cuts <cutlists.json>
+python3 ~/.claude/skills/video-edit-edl/scripts/edge_audit.py --root <project> --edl edit/<SPOT>-EDL.json [--cuts <cutlists.json>]
 ```
+
+`edge_audit.py` exits 1 on any edge where a take's sound plays and a word is cut (BITE) or its onset or tail is
+clipped (TIGHT), and 2 — NOT READ — when it read nothing because the EDL never says whose sound plays while a take carries
+sound: a pass after reading nothing is no pass (one compilation's first cut read 0 edges and printed PASS over six bitten
+words, 2026-10-22). Every EDL says it: `qc.native_programme` true or false, or `native_audio_vol` on the events. Each flag comes with the gap it measured and the take's cuts near it. This read of the take at the
+exact edge is the gate. Its `--deliv` mode reads the delivered file at every join as a cross-check inside the QC
+(`video-finish-qc` § 4). It skips the 10 ms either side of a join, where a hard cut rings through the band filter, so it
+cannot stand in for the gate. Look at every flagged edge on a spectrogram before declaring or moving it: a sibilant or a
+breath reads clearly there and nowhere else.
 
 `beat_sheet.py` exits 1 on any FAIL — no finish runs on a FAIL, and its printed sheet rides in the
 deliverable ask. `edl_check.py --cuts` takes the takes' own cut lists (from `video-take-review`'s
@@ -152,7 +172,8 @@ lands. Its first run (2026-09-29) failed the finisher of the day on all five: th
 events (each `-ss/-t` window rounded its own frame count), missing packets pulled a take's own sound 0.51 s early, a VO
 file's timestamp gap moved the rest of the line 0.41 s early, and the two delivery limiters left the sound 10 ms late.
 
-**Done when:** `BEAT-SHEET PASS` and `EDL-CHECK PASS` on the exact file the finisher will read.
+**Done when:** `BEAT-SHEET PASS`, `EDL-CHECK PASS` and, where a take's sound plays, `EDGE-AUDIT PASS` on the exact file
+the finisher will read.
 
 ## 5. Revise by parameter, into a new file
 
@@ -169,6 +190,8 @@ an insert / a re-order → scripts/edl_insert.py (shifts everything downstream; 
                          --replace re-times an existing insert)
 a bad short shot → drop it; a better shot in an older version → swap it; "cuts too soon" → lengthen
 a new take among the keepers → a hybrid EDL, its cuts mixed in
+"the word is cut off" → edge_audit.py on EVERY edge, never only the one cited; each fix is an edge in a measured gap
+                         or a carried tail
 a missing sound → a placed sfx; a lost word → a dub; the wrong thing in frame → a punch-in
 only then → a regen (video-refs-continuity → video-gen-cost-gate), with the approved cut frozen
 ```
@@ -192,6 +215,13 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
   prints every stale input — a layout to look at, never a version to finish.
 - A window crossing its take's own cut → a rogue frame, unless the take composed that cut and the operator kept it:
   declare it on the event (`accepted_cuts` + `accepted_cuts_note`); never drop `--cuts` to reach a PASS.
+- `EDGE-AUDIT NOT READ` → the EDL never says whose sound plays and a take carries sound. Declare it — `qc.native_programme:
+  true` when the takes ARE the programme, `false` when every take is muted, or `native_audio_vol` per event — and re-run;
+  never pass `--no-gate` to get past it.
+- `EDGE-AUDIT FAIL` → a word is cut at an edge. Move the edge into the gap the audit measured, or carry the tail (§ 3).
+  Declare `accepted_edges` with the reason only for a source that itself starts or ends mid-word. Never pass it by
+  fading over the word, or by loosening `--speech-db`/`--quiet-db` until it reads ok: those are leads from one job,
+  re-measured against the ear on this project's own takes.
 - An end card spanning less than its file → the finisher plays the card from its first frame and cuts the master at
   `runtime_s`, so the card's tail never plays and nothing else says so: span the whole file, or declare a meant trim on
   the event (`card_trim_note`, printed as INFO). A card starting past 0 always fails — the finisher never seeks a card.
@@ -205,6 +235,7 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
 | `edl_build.py --root --plan --out [--beats] [--stamp-derived] [--allow-stale-derived] [--no-lufs]` | the plan → EDL derivation; rewrites the beats markers; stamps and checks the input hashes of every derived constant (a stale one stops the build) |
 | `beat_sheet.py --root --edl [--beats]` | the script-fidelity gate; exit 1 on FAIL; prints the sheet; the verdict line names the EDL |
 | `edl_check.py --root --edl [--require-endcard] [--cuts] [--fps]` | the structural read: continuity, files, windows, cues, the seek convention, rogue frames — a crossing the event declares in `accepted_cuts` prints INFO; a VO line with no `source` WARNs; an end card starting past 0 or spanning less than its file FAILs (a trim declared in `card_trim_note` prints INFO); the verdict line names the EDL |
+| `edge_audit.py --root --edl [--cuts] [--transcripts <dir>] [--all-native]` · `--deliv <file>` · `--selftest` | no word bitten at a cut: every edge where a take's sound plays (`native_audio_vol` > 0, or `qc.native_programme`) read on a broadband 10 ms envelope against the event's speech level: BITE / TIGHT with the measured gap, CARRIED for a tail placed as an sfx, ACCEPT for `accepted_edges`; `--deliv` reads the delivered file at every join (a join under a VO line, an sfx or a cue is reported, never judged); word times print for orientation only; exit 1 on BITE/TIGHT, 2 on NOT READ (an EDL that never says whose sound plays, a take that carries sound) or an unreadable file |
 | `edl_insert.py --root --edl --after --id --take --in --out [--replace]` | insert or re-time an event, shifting everything downstream |
 | `fit_slots.py --root --slots --assign --edl --out [--slow-limit 0.2] [--fit-dir edit/fit] [--plan]` · `--selftest` | picture follows audio: each voiced slot's clip CUT, SLOWED (≤ 20 % short) or LOOPED to exactly the slot's frames, a slot with no clip or no recorded pick reported MISSING and left empty; fits recorded as derived from their take; writes a new EDL; exit 3 on a missing slot |
 | `av_sync_regress.py [--only offgrid,native,late,gap,vo] [--events 40] [--fps 24] [--grid] [--debug] [--keep <dir>]` | the A/V-sync regression suite for the cut path: off-grid cuts, the take's own audio, a late audio track, missing audio packets and VO placement, through the real finisher; exit 1 on any FAIL |

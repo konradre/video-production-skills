@@ -29,6 +29,8 @@ this file is DERIVED by a builder — a typed number is a defect waiting for the
 | `on_beat` | the cut at `tl[0]` is meant to land on the music's beat — `qc_deliverable.py` reads it against `qc.beat_data` (≤ 3 frames) | a cut declared on the beat and placed by eye |
 | `fit` | written by `fit_slots.py` in a voiced section: `{mode: cut\|slow\|loop\|missing, from, window, factor, why}` — picture follows audio; a `missing` slot keeps `take` null | a slot filled by hand after a MISSING verdict |
 | `accepted_cuts` | take seconds of cuts INSIDE the window that belong to the keeper — a long generation composed them and the operator kept them; `accepted_cuts_note` says why. A designed card's own hard changes — a word line cutting in or out — are declared the same way, in the card file's seconds | cut presence is descriptive, consistency across the cut is the verdict (`video-take-review`); undeclared, `edl_check --cuts` and the delivery QC's leak row fail a keeper the operator chose, and the steps row WARNs on every word line of a worded card (declared, it prints them as INFO; `decoded_checks.py motion --accepted` takes the same seconds) |
+| `accepted_edge_frames` | `{head\|tail: "<why>"}` — a hard change inside the event's first or last 7 frames that the take makes on purpose (a card's reveal, a dissolve the source starts on) | the delivery QC's stray-frame row (`video-finish-qc` `decoded_checks.edge_frames`) prints it as INFO instead of failing it — never a way to keep a neighbouring shot or a black frame at the cut, which moving the in or out removes |
+| `accepted_edges` | `{in\|out: "<why>"}` — an audible edge (the take's sound plays across it) that no cut can make clean: the supplied source itself starts or ends mid-word, or a word runs straight into the next with no gap | `edge_audit.py` prints it as INFO instead of BITE/TIGHT; a declared edge is looked at on a spectrogram first, and a source defect goes to the operator once — never a way to pass a cut that a gap or a carried tail would fix |
 | `montage_of` | `{edl, event}` when the event is a COPY of a delivered spot's event | the window may run past the delivered event; `handle_head` shifts with the new in |
 | `note` | the script line it serves + the operator's words that shaped it | the note is the audit trail; keep the quote |
 
@@ -70,6 +72,12 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
 - `loudnorm.TP_ceiling` (optional) — the platform's true-peak bar for the DELIVERED file when it is not −1 dBTP; the QC
   reads it as its default. `TP` stays the master's limiter ceiling under it: the AAC overshoot on limited peaks measured
   0.4–1.0 dB and grows with how hard the limiter works, so the gap is re-measured after any premix change.
+- `qc.native_programme` (`true` or `false`) — `true`: every footage event plays its take's own sound (a compilation of
+  supplied clips, an interview cut), whatever `native_audio_vol` says: `edge_audit.py` then reads every edge for a bitten
+  word, and the QC's cut-edge row reads every join. Otherwise only events with `native_audio_vol` > 0 are read. An EDL
+  must say whose sound plays — this key (`false` = every take muted) or `native_audio_vol` on its events (`edl_build.py`
+  writes it on every one): with neither, while a take carries an audio stream, the gate, the finisher and the QC row all
+  stop on NOT READ.
 - `qc.max_still_s` (optional, default 0.5) — the longest run of unchanged frames the footage span may hold before
   `qc_deliverable.py` fails it; a designed hold longer than that is declared on its event as `accepted_still: "<why>"`.
 - `poster_at` (optional, timeline seconds) — the frame the platform thumbnail should show: the finisher bakes the frame ON

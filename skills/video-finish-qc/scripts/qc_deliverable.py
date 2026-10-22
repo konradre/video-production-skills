@@ -53,6 +53,11 @@
                frame or the phone field. qc.accepted_flash_rate: [{"from": s, "to": s, "note": "<why>"}] declares a
                deliberate strobe — its flashes are set aside from the whole-frame rows and print as INFO with the reason on
                every run
+  edge frames  (decoded_checks.edge_frames, on the same frames): a change inside the first or last 7 frames of a footage event
+               — the join itself and every declared edge set aside — over 10 levels, 4 × the event's median and 3 × the change
+               beside it (an isolated spike; a pan is a run): a neighbouring shot, a card or a black frame at the cut. A judgement row under qc.native_programme (supplied clips cut by the
+               builder, where it was measured), a WARN line elsewhere; accepted_edge_frames {head|tail: why} on the event
+               declares a meant change (printed, never failed)
   phone band   INFO, with --phone-ref <real phone clips>: the delivered file's phone-texture band (phone_texture_probe.py —
                dead-flat 8×8 share, noise floor, median block sd) against the RANGE over every reference frame; a
                creator-style spot's read, never a failure — the operator judges the phone render beside the clean one
@@ -164,6 +169,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--edl'); ap.add_argument('--deliv')
     ap.add_argument('--placement', default=f'{SK}/spot-audio-assembly/scripts/qc_vo_placement.py'); ap.add_argument('--no-card', action='store_true')
+    ap.add_argument('--edge-audit', default=f'{SK}/video-edit-edl/scripts/edge_audit.py', help='the cut-edge read of the delivered joins (no word bitten)')
     ap.add_argument('--tp-ceiling', type=float, default=None, help='the delivered true-peak bar (the platform ceiling); default = the EDL loudnorm.TP_ceiling, else -1.0 — the EDL TP is the master target under it')
     ap.add_argument('--max-still-s', type=float, default=None, help='the longest still run allowed inside the footage span; default = the EDL qc.max_still_s, else 0.5')
     ap.add_argument('--black-luma', type=float, default=16.0, help='an event whose three sampled frames all read under this mean luma (0–255) fails unless it declares accepted_black')
@@ -277,6 +283,16 @@ def main():
             verdict(ncc >= 0.9, 'end card', f"last frame vs {os.path.basename(card[0]['take'])} NCC {ncc:.3f}")
     r = sh([sys.executable, os.path.expanduser(a.placement), '--root', '.', '--edl', a.edl, '--deliv', D]); out = r.stdout.strip()
     print('      ' + out.replace('\n', '\n      ')[-900:]); verdict(r.returncode == 0 and 'PLACEMENT OK' in out, 'VO placement', 'see the lines above')
+    if os.path.exists(os.path.expanduser(a.edge_audit)):   # every join where a take's own sound plays: no word bitten after the fades, the gain and the limiter
+        r = sh([sys.executable, os.path.expanduser(a.edge_audit), '--root', '.', '--edl', a.edl, '--deliv', D]); out = r.stdout.strip()
+        shown = [l for l in out.splitlines() if not l.startswith('ok ')]
+        print('      ' + '\n      '.join(shown)[-1500:])
+        last = (out.splitlines() or ['no output'])[-1]
+        if (e.get('qc') or {}).get('native_programme') or r.returncode == 0 or 'NOT READ' in last:   # the takes' own speech IS the programme, or the EDL never said whose sound plays: a judgement row
+            verdict(r.returncode == 0, 'cut edges (no word bitten)', last + ('' if r.returncode == 0 else ' — declare qc.native_programme (true or false) or native_audio_vol in the EDL' if 'NOT READ' in last
+                                                                            else ' — the take-edge gate (edge_audit.py on the EDL) names each fix'))
+        else: print(f'WARN cut edges: {last} — earned native beds only: the read is of SOUND, not words; listen at each flagged join, declare a meant cut (a knock on its hit) in accepted_edges')
+    else: print(f'INFO cut edges: not read — {a.edge_audit} not found')
     # ---- the platform contract (INFO): range tag, keyframe spacing, edit lists (look-library GUIDE § 7) ----
     rng = sh(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_range', '-of', 'csv=p=0', D]).stdout.strip()
     kf = [i for i, l in enumerate(sh(['ffprobe', '-v', 'error', '-select_streams', 'v', '-show_entries', 'packet=flags', '-of', 'csv=p=0', D]).stdout.split()) if 'K' in l]
@@ -298,6 +314,13 @@ def main():
         print(f"{'WARN' if po else 'INFO'} pops: " + (dc._fmt(po, efps, 'pops') + ' — read each frame and its neighbours; a designed one goes in qc.accepted_flashes' if po else 'none'))
         print(f"{'WARN' if st else 'INFO'} steps: " + (dc._fmt(st, efps, 'steps') + ' — read each; a worded card declares its word lines in its event\'s accepted_cuts' if st else 'none off the declared edges')
               + f" · on declared edges (INFO): {len(on)} — {sorted({w.split(' ')[0] for x in on for w in edges[x[0]]})}")
+        ef = dc.edge_frames(g, e, efps, edges); bad_ef = [x for x in ef if not x[5]]   # a stray frame INSIDE an event's first/last 7 frames
+        for i, side, k, c, med, why in ef:
+            print(f"      {'accepted' if why else 'STRAY   '} {i} {side} at {k / efps:.2f} s (frame {k}): change {c} vs the event median {med}" + (f' — {why}' if why else ''))
+        det = f"{len(bad_ef)} undeclared at the first/last 7 frames of the footage events, {len(ef) - len(bad_ef)} declared (accepted_edge_frames)" + (
+            ' — read each frame and its neighbours: a neighbouring shot, a card or a black frame at the cut is moved out by the in/out; a change the take makes on purpose is declared' if bad_ef else '')
+        if q.get('native_programme') or not bad_ef: verdict(not bad_ef, 'stray frames at event edges', det)   # supplied footage cut by the builder: a judgement row
+        else: print(f'WARN stray frames at event edges: {det} (a judgement row under qc.native_programme; the 10 / 4 × / 3 × thresholds are leads from one compilation)')
         wins, bad = dc.accepted_flash_windows(q)   # a deliberate strobe: time windows whose flashes the whole-frame rows set aside
         for b in bad: print(f"WARN qc.accepted_flash_rate: {b}")
         it, ffps, (fw, fh) = dc.flash_frames(D, efps)

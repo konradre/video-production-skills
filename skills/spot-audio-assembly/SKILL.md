@@ -119,7 +119,9 @@ operator sent back (an auction spot, 2026-09-15):
 
 - **A dip or a mute is placed by the level envelope, never by a transcript gap.** On fast speech the ASR drops words, so a
   "silent" gap in the transcript can be the speaker at full level; a −18 dB dip placed on one cut the caller's own calling.
-  Read the RMS envelope of the window first; mute only where it shows no speech.
+  Read the RMS envelope of the window first; mute only where it shows no speech. A CUT through recorded speech is placed
+  the same way: a word ends where its broadband sound falls into the gap — sibilants sit above 4 kHz, and ASR word ends
+  run early (one case: 0.19 s) — read by `video-edit-edl` `edge_audit.py`, never by the transcript.
 - **Processed voice enters a build only after the operator's A/B reel.** Light broadband denoise (`afftdn` at about 9 dB)
   is the default and needs no reel; a model separation (DeepFilterNet, demucs) is for a NAMED intrusion — a truck under one
   line — and even then the reel decides: the operator hears "too much messing with his voice" on every model pass a build

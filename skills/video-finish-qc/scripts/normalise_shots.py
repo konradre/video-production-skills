@@ -28,7 +28,8 @@ three points), NO geometric change (phase correlation of the luma = (0, 0) — a
 temporal alignment (the hero's middle frame matches the flat's frame m, not m +- 1, by gradient NCC). Exit 1 on any CHECK.
 Cutting a hero into a plan: the target frame is the one NEAREST the plan's in-time, f_in = round(in x fps) (never ceil: that
 leaves the picture up to a frame ahead of its synced sound), and the seek is that frame's OWN start, floored at the decimals
-the plan keeps: in = floor((f_in - f0) / fps). A seek between frames followed by a builder's fps filter doubles the first
+the plan keeps: in = floor((f_in - f0) / fps) — never rounded at the print: -ss keeps the first frame at or after the printed
+time, and a start printed 0.3 us late skipped its frame (2026-10-22). A seek between frames followed by a builder's fps filter doubles the first
 frame whenever the next frame starts more than half a frame after the seek point — the filter rounds it into output slot 1
 and the muxer copies it into slot 0. Measured on one spot: in-points at x.2 and x.4 of a frame doubled 4 of 22 first frames
 in the APPROVED version itself, and a half-frame seek into the heroes, quantised by their 1/12288 s timebase to an exact
