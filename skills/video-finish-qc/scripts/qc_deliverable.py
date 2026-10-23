@@ -16,8 +16,9 @@
   FORMAT rows  frame = the EDL canvas (1080 on the short side) · H.264 High yuv420p · BT.709 primaries + transfer + MATRIX
                (shipped finals carried an untagged matrix until 2026-09-10) · CFR at the EDL fps (r == avg) · faststart
                (moov before mdat) · AAC 48 kHz stereo
-  black/frozen blackdetect ≥ 0.1 s anywhere but a trailing fade or inside the events that declare accepted_black (INFO —
-               a title, a kinetic-type VO, an end card on black); freezedetect ≥ qc.max_still_s (--max-still-s; 0.5 s by
+  black/frozen blackdetect ≥ 0.1 s anywhere but a trailing fade or inside what an event's accepted_black declares (INFO —
+               "<why>" for the whole event: a title, a kinetic-type VO, an end card on black; {"why": …, "src": [[a, b], …]}
+               or "tl" windows for a source's own dip inside a moving event, so the rest of it stays checked); freezedetect ≥ qc.max_still_s (--max-still-s; 0.5 s by
                default) inside the footage span, the longest run printed — the card holds by design, and a designed hold
                inside the footage is declared on its event as accepted_still: "<why>" (the whole event) or
                {"why": …, "src": [[a, b], …]} in the take's own seconds / "tl": [[a, b], …] on the timeline (only those
@@ -97,7 +98,8 @@ def near_black_events(D, events, thr=16.0):
         t0 = float(x['tl'][0]); t1 = float(x['tl'][1]) if len(x.get('tl', [])) > 1 else t0 + float(x.get('out', 0)) - float(x.get('in', 0))
         if t1 - t0 <= 0: continue
         ls = [mean_luma(D, t0 + (t1 - t0) * f) for f in (0.1, 0.5, 0.9)]; ls = [l for l in ls if l is not None]
-        if ls and max(ls) < thr and not x.get('accepted_black'): bad.append((x.get('id', '?'), [round(l, 1) for l in ls]))
+        whole = x.get('accepted_black') and not isinstance(x.get('accepted_black'), dict)   # a window form never excuses a whole black event
+        if ls and max(ls) < thr and not whole: bad.append((x.get('id', '?'), [round(l, 1) for l in ls]))
     return bad
 
 
@@ -120,10 +122,10 @@ def _covered(a0, a1, wins, tol=0.05):
     return t >= a1
 
 
-def still_windows(x):
-    """The timeline windows an event's accepted_still declares: a string or True = the whole event; a dict = only its "src"
-    windows (the take's own seconds, mapped through the event's in-point) and its "tl" windows (timeline seconds)."""
-    v = x.get('accepted_still'); tl = x.get('tl', [])
+def still_windows(x, key='accepted_still'):
+    """The timeline windows an event's accepted_still (or accepted_black) declares: a string or True = the whole event; a
+    dict = only its "src" windows (the take's own seconds, mapped through the event's in-point) and its "tl" windows."""
+    v = x.get(key); tl = x.get('tl', [])
     if not v or len(tl) < 2: return []
     t0, t1 = float(tl[0]), float(tl[1])
     if not isinstance(v, dict): return [(t0, t1)]
@@ -209,7 +211,11 @@ def selftest():
     ok5 = (w == [(12.0, 14.0)] and still_windows({'tl': [1.0, 2.0], 'accepted_still': 'card'}) == [(1.0, 2.0)]
            and _covered(1.0, 3.0, [(0.5, 2.0), (2.0, 3.5)]) and not _covered(1.0, 3.0, [(0.5, 1.5), (2.5, 3.5)]))
     print(f"SELFTEST {'PASS' if ok5 else 'FAIL'}: accepted_still windows {w} (want [(12.0, 14.0)]) and the black-run coverage of adjacent declared events")
-    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 else 1)
+    wb = still_windows({'tl': [10.0, 20.0], 'in': 100.0, 'accepted_black': {'why': 'dip', 'src': [[103.0, 103.2]]}}, 'accepted_black')
+    ev[1]['accepted_black'] = {'why': 'a window only', 'tl': [[2.0, 2.1]]}; nb6 = [b[0] for b in near_black_events(clip, ev)]
+    ok6 = [(round(x, 6), round(y, 6)) for x, y in wb] == [(13.0, 13.2)] and nb6 == ['b'] and not _covered(12.5, 13.1, wb)
+    print(f"SELFTEST {'PASS' if ok6 else 'FAIL'}: accepted_black windows {wb} (want [(13.0, 13.2)]); a window form still fails a whole black event ({nb6})")
+    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 else 1)
 
 
 def last_frame_thumb(p):
@@ -304,7 +310,7 @@ def main():
     foot_end = float(card[0]['tl'][0]) if card else dur
     bl = sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', 'blackdetect=d=0.1:pic_th=0.98', '-f', 'null', '-']).stderr
     blacks = [(float(s0), float(e0)) for s0, e0 in re.findall(r'black_start:([\d.]+) black_end:([\d.]+)', bl)]
-    bwin = [(float(x['tl'][0]), float(x['tl'][1])) for x in e['events'] if x.get('accepted_black') and len(x.get('tl', [])) >= 2]
+    bwin = [w for x in e['events'] for w in still_windows(x, 'accepted_black')]   # whole events, or only their declared windows
     declared_black = [b for b in blacks if _covered(b[0], b[1], bwin)]   # a title, a kinetic-type VO, a card on black: declared on its event
     bad_black = [b for b in blacks if b[1] < dur - 0.3 and b not in declared_black]   # a trailing fade to black is a choice; a black run anywhere else is a hole
     if declared_black: print(f"INFO black runs inside events that declare accepted_black: {[(round(x, 2), round(y, 2)) for x, y in declared_black]}")
