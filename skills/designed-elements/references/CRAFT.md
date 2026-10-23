@@ -166,6 +166,13 @@ SAFE-AREAS.md).
   aims for about `0.5 s + characters ÷ 13` fully shown (showtime's rate for a caption read without the voice; klik's
   cold-read target `0.3 s × words + 1.5 s` and AbubakrChan's `~0.35 s a word + 0.3 s, never under 1.2 s` sit near it).
   It is a target, not a check: the floor above is what fails a piece.
+- **A card whose rows reveal one at a time** (a data card over footage, a list built up line by line): the title and every
+  row hold their own floor before the next reveal starts, and the LAST row holds its floor **+ 2 s** before the card's exit
+  starts — never less than the project's last-row floor (4.5 s for a data card in a film or a compilation, `video-production`
+  WHAT-VARIES). Once the last row lands the viewer takes in the whole card, and that read is not the row's own: a card whose
+  last row arrived 1.4 s before its exit read as the card leaving mid-thought and was sent back (2026-10-23). Nobody reads a data card aloud, so its rows aim for the no-voice target
+  above. A title, an end card and a one-line card are not progressive and keep the rules above. `scripts/card_read_time.py
+  <plan>` reads it from the plan's own numbers — the reveal times, the reveal and exit lengths — before anything renders.
 - **Small print** (a source line, a legal line, a price condition) holds **≥ 2.5 s at ≥ 50 % opacity**. Put it on
   the scene's FIRST beats, never its last: 40–70 characters on a last beat held 0.97–1.7 s, and eight lines were
   reworked in one film.

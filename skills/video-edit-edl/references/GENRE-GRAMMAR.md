@@ -30,7 +30,8 @@ operator corrects, never a taste of their own.
   layout, never as a layout — "a band with type above and below" seeded a strip at 0.56 scale with decorative fill around
   it; no beat is type-only except the card; a subject's head is checked per shot AND per raster, since the square crop of a
   vertical shot (or the reverse) cuts a head the other raster kept; every on-screen word has a named source — the client's
-  text, a line heard in the footage, or the CTA — and an internal label or a concept name never prints; a hold on one frame
+  text, a line heard in the footage, the CTA, or a fact read on its primary source and cited on the card (a data card:
+  `designed-elements` § 1) — and an internal label or a concept name never prints; a hold on one frame
   is bounded by the EDL's `qc.max_still_s` and read back by `qc_deliverable.py` (a designed hold declares `accepted_still`).
 - **Alternates** are their own EDLs and deliverables; finals are named versions per spot in
   `deliver/final/` with the current card.

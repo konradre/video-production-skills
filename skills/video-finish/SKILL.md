@@ -374,6 +374,21 @@ re-encoding a delivery file puts the grain through compression twice.
 
 **Done when:** an un-watermarked master exists alongside the watermarked deliverable.
 
+## 7b. Another outlet's mark or a burned-in banner in supplied footage
+
+Supplied footage carries other people's graphics — a channel's logo, a lower-third banner burned into the picture.
+Two moves, in this order:
+
+- **Push it out of frame** where the shot allows: a scale-up anchored away from the graphic, one push per shot, never
+  carrying a graphic of ours out with it. A banner across the lower ninth of the frame left it at 1.29× anchored at the
+  top; read the blow-up's softness at 1:1 on the delivered frame before it ships.
+- **Fill it from what sits above it** where the shot does not: a box over the mark, filled with the median of the ~10 rows
+  directly above, fresh grain on EVERY frame (σ ≈ 1.7 code values, blurred 0.8 px) and a 1.5 px feathered edge. A plain
+  inpaint left a grey trapezoid; grain seeded once stays still while the picture around it shimmers.
+- **Check the box on every background the mark crosses.** A box that vanished on a black backdrop left a 1–2 px line over
+  an audience member's shoulder in the next shot of the same clip; widen it until no edge of the mark survives.
+- Read the result in motion on the delivered file, never on one frame.
+
 ## 8. Platform variants and hard size caps
 
 A chat platform, a competition entry or an email attachment imposes a **byte ceiling, not a quality

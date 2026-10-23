@@ -79,7 +79,10 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
   writes it on every one): with neither, while a take carries an audio stream, the gate, the finisher and the QC row all
   stop on NOT READ.
 - `qc.max_still_s` (optional, default 0.5) — the longest run of unchanged frames the footage span may hold before
-  `qc_deliverable.py` fails it; a designed hold longer than that is declared on its event as `accepted_still: "<why>"`.
+  `qc_deliverable.py` fails it; a designed hold longer than that is declared on its event as `accepted_still: "<why>"`
+  (the whole event), or — for a still the SOURCE holds inside a moving event (a book-quote card, an easel shot) — as
+  `accepted_still: {"why": "<why>", "src": [[a, b], …]}` in the take's own seconds (or `"tl"` in timeline seconds), so
+  the rest of the event stays checked. A whole-event declaration hid every other frozen run in that event.
 - `poster_at` (optional, timeline seconds) — the frame the platform thumbnail should show: the finisher bakes the frame ON
   SCREEN at that time into frame 0 of the deliverable (`-ss` alone returns the NEXT frame for a time inside one), and the QC
   reads it back; with no `poster_at` a near-black frame 0 fails the poster row unless `qc.poster: "none"` declares it.

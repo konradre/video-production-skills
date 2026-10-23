@@ -53,6 +53,10 @@ def main():
     t = 0.0; dd = {}
     for x in ev:
         if abs(x['tl'][0] - t) > 1e-3: fail(f"{x['id']}: tl starts {x['tl'][0]} but the previous event ends {t} (gap/overlap)")
+        if 'in' not in x or 'out' not in x:   # a project builder's designed event (a title, a card) may carry dur instead
+            if x.get('dur') is None: fail(f"{x['id']}: no in/out and no dur — its span cannot be checked")
+            elif abs((x['tl'][1] - x['tl'][0]) - float(x['dur'])) > 1e-3: fail(f"{x['id']}: tl span {x['tl'][1] - x['tl'][0]:.3f} != dur {float(x['dur']):.3f}")
+            t = x['tl'][1]; continue
         if abs((x['tl'][1] - x['tl'][0]) - (x['out'] - x['in'])) > 1e-3: fail(f"{x['id']}: tl span {x['tl'][1] - x['tl'][0]:.3f} != out-in {x['out'] - x['in']:.3f}")
         t = x['tl'][1]
         if not x.get('take'): fail(f"{x['id']}: take is null — pick a keeper"); continue

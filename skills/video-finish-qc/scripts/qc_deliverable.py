@@ -16,9 +16,12 @@
   FORMAT rows  frame = the EDL canvas (1080 on the short side) · H.264 High yuv420p · BT.709 primaries + transfer + MATRIX
                (shipped finals carried an untagged matrix until 2026-09-10) · CFR at the EDL fps (r == avg) · faststart
                (moov before mdat) · AAC 48 kHz stereo
-  black/frozen blackdetect ≥ 0.1 s anywhere but a trailing fade; freezedetect ≥ qc.max_still_s (--max-still-s; 0.5 s by
+  black/frozen blackdetect ≥ 0.1 s anywhere but a trailing fade or inside the events that declare accepted_black (INFO —
+               a title, a kinetic-type VO, an end card on black); freezedetect ≥ qc.max_still_s (--max-still-s; 0.5 s by
                default) inside the footage span, the longest run printed — the card holds by design, and a designed hold
-               inside the footage is declared on its event as accepted_still: "<why>" and prints as INFO. Its floor is
+               inside the footage is declared on its event as accepted_still: "<why>" (the whole event) or
+               {"why": …, "src": [[a, b], …]} in the take's own seconds / "tl": [[a, b], …] on the timeline (only those
+               windows — a source's own still shot, while the rest of the event stays checked) and prints as INFO. Its floor is
                printed beside it: freezedetect's −60 dB tolerance is 0.26 code values, and on grain from a decoded σ of
                0.66 a frozen shot never got under it — over the floor the row is BLIND (a WARN line; read held shots by eye).
                The floor is the quietest still frame pair, so it misses two cases: a duplicate frame after the grain reads 0
@@ -36,7 +39,9 @@
                `finish` = every footage event regraded, none moved, none retimed (a finish changes the look and nothing else —
                it caught four aerial shots one frame late, 2026-09-26); `changed:<id,…>` = each named event differs from the
                previous version (a changed crop reached the picture — a builder cache keyed by event id once shipped the stale
-               render and every other row passed)
+               render and every other row passed); an event whose middle frame reads `same` is read again
+               at four frames near its two edges, because a change confined to a hold, a fade or a trim at an edge never
+               reaches the middle (a tail hold over a source dissolve read 'unchanged — a stale cache?')
   contract     INFO: the colour range tag, the keyframe spacing and the edit lists — the platform-contract encode wants `tv`, a
                closed 2 s GOP and no edit lists (look-library GUIDE § 7)
   decoded      (decoded_checks.py) frame 0's median RGB within 2 code values of qc.frame0_bg (a limited-range master read as full
@@ -105,6 +110,44 @@ def luma_at(p, t, W=None, H=None):
 
 
 
+def _covered(a0, a1, wins, tol=0.05):
+    """True when [a0, a1] lies inside the union of the windows (each widened by tol): a run that crosses two adjacent declared
+    events is still declared."""
+    t = a0
+    for w0, w1 in sorted(wins):
+        if w0 - tol <= t <= w1 + tol: t = max(t, w1 + tol)
+        if t >= a1: return True
+    return t >= a1
+
+
+def still_windows(x):
+    """The timeline windows an event's accepted_still declares: a string or True = the whole event; a dict = only its "src"
+    windows (the take's own seconds, mapped through the event's in-point) and its "tl" windows (timeline seconds)."""
+    v = x.get('accepted_still'); tl = x.get('tl', [])
+    if not v or len(tl) < 2: return []
+    t0, t1 = float(tl[0]), float(tl[1])
+    if not isinstance(v, dict): return [(t0, t1)]
+    i0 = float(x.get('in', 0.0))
+    out = [(max(t0, t0 + float(s0) - i0), min(t1, t0 + float(s1) - i0)) for s0, s1 in v.get('src', [])]
+    out += [(max(t0, float(a_)), min(t1, float(b_))) for a_, b_ in v.get('tl', [])]
+    return [(a_, b_) for a_, b_ in out if b_ > a_]
+
+
+def edge_dy(D, P, x, fps):
+    """The largest mean |dY| (0–255) between D and P over two frames in from each edge of the event (1 and 3 after its first
+    frame, 4 and 2 before its last): a change confined to an edge — a tail hold, a fade, a trim — that the middle frame never
+    sees. None when nothing could be read."""
+    k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps); best = None
+    for k in sorted({k0 + 1, k0 + 3, k1 - 4, k1 - 2}):
+        if not k0 <= k < k1: continue
+        a = luma_at(D, (k + 0.5) / fps)
+        if a is None: continue
+        b = luma_at(P, (k + 0.5) / fps, a.shape[1], a.shape[0])
+        if b is None: continue
+        dy = float(np.mean(np.abs(a - b)) * 255); best = dy if best is None else max(best, dy)
+    return best
+
+
 def _shift(x, y):
     F = np.fft.fft2(x - x.mean()) * np.conj(np.fft.fft2(y - y.mean())); F /= np.abs(F) + 1e-9
     c = np.abs(np.fft.ifft2(F)); iy, ix = np.unravel_index(np.argmax(c), c.shape)
@@ -157,7 +200,16 @@ def selftest():
         got[k] = classify(prev_compare(o, base, [{'id': k, 'tl': [0.0, 2.0]}], 24)[0])
     ok3 = all(got[k] == k for k in vfs)
     print(f"SELFTEST {'PASS' if ok3 else 'FAIL'}: vs previous — {got} (each must read as its own name)")
-    sys.exit(0 if ok1 and ok2 and ok3 else 1)
+    tail = os.path.join(d, 'tail.mp4')   # the last 6 frames held: the middle reads same, the edge read must see it
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', base, '-vf', 'trim=end_frame=42,setpts=PTS-STARTPTS,tpad=stop=6:stop_mode=clone', '-pix_fmt', 'yuv420p', '-crf', '12', tail], check=True)
+    ev2 = {'id': 't', 'tl': [0.0, 2.0]}; mid = classify(prev_compare(tail, base, [ev2], 24)[0]); edy = edge_dy(tail, base, ev2, 24)
+    ok4 = mid == 'same' and edy is not None and edy > 1.0
+    print(f"SELFTEST {'PASS' if ok4 else 'FAIL'}: an edge-only change — middle reads {mid}, edge dY {edy if edy is None else round(edy, 1)} (want same and > 1)")
+    w = still_windows({'tl': [10.0, 20.0], 'in': 100.0, 'accepted_still': {'why': 'x', 'src': [[102.0, 104.0]]}})
+    ok5 = (w == [(12.0, 14.0)] and still_windows({'tl': [1.0, 2.0], 'accepted_still': 'card'}) == [(1.0, 2.0)]
+           and _covered(1.0, 3.0, [(0.5, 2.0), (2.0, 3.5)]) and not _covered(1.0, 3.0, [(0.5, 1.5), (2.5, 3.5)]))
+    print(f"SELFTEST {'PASS' if ok5 else 'FAIL'}: accepted_still windows {w} (want [(12.0, 14.0)]) and the black-run coverage of adjacent declared events")
+    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 else 1)
 
 
 def last_frame_thumb(p):
@@ -252,8 +304,11 @@ def main():
     foot_end = float(card[0]['tl'][0]) if card else dur
     bl = sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', 'blackdetect=d=0.1:pic_th=0.98', '-f', 'null', '-']).stderr
     blacks = [(float(s0), float(e0)) for s0, e0 in re.findall(r'black_start:([\d.]+) black_end:([\d.]+)', bl)]
-    bad_black = [b for b in blacks if b[1] < dur - 0.3]   # a trailing fade to black is a choice; a black run anywhere else is a hole
-    verdict(not bad_black, 'black frames', f"{len(blacks)} black run(s) ≥ 0.1 s: {[(round(x, 2), round(y, 2)) for x, y in blacks]}" + (' — trailing fade only' if blacks and not bad_black else ''))
+    bwin = [(float(x['tl'][0]), float(x['tl'][1])) for x in e['events'] if x.get('accepted_black') and len(x.get('tl', [])) >= 2]
+    declared_black = [b for b in blacks if _covered(b[0], b[1], bwin)]   # a title, a kinetic-type VO, a card on black: declared on its event
+    bad_black = [b for b in blacks if b[1] < dur - 0.3 and b not in declared_black]   # a trailing fade to black is a choice; a black run anywhere else is a hole
+    if declared_black: print(f"INFO black runs inside events that declare accepted_black: {[(round(x, 2), round(y, 2)) for x, y in declared_black]}")
+    verdict(not bad_black, 'black frames', f"{len(blacks)} black run(s) ≥ 0.1 s, {len(bad_black)} undeclared: {[(round(x, 2), round(y, 2)) for x, y in bad_black]}" + (' — trailing fade / declared runs only' if blacks and not bad_black else ''))
     mst = a.max_still_s if a.max_still_s is not None else float(e.get('qc', {}).get('max_still_s', 0.5))   # the project's threshold, from the EDL
     fz = sh(['ffmpeg', '-v', 'info', '-nostats', '-i', D, '-vf', f"trim=0:{foot_end:.3f},freezedetect=n=-60dB:d={mst:g}", '-f', 'null', '-']).stderr
     runs = []
@@ -261,8 +316,9 @@ def main():
         if m.group(1) == 'start': runs.append([float(m.group(2)), None])
         elif runs and runs[-1][1] is None: runs[-1][1] = float(m.group(2))
     runs = [(s0, d0 if d0 is not None else max(0.0, foot_end - s0)) for s0, d0 in runs]
-    holds = [(float(x['tl'][0]), float(x['tl'][1]), x['id']) for x in e['events'] if x.get('accepted_still')]
-    declared_runs = [r for r in runs if any(h0 - 0.05 <= r[0] <= h1 for h0, h1, _ in holds)]
+    holds = [(h0, h1, isinstance(x.get('accepted_still'), dict)) for x in e['events'] for h0, h1 in still_windows(x)]
+    # a whole-event hold declares the runs that START inside it; a window declares only the runs it covers
+    declared_runs = [r for r in runs if any((_covered(r[0], r[0] + r[1], [(h0, h1)]) if win else h0 - 0.05 <= r[0] <= h1) for h0, h1, win in holds)]
     frozen = [r for r in runs if r not in declared_runs]; longest = max((d for _, d in runs), default=0.0)
     if declared_runs: print(f"INFO still runs inside declared holds (accepted_still on the event): {[(round(s0, 2), round(d0, 2)) for s0, d0 in declared_runs]}")
     nb = near_black_events(D, e['events'], a.black_luma)
@@ -282,7 +338,9 @@ def main():
             A -= A.mean(); B -= B.mean(); ncc = float((A * B).sum() / (np.sqrt((A * A).sum() * (B * B).sum()) + 1e-9))
             verdict(ncc >= 0.9, 'end card', f"last frame vs {os.path.basename(card[0]['take'])} NCC {ncc:.3f}")
     r = sh([sys.executable, os.path.expanduser(a.placement), '--root', '.', '--edl', a.edl, '--deliv', D]); out = r.stdout.strip()
-    print('      ' + out.replace('\n', '\n      ')[-900:]); verdict(r.returncode == 0 and 'PLACEMENT OK' in out, 'VO placement', 'see the lines above')
+    print('      ' + out.replace('\n', '\n      ')[-900:])
+    if r.returncode == 0 and 'PLACEMENT N/A' in out: print('INFO VO placement: no placed VO lines in the EDL — nothing to place')
+    else: verdict(r.returncode == 0 and 'PLACEMENT OK' in out, 'VO placement', 'see the lines above' if out else (r.stderr or '').strip()[-300:] or 'the placement script printed nothing')
     if os.path.exists(os.path.expanduser(a.edge_audit)):   # every join where a take's own sound plays: no word bitten after the fades, the gain and the limiter
         r = sh([sys.executable, os.path.expanduser(a.edge_audit), '--root', '.', '--edl', a.edl, '--deliv', D]); out = r.stdout.strip()
         shown = [l for l in out.splitlines() if not l.startswith('ok ')]
@@ -336,7 +394,12 @@ def main():
             verdict(not off, 'finish vs previous', f"{len(rows) - len(off)}/{len(rows)} footage events regraded with no move and no retime" + (f"; not: {off}" if off else ''))
         elif a.prev_expect and a.prev_expect.startswith('changed:'):
             want = [i for i in a.prev_expect.split(':', 1)[1].split(',') if i]; same = [i for i in want if cls.get(i, 'missing') in ('same', 'missing', 'unreadable')]
-            verdict(not same, 'changes reached the picture', f"{len(want) - len(same)}/{len(want)} named events differ from the previous version" + (f"; unchanged: {same} — a stale cache?" if same else ''))
+            byid = {x.get('id'): x for x in e['events'] if len(x.get('tl', [])) >= 2}; at_edge = []
+            for i in list(same):   # the middle frame missed it: read the edges (a tail hold, a fade, a trim) — and a designed event, which the middle read skips
+                edy = edge_dy(D, a.prev, byid[i], efps) if i in byid else None
+                if edy is not None and edy > 1.0: same.remove(i); at_edge.append(f"{i} dY {edy:.1f}")
+            if at_edge: print(f"INFO changed at an edge only (the middle frame reads the same): {at_edge}")
+            verdict(not same, 'changes reached the picture', f"{len(want) - len(same)}/{len(want)} named events differ from the previous version" + (f"; unchanged at the middle and at both edges: {same} — a stale cache?" if same else ''))
     # ---- the phone-texture band (INFO, a creator-style spot: a comparison against the project's real phone clips, never a threshold) ----
     if a.phone_ref:
         pr_ = sh([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phone_texture_probe.py'), '--json', D] + a.phone_ref)

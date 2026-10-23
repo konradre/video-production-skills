@@ -12,16 +12,28 @@ take's own audio in 10 ms frames, relative to the event's own speech level (the 
          TIGHT  the 20 ms are above the quiet line (--quiet-db under the p90, or the take's bed + --bed-margin)
     in   BITE   the 30 ms before the edge AND the first 10 ms after it are at speech level: the edge splits a word
          TIGHT  the first 10 ms after the edge are above the quiet line: the word's onset is clipped
+  A second read per edge, and the edge takes the worse of the two:
+    TWO-BAND   the 300-3400 Hz and 3-7.8 kHz bands, each against its own silence line inside the event (its p90 − 24 dB,
+               or its p10 + 6 dB when the take's floor sits higher): an edge whose louder band is over its line is TIGHT,
+               more than --two-band-bite-db (12) over it a BITE. A stop closure inside a word (the 't' of "ex|tent") reads
+               as quiet as a pause on the broadband envelope: one compilation's bitten "extent" sat 1.4 dB under the quiet
+               line there and passed every version, where the two-band read puts it 19 dB over its line (2026-10-23).
+  Each line also prints the DIP — the length of the quiet run that holds the edge. Under --min-gap-ms (60) it is a fast
+  join between words or a closure inside one: a note to listen, never a verdict (on the next compilation it marked three
+  clean fast joins and nothing the two reads had missed).
   Each flagged edge prints the measured fix: where the sounding word ends (or starts), the nearest gaps either side,
   and the take's own picture cuts near it (--cuts). Move the edge into a gap (in/out, or native_audio_from/_to), or
   carry the word's tail as an sfx over the next event (video-edit-edl § 3, carried sound) when the picture must
-  change first.
+  change first. A gap is a run silent on all three reads, at least --min-gap-ms long; with --transcripts, a gap that
+  lies inside a word is marked as such — the quietest spot near an edge can be the closure inside the word itself.
 
   --deliv <file> — the DELIVERED file at every join where a take's sound plays on either side: the 20 ms before the
   join's last 10 ms, and the 10 ms after the join's first 10 ms, against the programme's level (the p90 over ±5 s;
   the 10 ms either side of the join are skipped — a hard cut's last sound rings that far through any band filter). This is what the viewer
   hears after the fades, the gain and the limiter. A join under a VO line, an sfx or a music cue is reported, not
-  judged: that sound is meant to run across it, and the ear decides.
+  judged: that sound is meant to run across it, and the ear decides. A join it flags is settled by the takes read of
+  that edge and a listen — never dismissed as the source's noise: a delivered TIGHT dismissed that way, on every
+  version, was a bitten word heard on playback (2026-10-23).
 
 Whose sound plays: an event with native_audio_vol > 0 (the contract's default is muted). A builder whose takes ARE
 the programme (a compilation of supplied clips, a person to camera) declares qc.native_programme: true in the EDL, or
@@ -73,6 +85,38 @@ def envelope(x, band=(120.0, 7800.0)):
     g = 0.5 - 0.5 * np.cos(np.pi * g)
     y = np.fft.irfft(X * g, len(x)); n = len(y) // HOP
     return 20 * np.log10(np.sqrt((y[:n * HOP].reshape(n, HOP).astype(np.float64) ** 2).mean(1)) + 1e-9)
+
+
+VOICED, SIBIL = (300.0, 3400.0), (3000.0, 7800.0)
+
+
+def entries(v):
+    """audio.vo / .sfx / .music as a list of dicts: the contract keys them by name (a dict); an older plan may list them"""
+    if isinstance(v, dict): return [dict(x, line=k) for k, x in v.items() if isinstance(x, dict)]
+    return [x for x in (v or []) if isinstance(x, dict)]
+
+
+def over_silence(bands, i0, i1):
+    """per 10 ms frame, how far the louder of the bands sits over its own silence line inside [i0, i1) (the event's
+    window): each band relative to its p90 there, its line max(−24 dB, its p10 + 6 dB)"""
+    out = []
+    for env in bands:
+        w = env[i0:i1]
+        if not len(w): return np.full(len(env), -120.0)
+        z = env - float(np.percentile(w, 90)); out.append(z - max(-24.0, float(np.percentile(z[i0:i1], 10)) + 6.0))
+    return np.maximum(*out)
+
+
+def dip_ms(quiet_mask, T, side):
+    """ms of the quiet run holding the frame on the kept side of the edge (before an out, after an in); 0 when that frame
+    is not quiet"""
+    k = int(round(T * 100)) - (1 if side == 'out' else 0)
+    if not 0 <= k < len(quiet_mask) or not quiet_mask[k]: return 0
+    l = k
+    while l > 0 and quiet_mask[l - 1]: l -= 1
+    r = k
+    while r + 1 < len(quiet_mask) and quiet_mask[r + 1]: r += 1
+    return (r - l + 1) * 10
 
 
 def lvl(env, a, b):
@@ -145,7 +189,7 @@ def read_edge(env, T, side, ref, quiet, speech):
 def takes_mode(a, edl):
     allnative = a.all_native or bool((edl.get('qc') or {}).get('native_programme'))
     fps = float(edl.get('fps', 25)); cuts = json.load(open(a.cuts)) if a.cuts else {}
-    sfx = (edl.get('audio') or {}).get('sfx') or []
+    sfx = entries((edl.get('audio') or {}).get('sfx'))
     only = set(filter(None, a.only.split(','))); cache = {}; rows = []
     if not any(plays(x, allnative) for x in edl['events']):
         und = [] if a.all_native else undeclared_sound(edl); a.not_read = und
@@ -162,15 +206,22 @@ def takes_mode(a, edl):
         take = x['take']
         if not os.path.exists(take): print(f"FAIL {x['id']}: take missing {take}"); rows.append({'id': x['id'], 'verdict': 'MISSING'}); continue
         if take not in cache:
-            env = envelope(decode(take), a.band); live = env[env > -100]
-            cache[take] = (env, float(np.percentile(live, 10)) if len(live) else -100.0, words_for(a.transcripts, take))
-        env, bed, words = cache[take]
+            sig = decode(take); env = envelope(sig, a.band); live = env[env > -100]
+            cache[take] = (env, float(np.percentile(live, 10)) if len(live) else -100.0, words_for(a.transcripts, take),
+                           (envelope(sig, VOICED), envelope(sig, SIBIL)))
+        env, bed, words, bands = cache[take]
         T_in = float(x.get('native_audio_from', x['in'])); T_out = float(x.get('native_audio_to', x['out']))
-        w = env[int(round(T_in * 100)):int(round(T_out * 100))]
+        i0, i1 = int(round(T_in * 100)), int(round(T_out * 100)); w = env[i0:i1]
         ref = float(np.percentile(w, 90)) if len(w) else -60.0; quiet = max(ref + a.quiet_db, bed + a.bed_margin)
+        L = over_silence(bands, i0, i1); qm = (env < quiet) & (L < 0)   # silent on all three reads
         for side, T in (('in', T_in), ('out', T_out)):
-            e, pre, v = read_edge(env, T, side, ref, quiet, a.speech_db)
-            r = {'id': x['id'], 'take': take, 'edge': side, 'T': round(T, 3), 'edge_db': round(e - ref, 1), 'verdict': v}
+            e, pre, vb = read_edge(env, T, side, ref, quiet, a.speech_db)
+            d = dip_ms(env < quiet, T, side)
+            tb = lvl(L, T - 0.02, T) if side == 'out' else lvl(L, T, T + 0.01); tpre = lvl(L, T - 0.03, T) if side == 'in' else None
+            vt = ('BITE' if tb > a.two_band_bite_db and (side == 'out' or tpre > a.two_band_bite_db) else 'TIGHT' if tb > 0 else 'ok')
+            v = max((vb, vt), key=['ok', 'TIGHT', 'BITE'].index)
+            r = {'id': x['id'], 'take': take, 'edge': side, 'T': round(T, 3), 'edge_db': round(e - ref, 1), 'verdict': v,
+                 'reads': {'broadband': vb, 'dip_ms': d, 'two_band_db': round(tb, 1), 'two_band': vt}}
             if pre is not None: r['pre_db'] = round(pre - ref, 1)
             acc = (x.get('accepted_edges') or {}).get(side)
             car = side == 'out' and any(os.path.normpath(s.get('file', '')) == os.path.normpath(take) and s.get('src_in') is not None
@@ -178,19 +229,25 @@ def takes_mode(a, edl):
             if v != 'ok' and car: r['verdict'] = 'CARRIED'
             elif v != 'ok' and acc: r['verdict'] = 'ACCEPT'; r['why'] = acc
             if r['verdict'] in ('BITE', 'TIGHT'):
+                C = np.where(qm, -200.0, 0.0); need = max(1, int(round(a.min_gap_ms / 10)))
+                inword = lambda g: next((f" (inside the transcript word '{t}' {s_:.2f}-{e_:.2f} — a closure in the word, or a word time that runs over a pause: listen)" for s_, e_, t in words if s_ < g[0] and g[1] < e_), '')
                 if side == 'out':
-                    after = runs_below(env, quiet, T, T + 3.0); before = runs_below(env, quiet, max(0, T - 3.0), T)
+                    after = runs_below(C, -100, T, T + 3.0, need); before = runs_below(C, -100, max(0, T - 3.0), T, need)
                     r['sound_ends'] = after[0][0] if after else None; r['gap_before'] = before[-1] if before else None
-                    r['fix'] = (f"the sound runs to {r['sound_ends']} s" + (f"; the last gap before the edge is {before[-1][0]:.2f}-{before[-1][1]:.2f} s" if before else '')
+                    r['fix'] = (f"the sound runs to {r['sound_ends']} s" + (f"; the last gap before the edge is {before[-1][0]:.2f}-{before[-1][1]:.2f} s{inword(before[-1])}" if before else '')
+                                + (f"; the next gap after it is {after[0][0]:.2f}-{after[0][1]:.2f} s{inword(after[0])}" if after else '')
                                 + " — move the edge into a gap, or carry the tail as an sfx over the next event")
                 else:
-                    before = runs_below(env, quiet, max(0, T - 3.0), T); after = runs_below(env, quiet, T, T + 3.0)
+                    before = runs_below(C, -100, max(0, T - 3.0), T, need); after = runs_below(C, -100, T, T + 3.0, need)
                     r['sound_starts'] = before[-1][1] if before else None; r['gap_after'] = after[0] if after else None
-                    r['fix'] = (f"the sound starts at {r['sound_starts']} s" + (f"; the next gap after the edge is {after[0][0]:.2f}-{after[0][1]:.2f} s" if after else '')
+                    r['fix'] = (f"the sound starts at {r['sound_starts']} s" + (f"; the next gap after the edge is {after[0][0]:.2f}-{after[0][1]:.2f} s{inword(after[0])}" if after else '')
                                 + " — move the edge into a gap before the word (or after it), or fade over room tone, never over a word")
             near = [c for c in cuts.get(take, []) if abs(c - T) <= 1.5]
             ww = [f"{t}[{s:.2f}-{e_:.2f}]" for s, e_, t in words if s - 0.4 < T < e_ + 0.4]
+            rd = r['reads']; why = ([] if vb == 'ok' else ['broadband']) + ([f"two-band {tb:+.0f} dB"] if vt != 'ok' else [])
             line = (f"{r['verdict']:7s} {x['id']:6s} {side:3s} {T:9.3f}  edge {r['edge_db']:+6.1f} dB" + (f" pre {r['pre_db']:+6.1f}" if 'pre_db' in r else '')
+                    + f"  2-band {rd['two_band_db']:+5.1f}  dip {d:4d} ms" + (f"  [{', '.join(why)}]" if why and r['verdict'] in ('BITE', 'TIGHT') else '')
+                    + ('  (short dip: a fast join or a closure — listen)' if 0 < d < a.min_gap_ms and r['verdict'] == 'ok' else '')
                     + (f"  cuts {near}" if near else '') + (f"  | words (orientation only): {' '.join(ww)}" if ww else ''))
             print(line, flush=True)
             if 'fix' in r: print(f"        fix: {r['fix']}", flush=True)
@@ -202,9 +259,16 @@ def takes_mode(a, edl):
 def deliv_mode(a, edl):
     allnative = a.all_native or bool((edl.get('qc') or {}).get('native_programme'))
     env = envelope(decode(a.deliv), a.band); evs = edl['events']; au = edl.get('audio') or {}
-    spans = [(f"vo {v.get('line', v.get('file', '?'))}", float(v['at']), float(v['at']) + float(v.get('dur', 0))) for v in au.get('vo', []) if isinstance(v, dict) and 'at' in v and v.get('dur')]
-    spans += [(f"sfx {os.path.basename(s.get('file', '?'))}", float(s['at']), float(s['at']) + float(s.get('dur', 0))) for s in au.get('sfx', []) if 'at' in s and s.get('dur')]
-    spans += [(f"music {os.path.basename(str(m.get('file', '?')))}", float(m['tl'][0]), float(m['tl'][1])) for m in au.get('music', []) if m.get('tl')]
+    def dur_of(v):   # a placed line or sfx without a dur: its file's length (the contract keys entries by name and may omit dur)
+        if v.get('dur'): return float(v['dur'])
+        f = v.get('file')
+        if not f or not os.path.exists(f): return 0.0
+        o = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f], capture_output=True, text=True).stdout.strip()
+        try: return float(o)
+        except ValueError: return 0.0
+    spans = [(f"vo {v.get('line', v.get('file', '?'))}", float(v['at']), float(v['at']) + dur_of(v)) for v in entries(au.get('vo')) if 'at' in v and dur_of(v) > 0]
+    spans += [(f"sfx {v.get('line', os.path.basename(v.get('file', '?')))}", float(v['at']), float(v['at']) + dur_of(v)) for v in entries(au.get('sfx')) if 'at' in v and dur_of(v) > 0]
+    spans += [(f"music {v.get('line', os.path.basename(str(v.get('file', '?'))))}", float(v['tl'][0]), float(v['tl'][1])) for v in entries(au.get('music')) if v.get('tl')]
     rows = []
     if not any(plays(x, allnative) for x in evs):
         und = [] if a.all_native else undeclared_sound(edl); a.not_read = und
@@ -257,31 +321,46 @@ def selftest():
         m = (t >= a) & (t < b); x[m] += 0.08 * s[m]
     voiced(0.30, 0.70); sibilant(0.70, 0.80)          # word A ends on its 'st'
     voiced(1.10, 1.50); voiced(1.80, 2.30); voiced(2.60, 3.00)
+    voiced(3.20, 3.40); voiced(3.44, 3.70)           # "ex|tent": a 40 ms stop closure inside one word ...
+
+    def aspiration(a, b, amp):
+        n = rng.standard_normal(len(t)); X = np.fft.rfft(n); f = np.fft.rfftfreq(len(n), 1 / sr)
+        X[(f < 4500) | (f > 7500)] = 0; s = np.fft.irfft(X, len(n)); s /= s.std() + 1e-12
+        m = (t >= a) & (t < b); x[m] += amp * s[m]
+    aspiration(3.40, 3.44, 0.006)                    # ... carrying a faint release under the broadband quiet line
+    voiced(3.80, 3.90); voiced(3.95, 3.99)           # a fast join: 50 ms of true silence between two words
     d = tempfile.mkdtemp(prefix='edge_audit_selftest_'); take = os.path.join(d, 'take.wav'); _wav(take, x, sr)
     ev = lambda i, a_, b_, **k: dict({'id': i, 'take': take, 'in': a_, 'out': b_, 'native_audio_vol': 1.0}, **k)
     edl = {'fps': 25, 'events': [
         ev('S_TAIL', 0.30, 0.76), ev('GAP', 0.30, 0.95), ev('MIDWORD', 0.95, 1.30), ev('IN_MID', 1.30, 1.65),
         ev('IN_ONSET', 1.10, 1.65), ev('IN_GAP', 1.65, 2.45), ev('ACC', 0.95, 1.30, accepted_edges={'out': 'test'}),
-        ev('CARRY', 1.65, 2.05), dict(ev('MUTED', 0.95, 1.30), native_audio_vol=0)],
-        'audio': {'sfx': [{'file': take, 'at': 9.0, 'dur': 0.3, 'src_in': 2.05}]}}
+        ev('CARRY', 1.65, 2.05), dict(ev('MUTED', 0.95, 1.30), native_audio_vol=0), ev('CLOSURE', 3.10, 3.43), ev('FASTJOIN', 3.10, 3.93)],
+        'audio': {'sfx': {'tail': {'file': take, 'at': 9.0, 'dur': 0.3, 'src_in': 2.05}}}}
     want = {('S_TAIL', 'out'): {'BITE', 'TIGHT'}, ('GAP', 'out'): {'ok'}, ('MIDWORD', 'out'): {'BITE'}, ('IN_MID', 'in'): {'BITE'},
-            ('IN_ONSET', 'in'): {'TIGHT'}, ('IN_GAP', 'in'): {'ok'}, ('ACC', 'out'): {'ACCEPT'}, ('CARRY', 'out'): {'CARRIED'}}
-    ns = argparse.Namespace(all_native=False, cuts='', only='', transcripts='', band=(120.0, 7800.0), speech_db=-15.0, quiet_db=-22.0, bed_margin=6.0)
+            ('IN_ONSET', 'in'): {'TIGHT'}, ('IN_GAP', 'in'): {'ok'}, ('ACC', 'out'): {'ACCEPT'}, ('CARRY', 'out'): {'CARRIED'},
+            ('CLOSURE', 'out'): {'TIGHT', 'BITE'}, ('FASTJOIN', 'out'): {'ok'}}
+    ns = argparse.Namespace(all_native=False, cuts='', only='', transcripts='', band=(120.0, 7800.0), speech_db=-15.0, quiet_db=-22.0, bed_margin=6.0,
+                            min_gap_ms=60.0, two_band_bite_db=12.0)
     print('-- takes mode'); rows = takes_mode(ns, edl); got = {(r['id'], r['edge']): r['verdict'] for r in rows if 'edge' in r}
     bad = [f"{k}: {got.get(k)} (want {sorted(v)})" for k, v in want.items() if got.get(k) not in v]
     if any(r['id'] == 'MUTED' for r in rows): bad.append('MUTED: a muted take was read')
     ns_band = argparse.Namespace(**{**vars(ns), 'band': (200.0, 4000.0)})
     print('-- the same tail in a 200-4000 Hz band (must miss it: the reason the default band is wide)')
     rb = takes_mode(ns_band, {'fps': 25, 'events': [ev('S_TAIL', 0.30, 0.76)]})
-    if [r['verdict'] for r in rb if r['edge'] == 'out'] != ['ok']: bad.append('the speech band read the sibilant tail — the band known answer moved')
+    if [r['reads']['broadband'] for r in rb if r['edge'] == 'out'] != ['ok']: bad.append('the speech band read the sibilant tail — the band known answer moved')
+    if [r['verdict'] for r in rb if r['edge'] == 'out'] == ['ok']: bad.append('the two-band read missed the sibilant tail the narrow broadband band misses')
+    cl = next((r for r in rows if r['id'] == 'CLOSURE' and r['edge'] == 'out'), None)
+    if not cl or cl['reads']['broadband'] != 'ok': bad.append(f"the closure known answer moved: the level read should pass it alone ({cl and cl['reads']})")
     # the delivered file: e0 cut mid-word B (a bitten join), e1 opens and closes in gaps, e2 opens in a gap
     seg = lambda a_, b_: x[int(a_ * sr):int(b_ * sr)]
     dl = np.concatenate([seg(0.30, 1.30), seg(1.65, 2.45), seg(2.55, 3.20)]); deliv = os.path.join(d, 'deliv.wav'); _wav(deliv, dl, sr)
-    dedl = {'fps': 25, 'events': [ev('D0', 0.30, 1.30, tl=[0.0, 1.0]), ev('D1', 1.65, 2.45, tl=[1.0, 1.8]), ev('D2', 2.55, 3.20, tl=[1.8, 2.45])]}
+    dedl = {'fps': 25, 'events': [ev('D0', 0.30, 1.30, tl=[0.0, 1.0]), ev('D1', 1.65, 2.45, tl=[1.0, 1.8]), ev('D2', 2.55, 3.20, tl=[1.8, 2.45])],
+            'audio': {'vo': {'L1': {'file': take, 'at': 1.70, 'dur': 0.2}}}}   # the contract's dict: the D1|D2 join sits under L1
     print('-- deliv mode'); rd = deliv_mode(argparse.Namespace(**{**vars(ns), 'deliv': deliv}), dedl)
     dv = {(r['id'], r['edge']): r['verdict'] for r in rd if 'edge' in r}
-    for k, v in {('D0', 'out'): 'BITE', ('D1', 'in'): 'ok', ('D1', 'out'): 'ok', ('D2', 'in'): 'ok'}.items():
+    for k, v in {('D0', 'out'): 'BITE', ('D1', 'in'): 'ok'}.items():
         if dv.get(k) != v: bad.append(f"deliv {k}: {dv.get(k)} (want {v})")
+    if not any(r.get('verdict') == 'COVERED' and abs(r['J'] - 1.8) < 1e-6 for r in rd): bad.append('deliv: the join under the VO line (the contract keys vo by name) was not reported COVERED')
     # 0 read: undeclared + a take with sound = NOT READ; declared muted = an honest 0; a take with no audio stream = an honest 0
     sil = os.path.join(d, 'silent.mp4')
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=32x32:r=25:d=1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', sil], check=True)
@@ -314,6 +393,8 @@ def main():
     ap.add_argument('--speech-db', type=float, default=-15.0, help='within this of the p90 = speech level (lead from one job)')
     ap.add_argument('--quiet-db', type=float, default=-22.0, help='under this re the p90 = quiet (lead from one job)')
     ap.add_argument('--bed-margin', type=float, default=6.0, help="or the take's own bed (p10) + this, whichever is higher")
+    ap.add_argument('--min-gap-ms', type=float, default=60.0, help='the shortest quiet run a suggested gap may be; an edge in a shorter one prints a listen note (a fast join, or a stop closure inside a word, ~40 ms)')
+    ap.add_argument('--two-band-bite-db', type=float, default=12.0, help='the two-band read: over its silence line = TIGHT, more than this over = BITE (lead from one job)')
     ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
     if a.selftest: sys.exit(selftest())

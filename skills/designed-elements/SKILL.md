@@ -32,13 +32,20 @@ Anything that must be exact is designed, never generated: packaging and product 
 "WARNIGY"), the wordmark and the card, the product's pieces as sprites, a display with names, a wall or
 a drift that must straddle a cut at a known frame. Anything that must be alive is generated. The two
 meet only where the operator has accepted a composite on a plate — **never a 2D overlay on generated
-motion**. Every on-screen WORD has a named source — the client's text, a line heard in the footage, or the CTA — and an
-internal label, a placeholder or a concept name never prints in a frame (a shipped frame once read the concept's working
-title, 2026-09-15).
+motion**. Every on-screen WORD has a named source — the client's text, a line heard in the footage, the CTA, or a fact
+read on the page that publishes it and cited on the card — and an internal label, a placeholder or a concept name never
+prints in a frame (a shipped frame once read the concept's working title, 2026-09-15). A **data card** carries a sourced
+fact that supports or tests the point being made — a figure, a ruling, a finding — never a restatement of the line heard
+under it: a card that repeats the speaker is a caption with a border, and a full set of them was rejected
+(2026-10-23). Every figure is read on its primary source (the agency's table, the statute, the paper, the court order)
+before it renders, and the card's source line names that source; a search answer is a lead, never a source — on one job a
+search answer gave a year's total 40 % over the agency's own table, caught on the table before render
+(2026-10-23).
 
 **Done when:** every element in the shot list is labelled designed or generated, and each designed one
 names its kit entry (card · turntable · wall · drift · burst · title) and its length — and, where no voice sets the
-length, the holds of every line it sets plus their reveals and exits fit that length ([`references/CRAFT.md`](references/CRAFT.md) § Readable time).
+length, the holds of every line it sets plus their reveals and exits fit that length ([`references/CRAFT.md`](references/CRAFT.md) § Readable time) — and a
+card whose rows reveal one at a time passes `card_read_time.py` on the plan before it renders.
 
 ## 2. Build from the kit, customised per SKU
 
@@ -188,6 +195,7 @@ and the delivered frame re-read.
 | `det_check.py source <composition>` · `frames <A> <B> [--project]` · `prove <composition> [--host --workers 1,3 --no-push]` | the determinism proof: the script read for clock/random readers, a bare 2D canvas and a `from()` frozen by a `repeat: -1` (WARN), the CSS read (a transition FAILs; `will-change: transform` WARNs), an opacity, `autoAlpha` or filter on a `preserve-3d` element — by its CSS rule, an inline style, a class co-written with a 3D class, or a variable or array holding it (WARN), the PNG colour-chunk read (WARN), exit 2 without an `index.html`; two renders at different worker splits compared frame by frame on the host, each difference located in the frame and sized as stored and as composited, every listed frame named by its file, a ONE-ROW block giving every differing frame with each row's x range when each separate difference is one pixel row high, and a NOISE band for Chromium's antialiasing (the proof frames stay there, under `<remote-dir>/.det/`); refuses a project whose `frames/` holds PNGs; `--selftest` |
 | `asset_edge_repaint.py --src --dst --above --below --job …` | repaints a notch/speck at a fitted two-colour edge; 8× review crops |
 | `sprite_burst.py --root --in --out --bang --muzzle --dir --sheet` | the exact-silhouette burst composited on a hero, legibility floor |
+| `card_read_time.py <plan.json> [--reveal-s 0.4] [--exit-s 0.4] [--take-in 2.0] [--last-min 4.5]` · `--selftest` | the readable time of every card whose rows reveal one at a time, read from the plan's numbers (any object carrying `rows` + `reveal`, its `from`/`to` on it or its parent): the title and each row hold their floor before the next reveal, the LAST row its floor + the take-in and the project's last-row floor before the exit, the source line ≥ 2.5 s; the no-voice target printed as WARN; exit 1 on a FAIL, 2 when the plan holds no card |
 | `literal_audit.py <composition> --approved <copy> [--approved <script>] [--strict]` | every string the composition can put on screen, read from its SOURCE, against the approved copy (repeat `--approved` for each approved file); `--selftest` |
 | `slide_structure_audit.py <composition> [--lead 0.6] [--json]` | the four structures that read as a slide deck, read from the SOURCE: scenes switched by opacity with no world move · a three-size text stack in one container · scale as the only geometric animation · one property set at every cut. Exit 1 on a flag, **2 when it cannot segment the scenes**; `--selftest` |
 

@@ -123,6 +123,11 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
 
 - **1080p masters only**; H.264 High 4:2:0, CFR at the EDL's fps, AAC 48 kHz 192k, faststart; the campaign's TP target sits
   ≈ 1 dB under the platform ceiling because AAC overshoots (`spot-audio-assembly` § mix).
+- **A delivered true peak well over the master's is the ENCODER, not the mix.** ffmpeg's native AAC (the default twoloop
+  coder) at 192k once wrote a ~30 ms +5 dB burst at a hard transient right after a join: the master read −5 dB there and
+  −1.8 dBTP overall, the delivery 0.0 dBTP, from the 24-bit master in any container. Locate the peak on the delivered file,
+  read the master at the same time, and only when the master does not carry it change the encode — 256k read −1.62 dBTP,
+  `-aac_coder fast` at 192k −1.70 — then re-measure the whole file. Never answer it with the limiter (2026-10-22).
 - **Chat send only ≤ 30 MiB** (uploads over ~20 MiB time out); otherwise the full path in the ask; a
   section excerpt as a small clip is fine.
 - **Never re-encode a deliverable** to make a variant; every variant comes from the graded mezzanine;

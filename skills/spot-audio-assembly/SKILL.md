@@ -159,7 +159,8 @@ python3 ~/.claude/skills/spot-audio-assembly/scripts/build_captions.py --root <p
 - Word times: local whisper is free; Scribe is billed per minute (cost line). **`--only` when one take
   is swapped** — a full re-run clobbers hand patches on the other lines; a swapped file on a lip-synced
   line also re-measures its `at` (`video-edit-edl`). **Transcribe the WHOLE source, then window** — a short
-  excerpt transcribed alone lost the agreement between two model sizes that the full source restored.
+  excerpt transcribed alone lost the agreement between two model sizes that the full source restored. A model that merges a
+  stutter into one long word is no proof the line is clean: the envelope decides (`video-take-review` INSTRUMENTS.md).
   **Fast speech — chant, rap, an auctioneer, an overlapping crowd — is beyond ASR onsets**: seven runs (three
   models, three windows, 0.8× speed, a band-limited envelope) put one word's onset anywhere in a 0.74 s
   spread. A cue that must sit ON such a word takes its time from the operator (tapping along, or a tolerance

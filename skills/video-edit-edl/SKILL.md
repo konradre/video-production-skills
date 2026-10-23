@@ -88,11 +88,18 @@ its inputs' hashes, and the build fails when an input changed (`EDL-CONTRACT.md`
 
 **No cut bites a word.** Where a take's own sound plays, every edge is placed from that SOUND, never from word times:
 ASR word ends run early (one measured case: 0.19 s, the word's "-st" still sounding through the cut) and a speech-band
-filter misses the sibilant tail. `scripts/edge_audit.py` reads each audible edge on a broadband envelope against the
-event's own speech level and names the fix. Either the edge moves into a measured gap (`in`/`out`, or
+filter misses the sibilant tail. `scripts/edge_audit.py` reads each audible edge two ways and keeps the worse: the
+broadband envelope against the event's own speech level, and two bands (300–3400 Hz and 3–7.8 kHz) each against its own
+silence line. The closure of a stop consonant INSIDE a word is as quiet as a pause on the broadband read: one
+compilation's bitten "ex|tent" sat in a 40 ms 't' closure 1.4 dB under the quiet line and passed every version, where the
+two-band read puts it 19 dB over its line (2026-10-23). Each line also prints the quiet run that holds the edge; under
+60 ms it is a fast join or a closure — a cue to listen, not a verdict. It names the fix, and with `--transcripts` it
+marks a suggested gap that lies inside a transcript word. Either the edge moves into a measured gap (`in`/`out`, or
 `native_audio_from`/`_to` where the picture must stay), or, when the picture has to change before the word ends, the
 tail is carried over the next shot (§ 3). A fade never sits over a word. A supplied source that itself starts or ends
-mid-word cannot be cut clean: declare it (`accepted_edges`) and tell the operator once. A builder whose takes ARE the
+mid-word cannot be cut clean: declare it (`accepted_edges`) and tell the operator once; so is an edge the operator heard
+and kept (the only gap there, a crosstalk the clip carries), with the ruling as the reason. A flag the delivered-file
+cross-check raises is settled by this take read and a listen, never put down to the source's noise. A builder whose takes ARE the
 programme (a compilation of supplied clips, each playing its own sound) declares `qc.native_programme: true`;
 without it the audit finds no audible edge and says so.
 
@@ -219,7 +226,8 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
   true` when the takes ARE the programme, `false` when every take is muted, or `native_audio_vol` per event — and re-run;
   never pass `--no-gate` to get past it.
 - `EDGE-AUDIT FAIL` → a word is cut at an edge. Move the edge into the gap the audit measured, or carry the tail (§ 3).
-  Declare `accepted_edges` with the reason only for a source that itself starts or ends mid-word. Never pass it by
+  Declare `accepted_edges` with the reason only for a source that itself starts or ends mid-word, or for an edge the
+  operator heard and kept (the ruling is the reason). Never pass it by
   fading over the word, or by loosening `--speech-db`/`--quiet-db` until it reads ok: those are leads from one job,
   re-measured against the ear on this project's own takes.
 - An end card spanning less than its file → the finisher plays the card from its first frame and cuts the master at
@@ -235,7 +243,7 @@ through the gate with its sentinel, and "lock these in" placements are unchanged
 | `edl_build.py --root --plan --out [--beats] [--stamp-derived] [--allow-stale-derived] [--no-lufs]` | the plan → EDL derivation; rewrites the beats markers; stamps and checks the input hashes of every derived constant (a stale one stops the build) |
 | `beat_sheet.py --root --edl [--beats]` | the script-fidelity gate; exit 1 on FAIL; prints the sheet; the verdict line names the EDL |
 | `edl_check.py --root --edl [--require-endcard] [--cuts] [--fps]` | the structural read: continuity, files, windows, cues, the seek convention, rogue frames — a crossing the event declares in `accepted_cuts` prints INFO; a VO line with no `source` WARNs; an end card starting past 0 or spanning less than its file FAILs (a trim declared in `card_trim_note` prints INFO); the verdict line names the EDL |
-| `edge_audit.py --root --edl [--cuts] [--transcripts <dir>] [--all-native]` · `--deliv <file>` · `--selftest` | no word bitten at a cut: every edge where a take's sound plays (`native_audio_vol` > 0, or `qc.native_programme`) read on a broadband 10 ms envelope against the event's speech level: BITE / TIGHT with the measured gap, CARRIED for a tail placed as an sfx, ACCEPT for `accepted_edges`; `--deliv` reads the delivered file at every join (a join under a VO line, an sfx or a cue is reported, never judged); word times print for orientation only; exit 1 on BITE/TIGHT, 2 on NOT READ (an EDL that never says whose sound plays, a take that carries sound) or an unreadable file |
+| `edge_audit.py --root --edl [--cuts] [--transcripts <dir>] [--all-native]` · `--deliv <file>` · `--selftest` | no word bitten at a cut: every edge where a take's sound plays (`native_audio_vol` > 0, or `qc.native_programme`) read two ways, the worse kept — a broadband 10 ms envelope against the event's speech level, and two bands against their own silence lines (`--two-band-bite-db` 12) — with the quiet run holding the edge printed (under `--min-gap-ms` 60: listen): BITE / TIGHT with the measured gap (marked when it lies inside a transcript word), CARRIED for a tail placed as an sfx, ACCEPT for `accepted_edges`; `--deliv` reads the delivered file at every join (a join under a VO line, an sfx or a cue is reported, never judged); word times print for orientation only; exit 1 on BITE/TIGHT, 2 on NOT READ (an EDL that never says whose sound plays, a take that carries sound) or an unreadable file |
 | `edl_insert.py --root --edl --after --id --take --in --out [--replace]` | insert or re-time an event, shifting everything downstream |
 | `fit_slots.py --root --slots --assign --edl --out [--slow-limit 0.2] [--fit-dir edit/fit] [--plan]` · `--selftest` | picture follows audio: each voiced slot's clip CUT, SLOWED (≤ 20 % short) or LOOPED to exactly the slot's frames, a slot with no clip or no recorded pick reported MISSING and left empty; fits recorded as derived from their take; writes a new EDL; exit 3 on a missing slot |
 | `av_sync_regress.py [--only offgrid,native,late,gap,vo] [--events 40] [--fps 24] [--grid] [--debug] [--keep <dir>]` | the A/V-sync regression suite for the cut path: off-grid cuts, the take's own audio, a late audio track, missing audio packets and VO placement, through the real finisher; exit 1 on any FAIL |

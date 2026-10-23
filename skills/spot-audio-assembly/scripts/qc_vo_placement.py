@@ -7,6 +7,9 @@ measurement). Self-test first: the first take against ITSELF must land at 0 ms w
 broken and no other number is printed.
 
   qc_vo_placement.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--lines L1,L2] [--tol-ms 15]
+
+An EDL with no placed VO lines (no audio.vo, or none carrying a file — a compilation whose voice-overs are picture events
+with their own sound) prints PLACEMENT N/A and exits 0: there is nothing to place, which is not a failure.
 """
 import argparse, json, os, subprocess, sys
 import numpy as np
@@ -38,8 +41,11 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--edl', required=True); ap.add_argument('--deliv', required=True); ap.add_argument('--lines', default=''); ap.add_argument('--tol-ms', type=float, default=15)
     a = ap.parse_args(); os.chdir(a.root)
-    vo = json.load(open(a.edl, encoding='utf-8'))['audio']['vo']
+    vo = (json.load(open(a.edl, encoding='utf-8')).get('audio') or {}).get('vo') or {}
     lines = [x for x in a.lines.split(',') if x] or sorted(k for k in vo if isinstance(vo[k], dict) and 'file' in vo[k])
+    if not lines: print('PLACEMENT N/A — no placed VO lines in the EDL (audio.vo is absent or carries no file)'); sys.exit(0)
+    miss = [L for L in lines if not (isinstance(vo.get(L), dict) and vo[L].get('file'))]
+    if miss: sys.exit(f'PLACEMENT ERROR — --lines names {miss}, which audio.vo does not carry with a file')
     # self-test: the first take inside a padded copy of itself
     t0 = pcm(vo[lines[0]]['file']); e0 = envelope(t0); pad = np.zeros(int(1.0 * SR), np.float32); k, r = ncc_lag(envelope(np.concatenate([pad, t0, pad])), e0)
     if abs(k * HOP - 1.0) > 0.011 or r < 0.99: sys.exit(f'SELF-TEST FAILED: a take matched itself at {k * HOP - 1.0:+.3f} s / NCC {r:.3f} — the instrument is broken; no numbers printed')
