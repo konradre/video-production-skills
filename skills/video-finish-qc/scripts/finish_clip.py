@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """finish_clip.py — a single-clip finish (a standalone asset, an alternate, a section excerpt — NOT the spot): a pre-graded
 hero clip (carries head handles) + the take's own native audio → a 1080×1920 H.264 deliverable, mirroring the spot's deliver
-stage: lanczos downscale, libx264 slow CRF 17 tune film, AAC 192k, faststart, and the spot's loudness method — ONE measured
+stage: lanczos downscale, libx264 slow CRF 17 tune film, AAC 256k, faststart, and the spot's loudness method — ONE measured
 static gain to --I, then peak limiting at --TP oversampled (aresample 192k → alimiter → 48k → alimiter, latency compensated).
 Until 2026-09-29 this was a two-pass loudnorm, whose linear=true falls back to DYNAMIC on peaky audio: lowering its TP target
 RAISED a peaky take's delivered peak (-0.9 → -0.6 dBTP), so no TP setting could hold the ceiling. --LRA is accepted and unused.
@@ -79,7 +79,7 @@ def main():
              '-map', '0:v:0', '-map', '1:a:0', '-dn', '-vf', f'scale={W}:{H}:flags=lanczos,{to709(a.hero)}format=yuv420p', '-af', af, '-ar', '48000', '-shortest',
              '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-level', '4.1', '-g', '48',
              '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',   # true by construction: to709() converted any non-BT.709 hero first
-             '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-write_tmcd', '0', DELIV])   # -dn / -write_tmcd 0: the mov's timecode track would be re-muxed as a data track
+             '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-write_tmcd', '0', DELIV])   # -dn / -write_tmcd 0: the mov's timecode track would be re-muxed as a data track
         p = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_name,width,height,pix_fmt,r_frame_rate,sample_rate', '-show_entries', 'format=duration,size', '-of', 'default=nw=1', DELIV], capture_output=True, text=True).stdout
         e = subprocess.run(['ffmpeg', '-v', 'info', '-i', DELIV, '-af', 'ebur128=peak=true', '-f', 'null', '-'], capture_output=True, text=True).stderr
         il = re.findall(r'I:\s+(-?[\d.]+) LUFS', e); tp_ = re.findall(r'Peak:\s+(-?[\d.]+) dBFS', e)

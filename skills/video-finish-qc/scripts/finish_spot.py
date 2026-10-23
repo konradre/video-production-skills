@@ -7,7 +7,7 @@ the EDL has one) → mix → downscale → encode. Three stages, each re-runnabl
                                                       loudness processing — the master is a mix, the level is set once, at deliver
   deliver  deliver/<deliver_base><tag|-v1>.mp4        measure → ONE static gain to the EDL's I → aresample 192 kHz → alimiter at TP →
                                                       aresample 48k → alimiter again (the limiting the target costs is printed);
-                                                      captions overlaid AFTER the downscale; H.264 High CRF 17 slow, AAC 192k,
+                                                      captions overlaid AFTER the downscale; H.264 High CRF 17 slow, AAC 256k,
                                                       faststart, the length capped at runtime_s
 The script-fidelity gate (beat_sheet.py) runs BEFORE stage 1 when the beats file exists: a FAIL = no finish. So does the
 cut-edge gate (video-edit-edl edge_audit.py) wherever a take's own sound plays: a word bitten at an edge = no finish. A spot with no
@@ -254,7 +254,7 @@ def main():
         lim = f"alimiter=limit={10 ** (ln['TP'] / 20):.4f}:attack=5:release=60:level=false:latency=1"   # latency=1: the lookahead is compensated — two limiters left the audio 10 ms late (av_sync_regress.py, 2026-09-29)
         af = f"volume={g:.3f}dB,aresample=192000,{lim},aresample=48000,{lim}"   # limit at 192 kHz, where inter-sample peaks are visible; 48 kHz; limit again
         # Measured on a real master (TP target -2.4, AAC 192k): limiter after the resample only -> -1.0 dBTP; before only -> -2.0; both -> -2.1; none -> -1.9.
-        run(['ffmpeg', '-v', 'error', '-y', '-i', MASTER] + cin + ['-filter_complex', chain, '-map', f'[{last}]', '-map', '0:a', '-af', af, '-ar', '48000', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-level', '4.1', '-g', str(2 * FPS), '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', '-t', f'{RUN}', DELIV])   # -t: the picture is authoritative — without it AAC priming + padding set the container duration
+        run(['ffmpeg', '-v', 'error', '-y', '-i', MASTER] + cin + ['-filter_complex', chain, '-map', f'[{last}]', '-map', '0:a', '-af', af, '-ar', '48000', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-level', '4.1', '-g', str(2 * FPS), '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-t', f'{RUN}', DELIV])   # -t: the picture is authoritative — without it AAC priming + padding set the container duration
         print(probe(DELIV)); print(os.path.getsize(DELIV) / 1e6, 'MB', DELIV)
     print('FINISH-END stage', a.stage)
 

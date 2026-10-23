@@ -12,7 +12,7 @@ This file is the same order run over a whole spot from its EDL, with the campaig
 | hero pass, per clip | the flat or the upscaled mezzanine | `edit/hero/<stem>__<look>.mov` DNxHR HQX / ProRes 422 HQ 10-bit 4:2:2, pre-graded | `hero_pass.sh` (Resolve + Dehancer, `--transport auto`), then `normalise_shots.py verify` |
 | cut | the EDL: heroes (`src`, look `none`), upscaled mezzanines (a cube), designed renders | `edit/mezz/<SPOT>-footage-graded<tag>.mov` ProRes 422 HQ at the mezzanine raster, footage only | `finish_spot.py --stage cut` |
 | master | + post layers, the card when the spot has one, the VO stem (rebuilt), sfx, cues, native beds — a static sum, no loudness processing | `edit/mezz/<SPOT>-master-<W>x<H><tag>.mov` ProRes 422 HQ + PCM 24-bit | `finish_spot.py --stage master` |
-| deliver | the master | `deliver/<deliver_base><tag>.mp4` at the EDL's `canvas` (1080×1920 for a vertical spot) H.264 High CRF 17, AAC 192k; one measured static gain, a limiter at 192 kHz and again at 48 kHz; captions overlaid after the downscale; the length capped at the runtime | `finish_spot.py --stage deliver` |
+| deliver | the master | `deliver/<deliver_base><tag>.mp4` at the EDL's `canvas` (1080×1920 for a vertical spot) H.264 High CRF 17, AAC 256k; one measured static gain, a limiter at 192 kHz and again at 48 kHz; captions overlaid after the downscale; the length capped at the runtime | `finish_spot.py --stage deliver` |
 | finals | every approved spot's `-final` EDL | `deliver/final/<deliver_base>-final.mp4` after QC | `final_renders.sh` |
 
 Every intermediate is 10-bit 4:2:2 or better; 4:2:0 and 8 bits appear only in the deliverable. Probe
@@ -121,13 +121,15 @@ a crop. A plan step is a hypothesis about a file you have not read yet.
 
 ## The deliverable contract
 
-- **1080p masters only**; H.264 High 4:2:0, CFR at the EDL's fps, AAC 48 kHz 192k, faststart; the campaign's TP target sits
+- **1080p masters only**; H.264 High 4:2:0, CFR at the EDL's fps, AAC 48 kHz 256k, faststart; the campaign's TP target sits
   ≈ 1 dB under the platform ceiling because AAC overshoots (`spot-audio-assembly` § mix).
 - **A delivered true peak well over the master's is the ENCODER, not the mix.** ffmpeg's native AAC (the default twoloop
   coder) at 192k once wrote a ~30 ms +5 dB burst at a hard transient right after a join: the master read −5 dB there and
   −1.8 dBTP overall, the delivery 0.0 dBTP, from the 24-bit master in any container. Locate the peak on the delivered file,
   read the master at the same time, and only when the master does not carry it change the encode — 256k read −1.62 dBTP,
-  `-aac_coder fast` at 192k −1.70 — then re-measure the whole file. Never answer it with the limiter (2026-10-22).
+  `-aac_coder fast` at 192k −1.70 — then re-measure the whole file. Never answer it with the limiter (2026-10-22). The
+  finishers deliver at 256k since 2026-10-23 for that reason; the burst is the coder's, so a higher rate makes it rarer, not
+  impossible, and the true-peak row stays the check.
 - **Chat send only ≤ 30 MiB** (uploads over ~20 MiB time out); otherwise the full path in the ask; a
   section excerpt as a small clip is fine.
 - **Never re-encode a deliverable** to make a variant; every variant comes from the graded mezzanine;
