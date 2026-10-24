@@ -34,7 +34,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Preflight: lib/dsp/fft.js imports the npm package `fft.js`, so a skill that has
 // never had `npm install` run dies on the dynamic DSP import below with
 // ERR_MODULE_NOT_FOUND naming an internal file — a raw Node stack trace that does
-// not tell the caller the fix (ISS-20260719-001). Fail with the command instead.
+// not tell the caller the fix (measured 2026-07-19). Fail with the command instead.
 // Runs in the module body, which is safe here because the two static imports that
 // hoist above it (wav-encoder, audio-buffer-shim) have no imports of their own.
 const SKILL_ROOT = join(__dirname, '..');
