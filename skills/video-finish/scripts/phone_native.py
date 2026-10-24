@@ -38,14 +38,34 @@ def probe_dims(path):
     return int(v.get('width', 0) or 0), int(v.get('height', 0) or 0), float((js.get('format') or {}).get('duration', 0) or 0), has_audio
 
 
-def in_matrix(path, w, h):
-    """the input's YUV → RGB matrix and range by its tags; untagged: BT.709 at HD and above (normalise_shots.py's rule)"""
-    p = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=color_space,color_range', '-of', 'default=nw=1', path],
-                       capture_output=True, text=True)
+TO709 = 'scale=out_color_matrix=bt709:out_range=tv'
+ACC = 'accurate_rnd+full_chroma_int'   # swscale's default rounding loses 2-4 levels per RGB<->YUV crossing
+
+
+def in_colour(path, w, h):
+    """(matrix, range, rgb) the input is decoded with — by its tags; untagged: BT.709 at HD and above (normalise_shots.py's
+    rule); rgb for a png-codec or packed/planar RGB stream, which carries no YUV matrix at all"""
+    p = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,pix_fmt,color_space,color_range',
+                        '-of', 'default=nw=1', path], capture_output=True, text=True)
     tg = dict(l.split('=', 1) for l in (p.stdout or '').split('\n') if '=' in l); cs = tg.get('color_space', '')
     rng = 'pc' if tg.get('color_range') == 'pc' else 'tv'   # the range by its tag: a forced tv read clips a full-range input
     m = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if h >= 720 or w >= 1280 else 'bt601')
-    return f'{m}:in_range={rng}'
+    rgb = tg.get('codec_name') == 'png' or tg.get('pix_fmt', '').startswith(('rgb', 'bgr', 'gbr', 'argb', 'abgr', '0rgb', '0bgr', 'pal'))
+    return m, rng, rgb
+
+
+def head(src, W, H):
+    """The first scale, with the input brought into BT.709 tv-range YUV inside it. Every filter after it (hqdn3d, eq, noise,
+    the WB round trip) then works in the matrix the output is tagged with: left to ffmpeg, an RGB input meets its BT.601
+    default at the first YUV-only filter, and a BT.601 input passes through relabelled — 40 levels either way (pure green
+    read (0,215,0); measured 2026-10-24). A BT.709 tv-range YUV input is only scaled, as before."""
+    m, rng, rgb = src
+    sc = f'scale={W}:{H}:flags=lanczos'
+    if rgb:
+        return f'{sc}+{ACC}:out_color_matrix=bt709:out_range=tv,format=yuv444p'
+    if m == 'bt709' and rng == 'tv':
+        return sc
+    return f'scale=in_color_matrix={m}:in_range={rng}:flags={ACC},format=gbrp16le,{sc}+{ACC}:out_color_matrix=bt709:out_range=tv,format=yuv444p'
 
 
 def build(a, W, H, dur, cmdfile):
@@ -57,9 +77,9 @@ def build(a, W, H, dur, cmdfile):
         Hp = int(math.ceil(Wp * H / W))
         Hp += Hp % 2
         Hp = max(Hp, H + 2 * P)
-        chain.append(f'scale={Wp}:{Hp}:flags=lanczos')
+        chain.append(head(getattr(a, 'src', ('bt709', 'tv', False)), Wp, Hp))
     else:
-        chain.append(f'scale={W}:{H}:flags=lanczos')
+        chain.append(head(getattr(a, 'src', ('bt709', 'tv', False)), W, H))
     if a.denoise > 0:
         d = a.denoise
         chain.append(f'hqdn3d={d:g}:{d * 0.75:g}:{d * 1.5:g}:{d * 1.125:g}')
@@ -75,10 +95,11 @@ def build(a, W, H, dur, cmdfile):
             f.write('\n'.join(lines) + '\n')
         chain.append(f"sendcmd=f='{cmdfile}'")
         # colortemperature is RGB-only: name BOTH matrices of the round trip, or ffmpeg re-encodes with BT.601 under the
-        # bt709 tag and saturated colour moves up to 42 levels (measured 2026-10-21; grey and white do not move)
-        chain.append(f"scale=in_color_matrix={getattr(a, 'in_matrix', 'bt709:in_range=tv')},format=gbrp16le")
+        # bt709 tag and saturated colour moves up to 42 levels (measured 2026-10-21; grey and white do not move).
+        # The stream is BT.709 tv-range YUV here whatever the input was — head() brought it there — so the decode is fixed
+        chain.append(f'scale=in_color_matrix=bt709:in_range=tv:flags={ACC},format=gbrp16le')
         chain.append('colortemperature=temperature=6500:mix=1')
-        chain.append('scale=out_color_matrix=bt709:out_range=tv,format=yuv444p')
+        chain.append(f'{TO709}:flags={ACC},format=yuv444p')
     ph = a.seed * 0.61
     terms = [f'{a.drift:g}*sin(2*PI*t/{a.period:g}+{ph:.3f})'] if a.drift > 0 else []
     for i, c in enumerate(a.cut_list):
@@ -101,7 +122,7 @@ def encode_args(a, has_audio):
     args = ['-c:v', 'libx264', '-preset', 'medium', '-profile:v', 'high', '-level', '4.1', '-pix_fmt', 'yuv420p',
             '-b:v', f'{n:g}M', '-maxrate', f'{n * 1.15:g}M', '-bufsize', f'{n * 2:g}M',
             '-g', '48', '-keyint_min', '48', '-sc_threshold', '0', '-flags', '+cgop', '-x264-params', 'open-gop=0',
-            '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-movflags', '+faststart']
+            '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-color_range', 'tv', '-movflags', '+faststart']
     if a.audio == 'none' or not has_audio:
         args += ['-an']
     elif a.audio == 'copy':
@@ -117,7 +138,7 @@ def render(a):
     iw, ih, dur, has_audio = probe_dims(a.inp)
     if not iw or dur <= 0:
         sys.exit(f'PHONE-NATIVE FAIL — cannot probe {a.inp}')
-    a.in_matrix = in_matrix(a.inp, iw, ih)
+    a.src = in_colour(a.inp, iw, ih)
     cmdfile = a.out + '.wbcmds.txt'
     vf = build(a, W, H, dur, cmdfile)
     cmd = ['ffmpeg', '-v', 'error', '-y', '-i', a.inp, '-vf', vf] + encode_args(a, has_audio) + [a.out]
@@ -190,6 +211,35 @@ def selftest():
     if os.path.exists(dry.out + '.wbcmds.txt'):
         os.remove(dry.out + '.wbcmds.txt')
     print('selftest full filtergraph: ' + vf[:160] + ' …')
+    # colour: matrix_check's card born RGB (png codec) and tagged BT.601, each through a denoise (a YUV-only filter), must
+    # read back within its limit; before head() both read 40 (pure green (0,215,0)). With --wb the RGB card must stay
+    # within the tint colortemperature itself leaves at 6500 K (7 on a BT.709 input, black exact); before head() it read 54
+    mc = os.path.normpath(os.path.join(HERE, '..', '..', 'video-finish-qc', 'scripts', 'matrix_check.py'))
+    card = os.path.join(d, 'card.png')
+    subprocess.run([sys.executable, mc, 'card', card, '--size', '540x960'], capture_output=True, text=True)
+    fix = {'rgb': ('card-rgb.mov', ['-c:v', 'png']),
+           'bt601': ('card-601.mp4', ['-vf', 'scale=out_color_matrix=bt601:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p',
+                                      '-c:v', 'libx264', '-crf', '4', '-colorspace', 'smpte170m', '-color_range', 'tv'])}
+    for name, wb, limit in (('rgb', 0, 6), ('bt601', 0, 6), ('rgb', 150, 9)):
+        fn, enc = fix[name]; src_c = os.path.join(d, fn)
+        if not os.path.exists(src_c):
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-loop', '1', '-i', card, '-t', '1', '-r', '24'] + enc + [src_c], capture_output=True)
+        out = os.path.join(d, f'colour-{name}-wb{wb}.mp4')
+        args = argparse.Namespace(inp=src_c, out=out, canvas='540x960', noise=0, denoise=4, drift=0.0, wb=wb, period=3.0,
+                                  shake=0, cut_list=[], ae_step=0.0, bitrate='20M', audio='none', seed=0, dry_run=False, probe=False, ref=[])
+        args.src = in_colour(src_c, 540, 960)
+        vf = build(args, 540, 960, 1.0, out + '.wbcmds.txt')
+        r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', src_c, '-vf', vf] + encode_args(args, False) + [out], capture_output=True, text=True)
+        if os.path.exists(out + '.wbcmds.txt'):
+            os.remove(out + '.wbcmds.txt')
+        m = subprocess.run([sys.executable, mc, 'measure', out, '--at', '0.1', '--size', '540x960', '--json'], capture_output=True, text=True)
+        try:
+            err = json.loads(m.stdout).get('max_err')
+        except Exception:
+            err = None
+        good = r.returncode == 0 and err is not None and err <= limit
+        ok &= good
+        print(f'selftest colour {name} --wb {wb}: max err {err} (limit {limit}) ' + ('ok' if good else 'FAIL'))
     print('PHONE-NATIVE SELFTEST ' + ('PASS' if ok else 'FAIL'))
     sys.exit(0 if ok else 1)
 
