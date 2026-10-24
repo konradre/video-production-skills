@@ -110,7 +110,7 @@ outline only (no fine markers at 480p), human in manner never in movement; a spe
 reference sheets, never from text; the reveal is never pre-loaded; a look plate per light context, mapped
 to the shot list before it is generated; the pre-flight gate on every prompt. Every word of the known lyrics on a
 visible sung line is timed before a cut or a scene window is placed — the venue's hosted analysis, then local word
-timestamps checked by ear, then forced alignment of the known lyrics to a vocal stem on a GPU host; vocals outside the
+timestamps checked by ear, then forced alignment of the known lyrics to a vocal stem on a well-resourced machine; vocals outside the
 sheet are labelled estimates — and a cut that introduces a line lands on the last beat at or before its first-word
 onset plus 20 ms (it may fall a few ms into that word, never inside the previous one); on-screen lyrics follow the karaoke rules (highlight never ahead of the voice).
 [`references/MUSIC-VIDEO.md`](references/MUSIC-VIDEO.md) § 9.

@@ -90,12 +90,13 @@ timestamps checked by ear.
 1. **The venue's hosted analysis** where the venue offers one (read its readiness flag and its size cap: the cap is on
    the uploaded master, which is never recompressed to fit). Only cues it marks as exact
    are vocal onsets; adjusted, estimated or unknown cues go to the ear check like rung 2's.
-2. **Local word timestamps** from a Whisper-class transcriber (`faster-whisper` large-v3-turbo on a CUDA host, in an
-   activated venv; the first run downloads its CTranslate2 weights, ~1.6 GB, unless a cached Hugging Face
-   `openai/whisper-large-v3-turbo` snapshot is converted with `ct2-transformers-converter`, which needs `transformers`; `mlx-whisper` runs on Apple silicon only), every visible line
+2. **Local word timestamps** from a Whisper-class transcriber (`faster-whisper` large-v3-turbo in an activated venv; a
+   CUDA GPU speeds it up, the CPU also runs it. Without CTranslate2 weights for it on the machine, the first run
+   downloads them, ~1.6 GB, or a cached Hugging Face `openai/whisper-large-v3-turbo` snapshot is converted with
+   `ct2-transformers-converter`, which needs `transformers`; `mlx-whisper` runs on Apple silicon only), every visible line
    checked by ear against the track at its timestamp. A sung word the transcriber drops, splits or slides across a held note is a miss.
 3. **Forced alignment of the KNOWN lyrics to a separated vocal stem** — only when rungs 1 and 2 both miss sung words, and
-   on a GPU host with room for the models (~4 GB of weights):
+   on a machine with room for the models (~4 GB of weights; a GPU speeds the separation and the CTC pass, the CPU also runs them):
    - Separate the lead vocal (Demucs `htdemucs_ft`; where a lead sits under a pad, a karaoke-lead mel-band-roformer stem).
    - **Measure the stem's offset against the master** by cross-correlation before anything is timed on it, and shift it.
      The donor's stem sat 23 ms late (an MP3 decode that kept the encoder delay); measure every new stem, never copy that number.
