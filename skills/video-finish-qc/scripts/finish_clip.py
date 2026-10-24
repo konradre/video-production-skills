@@ -30,7 +30,7 @@ import argparse, json, os, re, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))   # resolved before main() changes directory
 
 
-TO709 = 'scale=out_color_matrix=bt709:out_range=tv'   # the delivery is tagged bt709, so a hero in another matrix is converted, never relabelled
+TO709 = 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int'   # the delivery is tagged bt709, so a hero in another matrix is converted, never relabelled
 
 
 def to709(p):
@@ -43,7 +43,7 @@ def to709(p):
     rng = 'pc' if st.get('color_range') == 'pc' else 'tv'; pf = st.get('pix_fmt') or ''
     if st.get('codec_name') == 'png' or pf.startswith(('rgb', 'bgr', 'gbr', 'argb', 'abgr', '0rgb', '0bgr', 'pal')): return f'{TO709},'
     if m == 'bt709' and rng == 'tv': return ''
-    return f'scale=in_color_matrix={m}:in_range={rng},format=gbrp16le,{TO709},'
+    return f'scale=in_color_matrix={m}:in_range={rng}:flags=accurate_rnd+full_chroma_int,format=gbrp16le,{TO709},'
 
 
 def main():

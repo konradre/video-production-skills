@@ -37,9 +37,10 @@ def ff_path(p):
     return p
 
 
-TO709 = 'scale=out_color_matrix=bt709:out_range=tv'   # EVERY RGB → YUV step names its matrix: ffmpeg's default is BT.601 while the
+TO709 = 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int'   # EVERY RGB → YUV step names its matrix: ffmpeg's default is BT.601 while the
 # files are tagged bt709, and a saturated patch read back up to 40 levels off (measured 2026-10-21). Grey, black and white do not
-# move, which is why no grey check saw it. `matrix_check.py` is the regression.
+# move, which is why no grey check saw it. `matrix_check.py` is the regression. Every RGB <-> YUV crossing also rounds
+# accurately: swscale's default rounding lost 2-4 levels per crossing (measured 2026-10-25).
 
 
 def main():
@@ -129,7 +130,7 @@ def main():
         return SMX[p]
     def src_matrix(p):
         """the named decode a cube's input gets — never ffmpeg's BT.601 default (an untagged upscale decoded as BT.601 shifts)"""
-        m, rng, _ = src_colour(p); return f"scale=in_color_matrix={m}:in_range={rng}"
+        m, rng, _ = src_colour(p); return f"scale=in_color_matrix={m}:in_range={rng}:flags=accurate_rnd+full_chroma_int"
     def to709(p):
         """'' for a BT.709 tv-range YUV source (it passes untouched, as before); otherwise the named conversion into the
         bt709 mezzanine — an RGB source (a png-codec render) by TO709, a BT.601 or full-range YUV source through 16-bit RGB"""

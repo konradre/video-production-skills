@@ -13,7 +13,7 @@ a caption, a cube), then measure what that path delivered.
 
   matrix_check.py card <out.png> [--size 1920x1080]                       # the 16-patch card as an RGB PNG
   matrix_check.py card --html <composition dir> [--size 1920x1080]        # the same card as a HyperFrames index.html
-  matrix_check.py measure <video|png> [--at 1.0] [--as tag|bt709|bt601] [--max 6] [--size 1920x1080] [--json]
+  matrix_check.py measure <video|png> [--at 1.0] [--as tag|bt709|bt601] [--max 3] [--size 1920x1080] [--json]
                                                                            # exit 1 over --max, 2 when it cannot decode
   matrix_check.py --selftest                                               # a 709 encode passes; ffmpeg's default FAILS;
                                                                            # finish_spot's three RGB steps pass
@@ -21,8 +21,9 @@ a caption, a cube), then measure what that path delivered.
                                                                            # branch, overlays over grey; exit 1 on any FAIL
 
 `--as tag` (the default) reads the stream's `color_space`: bt709 → BT.709; smpte170m / bt470bg → BT.601; anything
-else exits 2 rather than guess. A patch is read on its inner half, away from chroma-subsampled edges; a correct 8-bit
-4:2:0 encode reads within 3.
+else exits 2 rather than guess. A patch is read on its inner half, away from chroma-subsampled edges, and decoded with
+accurate rounding (swscale's default rounding alone read 2-4 on a correct file and hid a real 2-4 level loss under the
+old limit of 6); a correct 8-bit 4:2:0 encode reads within 1.
 """
 import argparse, importlib.util, json, os, struct, subprocess, sys, tempfile, zlib
 
@@ -30,6 +31,7 @@ COLS = ["FF0000", "00FF00", "0000FF", "FFFF00", "00FFFF", "FF00FF", "FFFFFF", "0
         "808080", "C89678", "BF0000", "FF4FA3", "B42828", "28A03C", "283CB4", "7F3FBF"]
 SRC = [tuple(int(c[i:i + 2], 16) for i in (0, 2, 4)) for c in COLS]
 TAGS = {'bt709': 'bt709', 'smpte170m': 'bt601', 'bt470bg': 'bt601'}
+LIMIT = 3   # every correct path reads 0-1 once the decode rounds accurately; ffmpeg's default matrix reads ~40 (measured 2026-10-25)
 
 
 def size(s):
@@ -111,7 +113,7 @@ def measure(path, at=1.0, as_='tag', W=1920, H=1080):
         m = TAGS.get(st.get('color_space') or '') if as_ == 'tag' else as_
         if not m: return {'ok': None, 'reason': f"untagged or unknown color_space {st.get('color_space')!r}: pass --as bt709|bt601"}
         rng = 'pc' if st.get('color_range') == 'pc' else 'tv'
-        vf, used = f'scale={W}:{H}:in_color_matrix={m}:in_range={rng}', f'{m} {rng} ({"tag" if as_ == "tag" else "forced"})'
+        vf, used = f'scale={W}:{H}:in_color_matrix={m}:in_range={rng}:flags=accurate_rnd+full_chroma_int', f'{m} {rng} ({"tag" if as_ == "tag" else "forced"})'
     seek = [] if rgb_src else ['-ss', str(at)]
     r = subprocess.run(['ffmpeg', '-v', 'error'] + seek + ['-i', path, '-vf', vf, '-frames:v', '1', '-f', 'rawvideo',
                         '-pix_fmt', 'rgb24', '-'], capture_output=True)
@@ -163,7 +165,7 @@ def selftest():
         lut = os.path.join(d, 'lut.mov'); ff(['-i', good, '-vf', f'format=gbrp16le,lut3d=file={cube}:interp=tetrahedral,{TO709},format=yuv422p10le',
              '-c:v', 'prores_ks', '-profile:v', '3'] + tag + [lut]); cases.append(('finish_spot look (identity cube)', lut, True))
         for name, f, want in cases:
-            r = measure(f, at=0.5, W=W, H=H); got = r['max_err'] <= 6; ok &= got == want
+            r = measure(f, at=0.5, W=W, H=H); got = r['max_err'] <= LIMIT; ok &= got == want
             print(f"selftest {name:32s} max err {r['max_err']:3d} → {'PASS' if got else 'FAIL'} (want {'PASS' if want else 'FAIL'})")
     print('SELFTEST', 'OK' if ok else 'FAILED'); return 0 if ok else 1
 
@@ -182,19 +184,21 @@ def finish_e2e(keep=None):
     tag = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709']
     still = ['-loop', '1', '-t', '4', '-r', str(FPS), '-i', 'card.png', '-f', 'lavfi', '-t', '4', '-i', 'anullsrc=r=48000:cl=stereo']
     enc = ['-c:v', 'libx264', '-crf', '10', '-c:a', 'aac', '-shortest']
-    ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'] + enc + tag + ['takes/tagged.mp4'])
-    ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'] + enc
+    ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'] + enc + tag + ['takes/tagged.mp4'])
+    ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'] + enc
        + ['-bsf:v', 'h264_metadata=matrix_coefficients=2:colour_primaries=2:transfer_characteristics=2', 'takes/untagged.mp4'])
-    ff(still + ['-vf', 'scale=out_color_matrix=bt601:out_range=tv,format=yuv420p'] + enc
+    ff(still + ['-vf', 'scale=out_color_matrix=bt601:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'] + enc
        + ['-colorspace', 'smpte170m', '-color_primaries', 'smpte170m', '-color_trc', 'smpte170m', 'takes/bt601.mp4'])
     ff(still + ['-c:v', 'png', '-c:a', 'pcm_s16le', '-shortest', 'takes/rgb.mov'])
+    ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=pc:flags=accurate_rnd+full_chroma_int,format=yuvj420p'] + enc + tag + ['-color_range', 'pc', 'takes/pc.mp4'])
     ff(['-f', 'lavfi', '-t', '4', '-i', f'color=0x808080:s={W}x{H}:r={FPS}', '-f', 'lavfi', '-t', '4', '-i', 'anullsrc=r=48000:cl=stereo',
-        '-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'] + enc + tag + ['takes/grey.mp4'])
+        '-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'] + enc + tag + ['takes/grey.mp4'])
     for i in range(FPS): shutil_copy(os.path.join(d, 'card-rgba.png'), os.path.join(d, f'edit/layers/card/frame_{i:06d}.png'))
     shutil_copy(os.path.join(d, 'card-rgba.png'), os.path.join(d, 'edit/captions/cap-00.png'))
     with open(os.path.join(d, 'cubes', 'idtest_33.cube'), 'w') as f:
         f.write('LUT_3D_SIZE 33\n' + ''.join(f'{r / 32:.6f} {g / 32:.6f} {b / 32:.6f}\n' for b in range(33) for g in range(33) for r in range(33)))
-    plan = [('tagged', 'idtest'), ('untagged', 'idtest'), ('tagged', 'none'), ('bt601', 'none'), ('rgb', 'none'), ('grey', 'none'), ('grey', 'none')]
+    plan = [('tagged', 'idtest'), ('untagged', 'idtest'), ('tagged', 'none'), ('bt601', 'none'), ('rgb', 'none'), ('grey', 'none'), ('grey', 'none'),
+            ('pc', 'none')]
     ev = []
     for k, (src, look) in enumerate(plan):
         f = f'takes/{src}.mp4' if src != 'rgb' else 'takes/rgb.mov'
@@ -218,14 +222,24 @@ def finish_e2e(keep=None):
     M, Mm, Dv = 'edit/mezz/MX-footage-graded.mov', f'edit/mezz/MX-master-{W}x{H}.mov', 'deliver/MX-v1.mp4'
     rows = [('cube, tagged bt709 source', M, 0.75), ('cube, untagged HD source', M, 2.25), ('look none, bt709 source', M, 3.75),
             ('look none, bt601-tagged source', M, 5.25), ('look none, RGB (png) source', M, 6.75),
-            ('RGBA post_layer over grey', Mm, 8.25), ('RGB end card', Mm, T + 0.75),
+            ('look none, full-range source', M, 11.25), ('RGBA post_layer over grey', Mm, 8.25), ('RGB end card', Mm, T + 0.75),
             ('RGBA caption over grey, delivered', Dv, 9.75), ('cube path, delivered', Dv, 0.75)]
     ok = True
     for name, f, at in rows:
         res = measure(os.path.join(d, f), at, 'tag', W, H)
         if res.get('ok') is None: print(f'e2e {name:34s} CANNOT {res["reason"]}'); ok = False; continue
-        good = res['max_err'] <= 6; ok &= good
+        good = res['max_err'] <= LIMIT; ok &= good
         print(f"e2e {name:34s} max err {res['max_err']:3d} {'PASS' if good else 'FAIL'} ({os.path.basename(f)} @ {at}s, as {res['decoded_as']})")
+    ff(['-f', 'lavfi', '-t', '4', '-i', 'sine=frequency=440:sample_rate=48000', '-af', 'volume=-20dB', '-c:a', 'pcm_s16le', 'takes/tone.wav'])
+    r = subprocess.run([sys.executable, os.path.join(SK, 'video-finish-qc', 'scripts', 'finish_clip.py'), '--root', d, '--hero', 'takes/bt601.mp4',
+                        '--take', 'takes/tone.wav', '--in', '0.5', '--out', '2.0', '--handle', '0.5', '--name', 'MXC', '--canvas', f'{W}x{H}'],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or not os.path.exists(os.path.join(d, 'deliver', 'MXC.mp4')):
+        print('e2e finish_clip, bt601-tagged hero     CANNOT: finish_clip.py failed\n' + (r.stdout + r.stderr)[-600:]); ok = False
+    else:
+        res = measure(os.path.join(d, 'deliver', 'MXC.mp4'), 0.5, 'tag', W, H)
+        good = res.get('ok') is not None and res['max_err'] <= LIMIT; ok &= good
+        print(f"e2e {'finish_clip, bt601-tagged hero':34s} max err {res.get('max_err', -1):3d} {'PASS' if good else 'FAIL'} (MXC.mp4 @ 0.5s, as {res.get('decoded_as')})")
     print('FINISH-E2E', 'OK' if ok else 'FAILED', '' if keep else '(scratch removed)')
     if not keep: shutil_rmtree(d)
     return 0 if ok else 1
@@ -247,7 +261,7 @@ def main():
     sp = ap.add_subparsers(dest='cmd', required=True)
     c = sp.add_parser('card'); c.add_argument('out', nargs='?'); c.add_argument('--html'); c.add_argument('--size', default='1920x1080')
     m = sp.add_parser('measure'); m.add_argument('file'); m.add_argument('--at', type=float, default=1.0)
-    m.add_argument('--as', dest='as_', default='tag', choices=['tag', 'bt709', 'bt601']); m.add_argument('--max', type=int, default=6)
+    m.add_argument('--as', dest='as_', default='tag', choices=['tag', 'bt709', 'bt601']); m.add_argument('--max', type=int, default=LIMIT)
     m.add_argument('--size', default='1920x1080'); m.add_argument('--json', action='store_true')
     a = ap.parse_args(); W, H = size(a.size)
     if a.cmd == 'card':
