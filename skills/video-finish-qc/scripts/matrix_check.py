@@ -174,7 +174,8 @@ def finish_e2e(keep=None):
     """The REAL finish_spot.py on the card, all stages. Every branch that converts colour gets its own event: a cube on a
     tagged and an untagged source; look none on a BT.709, a BT.601-tagged and an RGB (png-codec) source; an RGBA post
     layer and an RGBA caption, each over FLAT GREY so an overlay that never composited reads grey and fails; an RGB end
-    card. Each row is measured on the file the finisher wrote."""
+    card; an untagged SD source with its in_matrix declared; a luma-only source
+    under the cube and under look none (its 16 / 128 / 235 levels kept). Each row is measured on the file the finisher wrote."""
     W, H, FPS = 1280, 720, 24   # 720p: an untagged source is BT.709 by the HD rule
     here = os.path.dirname(os.path.abspath(__file__)); SK = os.path.abspath(os.path.join(here, '..', '..'))
     d = keep or tempfile.mkdtemp(prefix='matrix-e2e-'); os.makedirs(d, exist_ok=True)
@@ -190,6 +191,12 @@ def finish_e2e(keep=None):
     ff(still + ['-vf', 'scale=out_color_matrix=bt601:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'] + enc
        + ['-colorspace', 'smpte170m', '-color_primaries', 'smpte170m', '-color_trc', 'smpte170m', 'takes/bt601.mp4'])
     ff(still + ['-c:v', 'png', '-c:a', 'pcm_s16le', '-shortest', 'takes/rgb.mov'])
+    ff(still + ['-vf', 'scale=640:360,scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'] + enc
+       + ['-bsf:v', 'h264_metadata=matrix_coefficients=2:colour_primaries=2:transfer_characteristics=2', 'takes/usd.mp4'])
+    with open(os.path.join(d, 'bands.pgm'), 'wb') as f:   # luma-only: 16 / 128 / 235 thirds, untagged range
+        f.write(b'P5 %d %d 255\n' % (W, H) + (bytes([16] * (W // 3) + [128] * (W // 3) + [235] * (W - 2 * (W // 3))) * H))
+    ff(['-loop', '1', '-t', '4', '-r', str(FPS), '-i', 'bands.pgm', '-f', 'lavfi', '-t', '4', '-i', 'anullsrc=r=48000:cl=stereo',
+        '-vf', 'format=gray,setparams=range=unknown', '-c:v', 'ffv1', '-c:a', 'pcm_s16le', '-shortest', 'takes/gray.mkv'])
     ff(still + ['-vf', 'scale=out_color_matrix=bt709:out_range=pc:flags=accurate_rnd+full_chroma_int,format=yuvj420p'] + enc + tag + ['-color_range', 'pc', 'takes/pc.mp4'])
     ff(['-f', 'lavfi', '-t', '4', '-i', f'color=0x808080:s={W}x{H}:r={FPS}', '-f', 'lavfi', '-t', '4', '-i', 'anullsrc=r=48000:cl=stereo',
         '-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p'] + enc + tag + ['takes/grey.mp4'])
@@ -198,11 +205,12 @@ def finish_e2e(keep=None):
     with open(os.path.join(d, 'cubes', 'idtest_33.cube'), 'w') as f:
         f.write('LUT_3D_SIZE 33\n' + ''.join(f'{r / 32:.6f} {g / 32:.6f} {b / 32:.6f}\n' for b in range(33) for g in range(33) for r in range(33)))
     plan = [('tagged', 'idtest'), ('untagged', 'idtest'), ('tagged', 'none'), ('bt601', 'none'), ('rgb', 'none'), ('grey', 'none'), ('grey', 'none'),
-            ('pc', 'none')]
+            ('pc', 'none'), ('usd', 'none'), ('gray', 'idtest'), ('gray', 'none')]
     ev = []
     for k, (src, look) in enumerate(plan):
-        f = f'takes/{src}.mp4' if src != 'rgb' else 'takes/rgb.mov'
+        f = {'rgb': 'takes/rgb.mov', 'gray': 'takes/gray.mkv'}.get(src, f'takes/{src}.mp4')
         ev.append({'id': f'E{k:02d}', 'take': f, 'src': f, 'in': 0.5, 'out': 2.0, 'tl': [1.5 * k, 1.5 * k + 1.5], 'handle_head': 0.5, 'look': look})
+        if src == 'usd': ev[-1]['in_matrix'] = 'bt709'   # an untagged SD clip encoded BT.709: the size rule alone reads it BT.601 (26 off)
     T = 1.5 * len(plan)
     ev.append({'id': 'EC', 'role': 'endcard', 'source': 'designed', 'take': 'takes/rgb.mov', 'in': 0.0, 'out': 1.5, 'tl': [T, T + 1.5]})
     E = {'spot': 'MX', 'deliver_base': 'MX', 'runtime_s': T + 1.5, 'canvas': [W, H], 'events': ev,
@@ -222,7 +230,7 @@ def finish_e2e(keep=None):
     M, Mm, Dv = 'edit/mezz/MX-footage-graded.mov', f'edit/mezz/MX-master-{W}x{H}.mov', 'deliver/MX-v1.mp4'
     rows = [('cube, tagged bt709 source', M, 0.75), ('cube, untagged HD source', M, 2.25), ('look none, bt709 source', M, 3.75),
             ('look none, bt601-tagged source', M, 5.25), ('look none, RGB (png) source', M, 6.75),
-            ('look none, full-range source', M, 11.25), ('RGBA post_layer over grey', Mm, 8.25), ('RGB end card', Mm, T + 0.75),
+            ('look none, full-range source', M, 11.25), ('untagged SD, in_matrix bt709', M, 12.75), ('RGBA post_layer over grey', Mm, 8.25), ('RGB end card', Mm, T + 0.75),
             ('RGBA caption over grey, delivered', Dv, 9.75), ('cube path, delivered', Dv, 0.75)]
     ok = True
     for name, f, at in rows:
@@ -240,6 +248,13 @@ def finish_e2e(keep=None):
         res = measure(os.path.join(d, 'deliver', 'MXC.mp4'), 0.5, 'tag', W, H)
         good = res.get('ok') is not None and res['max_err'] <= LIMIT; ok &= good
         print(f"e2e {'finish_clip, bt601-tagged hero':34s} max err {res.get('max_err', -1):3d} {'PASS' if good else 'FAIL'} (MXC.mp4 @ 0.5s, as {res.get('decoded_as')})")
+    for name, at in (('luma-only source, cube', 14.25), ('luma-only source, look none', 15.75)):   # the bands keep their levels
+        g = subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(at), '-i', os.path.join(d, M), '-frames:v', '1', '-vf',
+                            'scale=in_range=tv:out_range=pc,format=gray', '-f', 'rawvideo', '-'], capture_output=True).stdout
+        lv = [round(sum(g[y * W + x] for y in range(H // 4, 3 * H // 4, 8) for x in range(c - 40, c + 40, 4)) / (len(range(H // 4, 3 * H // 4, 8)) * 20))
+              for c in (W // 6, W // 2, 5 * W // 6)] if len(g) >= W * H else []
+        good = len(lv) == 3 and all(abs(x - y) <= LIMIT for x, y in zip(lv, (16, 128, 235))); ok &= good
+        print(f"e2e {name:34s} levels {lv} (want 16/128/235 ±{LIMIT}) {'PASS' if good else 'FAIL'}")
     print('FINISH-E2E', 'OK' if ok else 'FAILED', '' if keep else '(scratch removed)')
     if not keep: shutil_rmtree(d)
     return 0 if ok else 1

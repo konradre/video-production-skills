@@ -33,15 +33,24 @@ HERE = os.path.dirname(os.path.abspath(__file__))   # resolved before main() cha
 TO709 = 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int'   # the delivery is tagged bt709, so a hero in another matrix is converted, never relabelled
 
 
-def to709(p):
+def to709(p, decl=None):
     """'' for a BT.709 tv-range YUV hero (it passes untouched); otherwise the named conversion to BT.709 — an RGB hero by
-    TO709, a BT.601 / untagged-SD / full-range YUV hero through 16-bit RGB. Untagged: BT.709 at HD, BT.601 below."""
+    TO709, a BT.601 / untagged-SD / full-range YUV hero through 16-bit RGB. The matrix: --in-matrix, else the tag, else
+    BT.709 at HD and BT.601 below (a WARN names --in-matrix when the size rule picks BT.601)."""
     r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,pix_fmt,color_space,color_range,width,height',
                         '-of', 'json', p], capture_output=True, text=True).stdout
     st = (json.loads(r or '{}').get('streams') or [{}])[0]; cs = st.get('color_space') or ''
-    m = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if st.get('height', 0) >= 720 or st.get('width', 0) >= 1280 else 'bt601')
+    tagged = cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc')
+    m = decl or (cs if tagged else ('bt709' if st.get('height', 0) >= 720 or st.get('width', 0) >= 1280 else 'bt601'))
     rng = 'pc' if st.get('color_range') == 'pc' else 'tv'; pf = st.get('pix_fmt') or ''
     if st.get('codec_name') == 'png' or pf.startswith(('rgb', 'bgr', 'gbr', 'argb', 'abgr', '0rgb', '0bgr', 'pal')): return f'{TO709},'
+    if pf.startswith(('gray', 'ya', 'mono')):   # luma only, no matrix: a forced tv read clipped 16/235 to 0/255
+        if decl: print(f"WARN {p}: --in-matrix {decl} ignored — a luma-only source has no YUV matrix", flush=True)
+        return ''
+    if decl and tagged and {'bt709': 'bt709', 'bt470bg': 'bt601', 'smpte170m': 'bt601', 'bt2020nc': 'bt2020nc'}[cs] != decl:
+        print(f"WARN {p}: --in-matrix {decl} overrides its own tag {cs} — right only when that tag is wrong", flush=True)
+    if not tagged and not decl and m == 'bt601':   # untagged HD reads BT.709, as players do: no WARN
+        print(f"WARN {p}: untagged — read as {m} by the size rule ({st.get('width')}x{st.get('height')}); --in-matrix declares it", flush=True)
     if m == 'bt709' and rng == 'tv': return ''
     return f'scale=in_color_matrix={m}:in_range={rng}:flags=accurate_rnd+full_chroma_int,format=gbrp16le,{TO709},'
 
@@ -54,6 +63,7 @@ def main():
     ap.add_argument('--I', type=float, default=-14); ap.add_argument('--TP', type=float, default=-2); ap.add_argument('--LRA', type=float, default=9); ap.add_argument('--match-tp', type=float)
     ap.add_argument('--canvas', default='1080x1920'); ap.add_argument('--tp-ceiling', type=float, default=-1.0)
     ap.add_argument('--no-retry', action='store_true', help='keep the single attempt when the true peak lands over the ceiling')
+    ap.add_argument('--in-matrix', dest='in_matrix', choices=['bt709', 'bt601', 'bt2020nc'], help="the hero's YUV matrix when its tag is missing or wrong")
     a = ap.parse_args(); os.chdir(a.root); DUR = a.tout - a.tin; DELIV = f'deliver/{a.name}.mp4'; os.makedirs('deliver', exist_ok=True)
     assert DUR > 0 and a.handle >= 0 and not os.path.exists(DELIV), f'bad range or {DELIV} exists (fresh filename per render)'
     W, H = a.canvas.lower().split('x')
@@ -76,7 +86,7 @@ def main():
             lim = f"alimiter=limit={10 ** (tp / 20):.4f}:attack=5:release=60:level=false:latency=1"
             af = achain + f",volume={g:.3f}dB,aresample=192000,{lim},aresample=48000,{lim},asettb=1/48000,asetpts=N"   # the clock rebuilt from the samples after the last resample
         run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{a.handle:.4f}', '-t', f'{DUR:.4f}', '-i', a.hero, '-ss', f'{a.tin:.4f}', '-t', f'{DUR:.4f}', '-i', a.take,
-             '-map', '0:v:0', '-map', '1:a:0', '-dn', '-vf', f'scale={W}:{H}:flags=lanczos,{to709(a.hero)}format=yuv420p', '-af', af, '-ar', '48000', '-shortest',
+             '-map', '0:v:0', '-map', '1:a:0', '-dn', '-vf', f'scale={W}:{H}:flags=lanczos,{to709(a.hero, a.in_matrix)}format=yuv420p', '-af', af, '-ar', '48000', '-shortest',
              '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-level', '4.1', '-g', '48',
              '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',   # true by construction: to709() converted any non-BT.709 hero first
              '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-write_tmcd', '0', DELIV])   # -dn / -write_tmcd 0: the mov's timecode track would be re-muxed as a data track

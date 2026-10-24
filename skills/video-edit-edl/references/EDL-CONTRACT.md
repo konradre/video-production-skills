@@ -20,6 +20,7 @@ this file is DERIVED by a builder — a typed number is a defect waiting for the
 | `tl` | `[start, end]` on the timeline; `end − start == out − in` | accumulated by the builder, never typed |
 | `src` | the pre-graded hero (`edit/hero/<stem>__rhea-1x4__ads-clean.mov` or a windowed `-win` hero); `a|b` alternatives resolve by the finisher's file rule, the first that exists | with a `src` the event's `look` is `none` — the hero pass already graded it |
 | `look` | `none` (pre-graded hero) · a cube name (`ads-clean`) for an upscaled mezzanine or a designed render | a look on a hero grades it twice |
+| `in_matrix` | `bt709` · `bt601` · `bt2020nc` — the source's YUV matrix when its colour tag is missing or wrong; absent = the tag, else BT.709 at ≥ 720 high or ≥ 1280 wide and BT.601 below | it describes the FILE the finisher reads (`src`, else `take`) — a re-encoded hero carries its own tag, so never copy the take's matrix onto it (a WARN prints when a declaration contradicts a tag); the finisher prints a WARN each time the size rule picks BT.601: an untagged SD clip encoded BT.709 read 26 levels off as BT.601 — declare it, never re-encode to add a tag |
 | `source` | `designed` for a rendered element (turntable, card); no `src`, native resolution, no handles | |
 | `role` | `endcard` on at most one event — the finisher cuts the footage at its `tl[0]` and concatenates the card; a spot whose beat list forbids a card has none | the card plays its FULL render length (2.5 s by default; a two-line card longer — designed-elements CRAFT § Readable time); captions never run over it; `edl_check --require-endcard` holds a card where the script has one; the event spans its whole FILE — `in` 0, `out` its length — because the finisher plays a card from its first frame and cuts the master at `runtime_s`: a shorter span cuts the card's tail with no error anywhere (`edl_check` fails it unless the event's `card_trim_note` says the trim is meant) |
 | `handle_head` | where the in-point sits inside the SOURCE the finisher seeks | **the seek convention**: a full-take hero needs `handle_head = in`; a pre-trimmed upscale input needs the handle written by `trim_for_upscale.py`; `0` with `in > 0` ran a spot 0.3 s late for four versions |
@@ -135,7 +136,7 @@ constant is re-measured, then re-stamped). `--allow-stale-derived` builds anyway
 ## The plan (`edl_build.py`)
 
 The plan is the EDL with every time replaced by a reference. `events[]` carry `take/in/out` (+ `src`,
-`look`, `source`, `role`, `card_trim_note`, `vol`, `native_from/to`, `zoom/anchor`, `accepted_cuts/accepted_cuts_note`, `note`);
+`look`, `source`, `role`, `card_trim_note`, `vol`, `native_from/to`, `zoom/anchor`, `accepted_cuts/accepted_cuts_note`, `in_matrix`, `note`);
 `vo` lines carry `file`, `at`, `text` (+ `source`, `lip_synced`, `floor_ok`); any entry may carry `derived`;
 `markers` are `{event, take}` MEASURED on the keeper; every `at` and `tl` is a **time ref**:
 

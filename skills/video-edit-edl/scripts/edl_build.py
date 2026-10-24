@@ -9,7 +9,7 @@ becomes a change to the plan, not a hand edit of a time.
 
 Plan (full field list: references/EDL-CONTRACT.md § The plan):
   events[]    {id, take, in, out, src?, look?, source?, role?, card_trim_note?, vol?, native_from?, native_to?, zoom?, anchor?,
-               accepted_cuts?, accepted_cuts_note?, note}
+               accepted_cuts?, accepted_cuts_note?, in_matrix?, note}
               a generated event without src gets hero_pattern.format(stem=<take stem>, id=<id>) and look "none"
               (pre-graded hero); a "designed" event keeps its own look and never gets a src; the card is role "endcard" and
               spans its whole file (in 0, out its length) — card_trim_note says why when a trim is meant (edl_check).
@@ -112,6 +112,7 @@ def main():
                 if ev.get(k) is not None: x['native_audio_' + k.split('_')[1]] = float(ev[k])
             if ev.get('zoom'): x['zoom'] = float(ev['zoom']); x['anchor'] = ev.get('anchor', [0.5, 0.5])
             if ev.get('accepted_cuts'): x['accepted_cuts'] = [round(float(c), 3) for c in ev['accepted_cuts']]; x['accepted_cuts_note'] = ev.get('accepted_cuts_note', '')
+        if ev.get('in_matrix'): x['in_matrix'] = ev['in_matrix']   # a source's declared YUV matrix (finish_spot reads it; EDL-CONTRACT)
         d = o0 - i0; t1 = round(t + d, 6); x['tl'] = [t, t1]; tl[ev['id']] = x['tl']; EIN[ev['id']] = i0; t = t1; events.append(x)
     RUN = t
     markers = {}

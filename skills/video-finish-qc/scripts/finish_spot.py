@@ -78,6 +78,7 @@ def main():
     EC = ecs[0] if ecs else None   # optional: edl_check --require-endcard holds a card where the script has one
     ev = [e for e in edl['events'] if e.get('role') != 'endcard']
     for e in ev: assert e.get('take'), f"{e['id']}: take is null — pick a keeper in the EDL first"
+    for e in edl['events']: assert e.get('in_matrix') in (None, 'bt709', 'bt601', 'bt2020nc'), f"{e['id']}: in_matrix {e.get('in_matrix')!r} — bt709 | bt601 | bt2020nc"
     FOOT_END = float(EC['tl'][0]) if EC else RUN
     beats = f"prompts/{SPOT}-beats.json"
     if not a.no_gate and os.path.exists(beats):
@@ -117,27 +118,40 @@ def main():
             except (ValueError, ZeroDivisionError): SFPS[p] = None
         return SFPS[p]
     SMX = {}
-    def src_colour(p):
-        """(matrix, range, rgb) a source is decoded with — the tag, else BT.709 at HD and above (normalise_shots.py's rule)"""
-        if p not in SMX:
+    def src_colour(p, decl=None):
+        """(matrix, range, rgb) a source is decoded with — the event's declared in_matrix, else the tag, else BT.709 at HD
+        and above and BT.601 below (normalise_shots.py's rule, the one players apply to untagged video;
+        measured 2026-10-25). The size rule picking BT.601 prints a WARN, the cue to declare: an untagged SD clip encoded BT.709 reads 26 off."""
+        if (p, decl) not in SMX:
             r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,pix_fmt,color_space,color_range,width,height',
                                 '-of', 'json', p], capture_output=True, text=True).stdout
             st = (json.loads(r or '{}').get('streams') or [{}])[0]; cs = st.get('color_space') or ''
-            m = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if st.get('height', 0) >= 720 or st.get('width', 0) >= 1280 else 'bt601')
+            tagged = cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc')
+            m = decl or (cs if tagged else ('bt709' if st.get('height', 0) >= 720 or st.get('width', 0) >= 1280 else 'bt601'))
             pf = st.get('pix_fmt') or ''
             rgb = st.get('codec_name') == 'png' or pf.startswith(('rgb', 'bgr', 'gbr', 'argb', 'abgr', '0rgb', '0bgr', 'pal'))
-            SMX[p] = (m, 'pc' if st.get('color_range') == 'pc' else 'tv', rgb)
-        return SMX[p]
-    def src_matrix(p):
+            kind = 'rgb' if rgb else 'gray' if pf.startswith(('gray', 'ya', 'mono')) else 'yuv'
+            if decl and kind != 'yuv':   # RGB and luma-only carry no YUV matrix: a declaration there would only force a range
+                print(f"WARN {p}: in_matrix {decl} ignored — a {kind} source has no YUV matrix", flush=True)
+            if decl and kind == 'yuv' and tagged and {'bt709': 'bt709', 'bt470bg': 'bt601', 'smpte170m': 'bt601', 'bt2020nc': 'bt2020nc'}[cs] != decl:   # the declaration describes the file READ (src), never the take behind a re-encoded hero
+                print(f"WARN {p}: in_matrix {decl} overrides its own tag {cs} — right only when that tag is wrong", flush=True)
+            if kind == 'yuv' and not tagged and not decl and m == 'bt601':   # untagged HD reads BT.709, as players do: no WARN
+                print(f"WARN {p}: untagged — read as {m} by the size rule ({st.get('width')}x{st.get('height')}); declare the event's in_matrix if the source says otherwise", flush=True)
+            SMX[(p, decl)] = (m, 'pc' if st.get('color_range') == 'pc' else 'tv', kind)
+        return SMX[(p, decl)]
+    def src_matrix(p, decl=None):
         """the named decode a cube's input gets — never ffmpeg's BT.601 default (an untagged upscale decoded as BT.601 shifts)"""
-        m, rng, _ = src_colour(p); return f"scale=in_color_matrix={m}:in_range={rng}:flags=accurate_rnd+full_chroma_int"
-    def to709(p):
+        m, rng, kind = src_colour(p, decl)
+        if kind == 'gray': return "scale=flags=accurate_rnd+full_chroma_int"   # luma keeps swscale's own gray step: a forced tv read clipped 16/235 to 0/255
+        return f"scale=in_color_matrix={m}:in_range={rng}:flags=accurate_rnd+full_chroma_int"
+    def to709(p, decl=None):
         """'' for a BT.709 tv-range YUV source (it passes untouched, as before); otherwise the named conversion into the
         bt709 mezzanine — an RGB source (a png-codec render) by TO709, a BT.601 or full-range YUV source through 16-bit RGB"""
-        m, rng, rgb = src_colour(p)
-        if rgb: return f"{TO709},"
+        m, rng, kind = src_colour(p, decl)
+        if kind == 'rgb': return f"{TO709},"
+        if kind == 'gray': return ''   # no matrix: the final format= step keeps its levels
         if m == 'bt709' and rng == 'tv': return ''
-        return f"{src_matrix(p)},format=gbrp16le,{TO709},"
+        return f"{src_matrix(p, decl)},format=gbrp16le,{TO709},"
 
     # ---- 1. graded mezzanine cut (footage only, 0–FOOT_END) ----
     if a.stage in ('cut', 'all'):
@@ -160,7 +174,7 @@ def main():
             sf = src_fps(src)   # seek onto the source's own frame grid, a quarter frame early: at a half-frame offset the fps filter's
             if sf: ss = max(0.0, round(ss * sf) / sf - 0.25 / sf)   # nearest-frame choice flips on 1 ms timestamps (Matroska) → a frame shown twice
             inputs += ['-ss', f'{ss:.6f}', '-t', f'{(nfr + 2) / FPS:.6f}', '-i', src]
-            lut = f"{src_matrix(src)},format=gbrp16le,lut3d=file={ff_path(f'{a.cubes}/{look}_33.cube')}:interp=tetrahedral,{TO709}," if look != 'none' else to709(src)   # look "none" = pre-graded hero (Resolve/Dehancer pass); both matrices named
+            lut = f"{src_matrix(src, e.get('in_matrix'))},format=gbrp16le,lut3d=file={ff_path(f'{a.cubes}/{look}_33.cube')}:interp=tetrahedral,{TO709}," if look != 'none' else to709(src, e.get('in_matrix'))   # look "none" = pre-graded hero (Resolve/Dehancer pass); both matrices named
             z = float(e.get('zoom', 1) or 1); zc = ''
             if z > 1.0001:                                                                                   # per-event punch-in: crop 1/z around the anchor, then the normal scale
                 ax, ay = e.get('anchor', [0.5, 0.5]); cw, ch = f'iw/{z:.4f}', f'ih/{z:.4f}'
@@ -175,7 +189,7 @@ def main():
         subprocess.run([sys.executable, os.path.expanduser(a.stem_builder), '--root', '.', '--edl', a.edl], check=True)   # ALWAYS rebuild the stem from the EDL — a stale stem shipped a line at its old time
         inp = ['-i', FOOT] + (['-i', EC['take']] if EC else []) + ['-i', AU['vo']['stem']]
         STEM = 2 if EC else 1; n = STEM + 1   # input indices are DERIVED — a hard-coded stem index is where a card-less patch breaks the audio map
-        v = ([f"[1:v]scale={W}:{H}:flags=lanczos,{to709(EC['take'])}format=yuv422p10le,setpts=PTS-STARTPTS[ec]"] if EC else []) + ["[0:v]format=yuv422p10le,tpad=stop_mode=clone:stop_duration=0.05[b0]"]; last = 'b0'
+        v = ([f"[1:v]scale={W}:{H}:flags=lanczos,{to709(EC['take'], EC.get('in_matrix'))}format=yuv422p10le,setpts=PTS-STARTPTS[ec]"] if EC else []) + ["[0:v]format=yuv422p10le,tpad=stop_mode=clone:stop_duration=0.05[b0]"]; last = 'b0'
         for k, L in enumerate(edl.get('post_layers', [])):
             inp += ['-framerate', str(FPS), '-i', L['frames']]
             v.append(f"[{n}:v]scale={W}:{H}:flags=lanczos,{TO709},format=yuva422p10le,setpts=PTS-STARTPTS+{L['at']}/TB[ov{k}]"); n += 1   # RGBA → YUVA here, by the named matrix — never inside overlay

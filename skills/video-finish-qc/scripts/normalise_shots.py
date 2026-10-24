@@ -9,12 +9,14 @@ then a saturation factor that lands the shot's chroma on a target measured on fo
   normalise_shots.py measure --root <project> --shots <shots.json> (--target-chroma 0.030 | --target-ref <video> --target-at 3.2,9.8,…)
                              [--t-scale 0.91] [--min-short 1080]
   normalise_shots.py flatten --root <project> --shots <shots.json> --out-dir edit/flat [--only id,…]
-  normalise_shots.py chain   --shots <shots.json> --id <id>          # the -vf chain, for a builder that grades with a cube instead
+  normalise_shots.py chain   [--root <project>] --shots <shots.json> --id <id>   # the -vf chain, for a builder that grades with a cube
+                                                                                  # instead; the source's decode named as flatten names it
   normalise_shots.py verify  --root <project> --shots <shots.json> --flat-dir edit/flat --hero-dir edit/hero --look ads-clean
   normalise_shots.py --selftest
 
 shots.json — one window per shot, frames of the SOURCE, handles included: [{"id": "s03", "src": "assets/C5325.mp4", "f0": 150,
-"n": 99}, …]. `measure` adds W, H (the square-pixel display shape, scaled UP to --min-short on its short side, never down: an
+"n": 99}, …]; optional "in_matrix": bt709 | bt601 | bt2020nc for a source whose colour tag is missing or wrong (an untagged
+source is read BT.709 at HD and above, BT.601 below — the BT.601 case prints a WARN, the cue to declare it). `measure` adds W, H (the square-pixel display shape, scaled UP to --min-short on its short side, never down: an
 anamorphic 9:16 clip stored 1920x1080 at SAR 81:256 becomes 1080x1920; a 4K source keeps its pixels for the crops downstream),
 lo, hi, sat, and writes a .bak first. A resample is lanczos — nothing is redrawn; a source that needs detail REBUILT is the
 upscale arm's (video-finish § 1), before this step.
@@ -64,21 +66,32 @@ def display(st, min_short):   # the square-pixel display shape, scaled up (never
     k = max(1.0, min_short / min(w, h)); return 2 * round(w * k / 2), 2 * round(h * k / 2)
 
 
-def in_matrix(st):   # an untagged source: BT.709 at HD and above, BT.601 below — swscale's own default is BT.601 at every size
-    cs = st.get('color_space') or ''
-    return cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if st['height'] >= 720 or st['width'] >= 1280 else 'bt601')
+WARNED = set()
 
 
-def scale_in(w, st):
-    return f"scale={w['W']}:{w['H']}:flags=lanczos+accurate_rnd+full_chroma_int:in_color_matrix={in_matrix(st)},setsar=1"
+def in_matrix(st, decl=None, src=''):   # the shot's declared in_matrix, else the tag; untagged: BT.709 at HD and above, BT.601 below
+    cs = st.get('color_space') or ''   # (the rule players apply; swscale's own default is BT.601 at every size)
+    if decl:
+        if cs in {'bt709': 'bt709', 'bt470bg': 'bt601', 'smpte170m': 'bt601', 'bt2020nc': 'bt2020nc'} and {'bt709': 'bt709', 'bt470bg': 'bt601', 'smpte170m': 'bt601', 'bt2020nc': 'bt2020nc'}[cs] != decl and src not in WARNED:
+            WARNED.add(src); print(f"WARN {src}: in_matrix {decl} overrides its own tag {cs} — right only when that tag is wrong", file=sys.stderr, flush=True)
+        return decl
+    if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc'): return cs
+    m = 'bt709' if st['height'] >= 720 or st['width'] >= 1280 else 'bt601'
+    if m == 'bt601' and src not in WARNED:   # untagged HD reads BT.709, as players do: no WARN
+        WARNED.add(src); print(f"WARN {src}: untagged — read as {m} by the size rule ({st['width']}x{st['height']}); a shot's in_matrix declares it", file=sys.stderr, flush=True)
+    return m
 
 
-def frames(src, st, t0, n, W, H, count=5, pre=''):   # RGB 0..1 of `count` frames spread over [t0, t0 + n/fps)
+def scale_in(w, st, src=''):
+    return f"scale={w['W']}:{w['H']}:flags=lanczos+accurate_rnd+full_chroma_int:in_color_matrix={in_matrix(st, w.get('in_matrix'), src)},setsar=1"
+
+
+def frames(src, st, t0, n, W, H, count=5, pre='', decl=None):   # RGB 0..1 of `count` frames spread over [t0, t0 + n/fps)
     out = []
     for k in range(count):
         t = t0 + (k + 0.5) * (n / st['fps']) / count
         b = run(['ffmpeg', '-v', 'error', '-ss', f'{t:.4f}', '-i', src, '-frames:v', '1', '-vf',
-                 (pre or f"scale={W}:{H}:flags=lanczos:in_color_matrix={in_matrix(st)}") + ',format=rgb48le', '-f', 'rawvideo', '-'], binary=True)
+                 (pre or f"scale={W}:{H}:flags=lanczos:in_color_matrix={in_matrix(st, decl, str(src))}") + ',format=rgb48le', '-f', 'rawvideo', '-'], binary=True)
         out.append(np.frombuffer(b, np.uint16).reshape(H, W, 3).astype(np.float32) / 65535)
     return out
 
@@ -117,7 +130,7 @@ def measure(a, root, shots):
     T = target(a, root) * a.t_scale; print(f"chroma target {T:.4f} (t-scale {a.t_scale})")
     for w in shots:
         src = root / w['src']; st = probe(src); w['W'], w['H'] = display(st, a.min_short)
-        fr = frames(src, st, w['f0'] / st['fps'], w['n'], w['W'], w['H'])
+        fr = frames(src, st, w['f0'] / st['fps'], w['n'], w['W'], w['H'], decl=w.get('in_matrix'))
         lo, hi = levels(np.concatenate([luma(f).ravel() for f in fr]))
         lev = [B_OUT + (W_OUT - B_OUT) * np.clip((f - lo) / (hi - lo), 0, 1) for f in fr]
         c0 = float(np.mean([chroma(f) for f in lev])); sat = float(np.clip(T / max(c0, 1e-4), *SAT_RANGE))
@@ -134,7 +147,7 @@ def flatten(a, root, shots):
         src = root / w['src']; st = probe(src); out = out_dir / f"{w['id']}.mov"
         if out.exists(): sys.exit(f"{out} exists: a new flat is a new --out-dir (the heroes cut from the old one stay valid)")
         run(['ffmpeg', '-v', 'error', '-ss', f"{max(0.0, (w['f0'] - 0.5) / st['fps']):.5f}", '-i', src, '-frames:v', w['n'], '-vf',
-             f"{scale_in(w, st)},{chain(w)},scale=out_color_matrix=bt709:out_range=tv,format=yuv422p10le,setpts=PTS-STARTPTS",
+             f"{scale_in(w, st, str(src))},{chain(w)},scale=out_color_matrix=bt709:out_range=tv,format=yuv422p10le,setpts=PTS-STARTPTS",
              '-an', '-c:v', 'prores_ks', '-profile:v', '3', '-vendor', 'apl0', '-color_range', 'tv', '-colorspace', 'bt709',
              '-color_primaries', 'bt709', '-color_trc', 'bt709', '-r', f"{st['fps']:g}", out])
         o = probe(out); ok = o['start_time'] == 0.0 and int(o.get('nb_frames') or 0) == w['n'] and o['pix_fmt'] == 'yuv422p10le'
@@ -222,12 +235,18 @@ def main():
     if a.selftest: sys.exit(selftest())
     if not (a.cmd and a.shots): ap.error('a command and --shots')
     root = Path(a.root).resolve(); sp = Path(a.shots) if Path(a.shots).is_absolute() else root / a.shots; shots = json.loads(sp.read_text())
+    bad = [f"{w.get('id')}: in_matrix {w.get('in_matrix')!r}" for w in shots if w.get('in_matrix') not in (None, 'bt709', 'bt601', 'bt2020nc')]
+    if bad: sys.exit('in_matrix must be bt709 | bt601 | bt2020nc — ' + '; '.join(bad))   # a typo reaches ffmpeg as a silent BT.601
     if a.cmd == 'measure':
         measure(a, root, shots); shutil.copy2(sp, sp.with_name(sp.name + f'.bak-{time.strftime("%Y%m%d-%H%M%S")}-measure'))
         sp.write_text(json.dumps(shots, indent=1)); print('MEASURE-END', sp)
     elif a.cmd == 'flatten': flatten(a, root, shots)
     elif a.cmd == 'chain':
-        w = next(x for x in shots if x['id'] == a.id); print(f"scale={w['W']}:{w['H']}:flags=lanczos,setsar=1,{chain(w)}")
+        w = next(x for x in shots if x['id'] == a.id)   # the decode named as flatten names it; stdout stays the filter string
+        src = next((b / w['src'] for b in [root] + list(sp.parents) if (b / w['src']).exists()), None)   # --root, else up from shots.json
+        if src: print(f"{scale_in(w, probe(src), str(src))},{chain(w)}")
+        elif w.get('in_matrix'): print(f"scale={w['W']}:{w['H']}:flags=lanczos+accurate_rnd+full_chroma_int:in_color_matrix={w['in_matrix']},setsar=1,{chain(w)}")
+        else: sys.exit(f"chain: {w['src']} not found under --root or above {sp} — pass --root <project>, or declare the shot's in_matrix")
     else: sys.exit(1 if verify(a, root, shots) else 0)
 
 
