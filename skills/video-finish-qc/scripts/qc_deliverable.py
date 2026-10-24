@@ -76,7 +76,7 @@ Exit 1 on any FAIL; the summary names the failures by kind.
                     [--prev deliver/<previous version>.mp4 [--prev-expect finish|changed:<id,…>]]
   qc_deliverable.py --selftest        # near-black: a black event FAILS, a declared one passes · vs previous: regraded / moved / retimed read back
 """
-import argparse, json, os, re, subprocess, sys
+import argparse, glob, json, os, re, subprocess, sys
 import numpy as np
 
 SK = os.path.expanduser('~/.claude/skills')
@@ -183,6 +183,28 @@ def classify(row):
     return 'moved' if off is None else 'retimed' if off else 'regraded' if dy > 1.0 else 'same'
 
 
+def matrix_provenance(D, e, mezz='edit/mezz'):
+    """(finished, detail) for the colour-matrix row: a deliverable finish_spot.py wrote has a record in edit/mezz/*.finish.json
+    naming its sha256 — its conversions are the ones matrix_check.py --finish-e2e covers. Any other render (a project's own
+    builder) owes one matrix_check card run through its exact decode and encode before its first delivery, recorded in the EDL
+    as qc.matrix_check (measured 2026-10-23: a builder's BT.601 conversion under a bt709 tag passed every other row)."""
+    import hashlib
+    h = hashlib.sha256()
+    with open(D, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''): h.update(b)
+    sha = h.hexdigest()
+    for p in sorted(glob.glob(os.path.join(mezz, '*.finish.json'))):
+        try: r = json.load(open(p))
+        except (OSError, ValueError): continue
+        if isinstance(r, dict) and r.get('sha256') == sha: return True, f"finished by {r.get('tool', 'finish_spot.py')} ({p})"
+    rec = (e.get('qc') or {}).get('matrix_check')
+    if rec: return True, f"not a finish_spot.py render; card run recorded in qc.matrix_check: {rec}"
+    return False, ("not a finish_spot.py render (no edit/mezz/*.finish.json names this file) — a matrix_check card run through "
+                   "this render's exact decode and encode is OWED before its first delivery (QC.md § builder renders); "
+                   "record its result as qc.matrix_check in the EDL; a finish_spot.py delivery made before 2026-10-25, or delivered "
+                   "from a master that carries no record, has none — re-run the finish from its cut stage (--stage all)")
+
+
 def selftest():
     import tempfile
     d = tempfile.mkdtemp(); clip = os.path.join(d, 'clip.mp4')
@@ -215,7 +237,15 @@ def selftest():
     ev[1]['accepted_black'] = {'why': 'a window only', 'tl': [[2.0, 2.1]]}; nb6 = [b[0] for b in near_black_events(clip, ev)]
     ok6 = [(round(x, 6), round(y, 6)) for x, y in wb] == [(13.0, 13.2)] and nb6 == ['b'] and not _covered(12.5, 13.1, wb)
     print(f"SELFTEST {'PASS' if ok6 else 'FAIL'}: accepted_black windows {wb} (want [(13.0, 13.2)]); a window form still fails a whole black event ({nb6})")
-    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 else 1)
+    mz = os.path.join(d, 'mezz'); os.makedirs(mz)
+    r1 = matrix_provenance(clip, {}, mz)                                                          # no record, no declaration: owed
+    r2 = matrix_provenance(clip, {'qc': {'matrix_check': 'card max err 1 (2026-10-25)'}}, mz)   # a builder render, card run recorded
+    import hashlib; json.dump({'tool': 'finish_spot.py', 'sha256': hashlib.sha256(open(clip, 'rb').read()).hexdigest()}, open(os.path.join(mz, 'clip.mp4.finish.json'), 'w'))
+    open(os.path.join(mz, 'broken.finish.json'), 'w').write('{')
+    r3 = matrix_provenance(clip, {}, mz); r4 = matrix_provenance(base, {}, mz)                 # the record names clip, not base
+    ok7 = not r1[0] and 'OWED' in r1[1] and r2[0] and 'qc.matrix_check' in r2[1] and r3[0] and 'finish_spot' in r3[1] and not r4[0]
+    print(f"SELFTEST {'PASS' if ok7 else 'FAIL'}: colour-matrix provenance — owed {not r1[0]}, declared {r2[0]}, finish_spot record {r3[0]}, another file {not r4[0]}")
+    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 else 1)
 
 
 def last_frame_thumb(p):
@@ -366,6 +396,7 @@ def main():
     q = e.get('qc', {}) or {}
     if q.get('frame0_bg'): ok, det = dc.frame0_bg(D, q['frame0_bg']); verdict(ok, 'frame 0 vs the background', det)
     ok, det = dc.range_read(D, rng); print(f"{'INFO' if ok else 'WARN'} range read: {det}")
+    ok, det = matrix_provenance(D, e); print(f"INFO colour matrix: {det}")   # INFO either way: owed is a step to take, not a verdict on the file
     if q.get('loop'): ok, det = dc.loop_seam(D); verdict(ok, 'loop seam', det)
     ok, det = dc.poster(D, e.get('poster_at'), q.get('poster'), a.black_luma); verdict(ok, 'poster (frame 0)', det)
     if e.get('poster_at') is not None: ok, det = dc.poster_flash(D); print(f"{'INFO' if ok else 'WARN'} poster flash: {det}")   # WARN only: the chosen thumbnail is kept

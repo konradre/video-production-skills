@@ -48,6 +48,7 @@ Nothing is graded by a total score: the number decides pass/fail and the label d
 | source geometry | INFO: every hero take whose display shape differs from its storage shape (SAR ≠ 1:1, a rotation tag), from the take's own probe; the eye check is a delivered frame beside the source's display frame at 1:1 — a circle stays a circle | 11 of 17 client clips stored anamorphically were read as square pixels and every render stretched them 3.16× wide; no row compared a delivered frame with its source (2026-09-15) |
 | vs the previous version | `--prev <file>`: each footage event's middle frame against the same timeline frame of the previous version and its two neighbours — **regraded** (mean \|dY\| > 1/255, phase (0, 0), best structural match at m), **moved** (no neighbour lines up at (0, 0): a crop, scale or warp), **retimed** (a neighbour lines up: a one-frame slip), **same**; `--prev-expect finish` fails anything but regraded, `--prev-expect changed:<ids>` fails a named event that reads same at its middle AND at four frames near its two edges (a change confined to a tail hold, a fade or a trim never reaches the middle), a designed event read at its edges too | a finish that doubled the first frame of 14 of 22 events — a half-frame in-point into the hero quantised to a rounding tie in the builder's `fps` filter — while every per-hero row passed, and the approved version's own four doubled first frames (in-points at x.2 / x.4 of a frame) that read `retimed` until the in-points took the nearest frame (2026-09-26); a changed square crop that a builder's id-keyed cache never re-rendered |
 | platform contract | INFO: the colour range tag (`tv`), the keyframe spacing (a closed 2 s GOP = every 48 frames at 24 fps), the edit lists (0) — look-library GUIDE § 7 | a validator that rejects an open or irregular GOP; an A/V offset on a platform that ignores the edit list the muxer wrote for the AAC priming |
+| colour matrix | INFO: a deliverable `finish_spot.py` wrote is named by its record in `edit/mezz/*.finish.json` (the file's sha256); any other render prints the `matrix_check` card run as **owed** unless the EDL records it in `qc.matrix_check` — § Builder renders | a builder that converts RGB ↔ YUV with BT.601 under a bt709 tag: saturated colour 40 levels off while every other row passes |
 
 **Every row has a kind.** `format` rows are mechanically fixable — the agent fixes them alone (a re-mux for tags or
 faststart, a re-encode at the right frame) and re-runs; `judgement` rows change the content — duration, loudness, cuts,
@@ -60,6 +61,24 @@ dark backgrounds (never the first frame alone); the mouth check on every wide; t
 the captions' text against the VO variant. Every comparison instrument carries a known-answer case in the
 same invocation (a file against itself must return `inf` / NCC 1.0): `ffmpeg -v error` suppresses the
 PSNR summary line and an empty result reads as "identical".
+
+## Builder renders — the colour-matrix card run
+
+A render made by anything other than `finish_spot.py` — a project's own build script, a compilation builder — owes **one
+`matrix_check.py` card run through that builder's exact decode and encode arguments before its first delivery**, once per
+kind of input it takes: `matrix_check.py card <card.png>` for an RGB input (a still, a rendered layer), and
+`matrix_check.py card <card.mp4>` for a video input — a known-correct BT.709 tv-range YUV video that the command measures
+before keeping it, because the PNG card cannot see a wrong YUV decode (a BT.601 decode with a correct encode read 1 on the
+PNG and 24 on the video). Put each through the builder the way it takes that input → `matrix_check.py measure <rendered
+card> --max 3`. Record both results in the EDL as `qc.matrix_check` (the measured errors and the date). The finisher needs
+no card run: its conversions are the ones `matrix_check.py --finish-e2e` covers. Each stage it runs leaves a provenance
+record, `edit/mezz/<file>.finish.json` with the file's sha256, written only when the stage's input carries one too — so a
+deliver-only re-run over an older master writes none — and `qc_deliverable.py` matches the delivered file against them. With
+neither the record nor `qc.matrix_check`, the QC prints the card run as owed (INFO). A kit tool's own re-encode of a finished
+spot — `video-finish/scripts/phone_native.py` — is covered by that tool's `--selftest` colour rows: declare it (`qc.matrix_check:
+"phone_native.py --selftest"`) rather than re-run a card. Why: a builder that piped frames to
+the encoder with no matrix named, under a bt709 tag, shipped three compilations 40 levels off on saturated colour while
+grey, black and white read exact — every other row passed them.
 
 ## On a creator-style spot — the phone-texture band and the inter-shot spread
 

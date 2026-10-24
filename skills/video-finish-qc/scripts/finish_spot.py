@@ -23,7 +23,7 @@ Before any stage the HOST drive's free space is read; under the floor (--min-fre
 pair) the finish WARNS with the numbers and runs — the floor is a buffer, not a gate (since 2026-10-09). A
 mezzanine pair per version fills a drive, and on a VM the guest's free space is not the host's.
 """
-import argparse, glob, json, os, subprocess, sys
+import argparse, glob, hashlib, json, os, subprocess, sys
 
 SK = os.path.expanduser('~/.claude/skills')
 
@@ -41,6 +41,33 @@ TO709 = 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chrom
 # files are tagged bt709, and a saturated patch read back up to 40 levels off (measured 2026-10-21). Grey, black and white do not
 # move, which is why no grey check saw it. `matrix_check.py` is the regression. Every RGB <-> YUV crossing also rounds
 # accurately: swscale's default rounding lost 2-4 levels per crossing (measured 2026-10-25).
+
+
+
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for b in iter(lambda: f.read(1 << 20), b''): h.update(b)
+    return h.hexdigest()
+
+
+def verified(path):
+    """True when edit/mezz/<file>.finish.json names this file's current content"""
+    try: r = json.load(open(f'edit/mezz/{os.path.basename(path)}.finish.json'))
+    except (OSError, ValueError): return False
+    return isinstance(r, dict) and r.get('sha256') == _sha256(path)
+
+
+def provenance(path, parent=None):
+    """write edit/mezz/<file>.finish.json for a stage's output — qc_deliverable.py reads a deliverable's record as 'made by
+    this finisher'. A stage writes one only when its input carries a matching record, so a deliver-only re-run over an older,
+    unchecked master never certifies the result (measured 2026-10-25: a BT.601 master re-delivered read as finished)."""
+    if parent is not None and not verified(parent):
+        print(f"INFO provenance: none written for {path} — its input {parent} has no matching record from this finisher; "
+              "re-run from the cut stage (--stage all)", flush=True)
+        return
+    json.dump({'tool': 'finish_spot.py', 'file': path, 'sha256': _sha256(path), 'bytes': os.path.getsize(path)},
+              open(f'edit/mezz/{os.path.basename(path)}.finish.json', 'w'), indent=1)
 
 
 def main():
@@ -184,6 +211,7 @@ def main():
         fc.append(''.join(f'[v{i}]' for i in range(len(ev))) + f'concat=n={len(ev)}:v=1:a=0[out]')
         run(['ffmpeg', '-v', 'error', '-y'] + inputs + ['-filter_complex', ';'.join(fc), '-map', '[out]', '-c:v', 'prores_ks', '-profile:v', '3', '-vendor', 'apl0', '-pix_fmt', 'yuv422p10le', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv', '-r', str(FPS), FOOT])
         print(probe(FOOT))
+        provenance(FOOT)
     # ---- 2. master: composite layers + end card at the mezzanine raster, mix the audio ----
     if a.stage in ('master', 'all'):
         subprocess.run([sys.executable, os.path.expanduser(a.stem_builder), '--root', '.', '--edl', a.edl], check=True)   # ALWAYS rebuild the stem from the EDL — a stale stem shipped a line at its old time
@@ -239,6 +267,7 @@ def main():
         au.append(''.join(mix) + f"amix=inputs={len(mix)}:normalize=0,atrim=0:{RUN}[aout]")
         run(['ffmpeg', '-v', 'error', '-y'] + inp + ['-filter_complex', ';'.join(v + au), '-map', '[vout]', '-map', '[aout]', '-c:v', 'prores_ks', '-profile:v', '3', '-pix_fmt', 'yuv422p10le', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv', '-r', str(FPS), '-c:a', 'pcm_s24le', '-ar', '48000', '-t', f'{RUN}', MASTER])
         print(probe(MASTER)); print('audio inputs used:', json.dumps(used))
+        provenance(MASTER, FOOT)
     # ---- 3. deliverable: downscale from the mezzanine, H.264 ----
     if a.stage in ('deliver', 'all'):
         ln = AU.get('loudnorm', {'I': -14, 'TP': -1, 'LRA': 9})
@@ -271,6 +300,7 @@ def main():
         # Measured on a real master (TP target -2.4, AAC 192k): limiter after the resample only -> -1.0 dBTP; before only -> -2.0; both -> -2.1; none -> -1.9.
         run(['ffmpeg', '-v', 'error', '-y', '-i', MASTER] + cin + ['-filter_complex', chain, '-map', f'[{last}]', '-map', '0:a', '-af', af, '-ar', '48000', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-level', '4.1', '-g', str(2 * FPS), '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-t', f'{RUN}', DELIV])   # -t: the picture is authoritative — without it AAC priming + padding set the container duration
         print(probe(DELIV)); print(os.path.getsize(DELIV) / 1e6, 'MB', DELIV)
+        provenance(DELIV, MASTER)
     print('FINISH-END stage', a.stage)
 
 

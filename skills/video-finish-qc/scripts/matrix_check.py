@@ -96,6 +96,22 @@ def card_html(d, W, H, dur=2.0, fps=24):
     with open(os.path.join(d, 'index.html'), 'w') as f: f.write(html)
 
 
+def card_video(path, W, H, dur=2.0, fps=24):
+    """the card as a KNOWN-CORRECT BT.709 tv-range YUV video (H.264 4:2:0, tagged): the reference a builder's YUV decode
+    is tested with — the PNG card alone cannot see a wrong decode (measured 2026-10-25: a BT.601 decode with a correct encode
+    read 1 on the PNG and 24 on a tagged video). Measured before it is kept: it must read within LIMIT itself."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        png = os.path.join(d, 'card.png'); card_png(png, W, H)
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-loop', '1', '-t', f'{dur}', '-r', f'{fps}', '-i', png,
+                        '-vf', 'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p',
+                        '-c:v', 'libx264', '-crf', '12', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+                        '-color_range', 'tv', path], check=True)
+    r = measure(path, min(1.0, dur / 2), 'tag', W, H)
+    if r.get('ok') is None or r['max_err'] > LIMIT: sys.exit(f'card video {path} reads {r.get("max_err")} — not a usable reference')
+    return r
+
+
 def probe(path):
     r = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
                         'stream=codec_name,pix_fmt,color_space,color_range,width,height', '-of', 'json', path],
@@ -148,6 +164,13 @@ def selftest():
     with tempfile.TemporaryDirectory() as d:
         png = os.path.join(d, 'card.png'); card_png(png, W, H)
         r = measure(png, W=W, H=H); ok &= r['max_err'] == 0; print(f"selftest card png:            max err {r['max_err']} (want 0)")
+        cv = os.path.join(d, 'card.mp4'); rv = card_video(cv, W, H); okv = rv['max_err'] <= LIMIT
+        wrong = os.path.join(d, 'wrongdecode.mp4')   # a builder that decodes the video as BT.601 and encodes BT.709 correctly
+        subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', cv, '-vf', 'scale=in_color_matrix=bt601:in_range=tv:flags=accurate_rnd+full_chroma_int,format=gbrp16le,'
+                        'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p', '-c:v', 'libx264', '-crf', '12',
+                        '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', wrong], check=True)
+        rw = measure(wrong, W=W, H=H); okw = rw['max_err'] > LIMIT; ok &= okv and okw
+        print(f"selftest card video:          max err {rv['max_err']} (want <= {LIMIT}); a BT.601 decode of it reads {rw['max_err']} (want > {LIMIT})")
         def ff(args): subprocess.run(['ffmpeg', '-v', 'error', '-y'] + args, check=True)
         tag = ['-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709']
         cases = []
@@ -281,7 +304,9 @@ def main():
     a = ap.parse_args(); W, H = size(a.size)
     if a.cmd == 'card':
         if not (a.out or a.html): ap.error('card needs <out.png> or --html <dir>')
-        if a.out: card_png(a.out, W, H); print('card', a.out, f'{W}x{H}')
+        if a.out and a.out.lower().endswith(('.mp4', '.mov', '.mkv')):
+            r = card_video(a.out, W, H); print('card video', a.out, f'{W}x{H}', f"BT.709 tv YUV, reads {r['max_err']} (the reference)")
+        elif a.out: card_png(a.out, W, H); print('card', a.out, f'{W}x{H}')
         if a.html: card_html(a.html, W, H); print('card', os.path.join(a.html, 'index.html'), f'{W}x{H}')
         return
     res = measure(a.file, a.at, a.as_, W, H)

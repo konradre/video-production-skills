@@ -95,6 +95,10 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
 - `qc.accepted_flashes` (optional, timeline seconds, entered by hand) — a one-frame flash or snap the piece means to
   have: the delivery QC's pops and steps rows set those frames aside. The steps row reads the other frames the picture
   changes on purpose from the EDL itself: the joins, each event's `accepted_cuts`, every caption card's on and off.
+- `qc.matrix_check` (optional, text) — a render made by a project's own builder, not `finish_spot.py`: the result of
+  its `matrix_check.py` card run through the builder's exact decode and encode (the measured error and the date). With it,
+  or with `finish_spot.py`'s provenance record for the delivered file, the delivery QC's colour-matrix row reads done;
+  with neither it prints the card run as owed (video-finish-qc QC.md § Builder renders).
 - `qc.grain_after` (optional, `true`) — the finish lays grain over the picture after the cut. No frozen shot gets under
   freezedetect's tolerance through grain, so the delivery QC's frozen row prints BLIND outright and the held shots are
   read by eye.
