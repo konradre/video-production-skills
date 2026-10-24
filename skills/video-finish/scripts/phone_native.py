@@ -10,7 +10,7 @@ that arrived through a platform re-encode (measured 2026-09-16), so the layer ca
 
   phone_native.py --in <clip> --out <mp4> [--canvas 1080x1920] [--noise 6] [--denoise 0] [--drift 0.04] [--wb 150]
                   [--period 3.0] [--shake 2] [--cuts 3.2,7.8] [--ae-step 0.06] [--bitrate 12M] [--audio copy|phone|none]
-                  [--seed 7] [--dry-run] [--probe] [--ref <real phone clip> …]
+                  [--seed 7] [--in-matrix auto|bt709|bt601|bt2020nc] [--dry-run] [--probe] [--ref <real phone clip> …]
   phone_native.py --selftest      # a flat synthetic clip through two doses: the probe must read the higher dose higher
 
   --noise    ffmpeg `noise` strength (temporal + uniform), 0 = off — the probe reads the RESULT after the encode
@@ -42,16 +42,26 @@ TO709 = 'scale=out_color_matrix=bt709:out_range=tv'
 ACC = 'accurate_rnd+full_chroma_int'   # swscale's default rounding loses 2-4 levels per RGB<->YUV crossing
 
 
-def in_colour(path, w, h):
-    """(matrix, range, rgb) the input is decoded with — by its tags; untagged: BT.709 at HD and above (normalise_shots.py's
-    rule); rgb for a png-codec or packed/planar RGB stream, which carries no YUV matrix at all"""
+def in_colour(path, declared='auto'):
+    """(matrix, range, kind, untagged) the input is decoded with. kind: 'rgb' for a png-codec or RGB stream (no YUV
+    matrix at all), 'gray' for a luma-only stream (no matrix either), else 'yuv'. The matrix is the --in-matrix the caller
+    declared, else the stream's tag, else BT.709: an untagged input keeps the treatment it always had here (it passed
+    through and was tagged bt709). Guessing BT.601 from the size moved an untagged SD BT.709 clip from 2 to 26 levels off
+    (measured 2026-10-25), so an untagged BT.601 source is declared with --in-matrix, never inferred."""
     p = subprocess.run(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_name,pix_fmt,color_space,color_range',
                         '-of', 'default=nw=1', path], capture_output=True, text=True)
-    tg = dict(l.split('=', 1) for l in (p.stdout or '').split('\n') if '=' in l); cs = tg.get('color_space', '')
+    tg = dict(l.split('=', 1) for l in (p.stdout or '').split('\n') if '=' in l)
+    cs, pf = tg.get('color_space', ''), tg.get('pix_fmt', '')
     rng = 'pc' if tg.get('color_range') == 'pc' else 'tv'   # the range by its tag: a forced tv read clips a full-range input
-    m = cs if cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc') else ('bt709' if h >= 720 or w >= 1280 else 'bt601')
-    rgb = tg.get('codec_name') == 'png' or tg.get('pix_fmt', '').startswith(('rgb', 'bgr', 'gbr', 'argb', 'abgr', '0rgb', '0bgr', 'pal'))
-    return m, rng, rgb
+    tagged = cs in ('bt709', 'bt470bg', 'smpte170m', 'bt2020nc')
+    m = declared if declared != 'auto' else (cs if tagged else 'bt709')
+    if tg.get('codec_name') == 'png' or pf.startswith(('rgb', 'bgr', 'gbr', 'argb', 'abgr', '0rgb', '0bgr', 'pal')):
+        kind = 'rgb'
+    elif pf.startswith(('gray', 'ya', 'mono')):
+        kind = 'gray'
+    else:
+        kind = 'yuv'
+    return m, rng, kind, kind == 'yuv' and not tagged and declared == 'auto'
 
 
 def head(src, W, H):
@@ -59,10 +69,14 @@ def head(src, W, H):
     the WB round trip) then works in the matrix the output is tagged with: left to ffmpeg, an RGB input meets its BT.601
     default at the first YUV-only filter, and a BT.601 input passes through relabelled — 40 levels either way (pure green
     read (0,215,0); measured 2026-10-24). A BT.709 tv-range YUV input is only scaled, as before."""
-    m, rng, rgb = src
+    m, rng, kind = src[:3]
     sc = f'scale={W}:{H}:flags=lanczos'
-    if rgb:
+    if kind == 'rgb':
         return f'{sc}+{ACC}:out_color_matrix=bt709:out_range=tv,format=yuv444p'
+    if kind == 'gray':
+        # luma only, no matrix: swscale's own gray → YUV step keeps the levels by the stream's range (the old chain did it at
+        # its final format=yuv420p and read exact); forcing a YUV decode on it clipped 16 → 0 and 235 → 255 (measured 2026-10-25)
+        return f'{sc},format=yuv444p'
     if m == 'bt709' and rng == 'tv':
         return sc
     return f'scale=in_color_matrix={m}:in_range={rng}:flags={ACC},format=gbrp16le,{sc}+{ACC}:out_color_matrix=bt709:out_range=tv,format=yuv444p'
@@ -77,9 +91,9 @@ def build(a, W, H, dur, cmdfile):
         Hp = int(math.ceil(Wp * H / W))
         Hp += Hp % 2
         Hp = max(Hp, H + 2 * P)
-        chain.append(head(getattr(a, 'src', ('bt709', 'tv', False)), Wp, Hp))
+        chain.append(head(getattr(a, 'src', ('bt709', 'tv', 'yuv')), Wp, Hp))
     else:
-        chain.append(head(getattr(a, 'src', ('bt709', 'tv', False)), W, H))
+        chain.append(head(getattr(a, 'src', ('bt709', 'tv', 'yuv')), W, H))
     if a.denoise > 0:
         d = a.denoise
         chain.append(f'hqdn3d={d:g}:{d * 0.75:g}:{d * 1.5:g}:{d * 1.125:g}')
@@ -138,7 +152,9 @@ def render(a):
     iw, ih, dur, has_audio = probe_dims(a.inp)
     if not iw or dur <= 0:
         sys.exit(f'PHONE-NATIVE FAIL — cannot probe {a.inp}')
-    a.src = in_colour(a.inp, iw, ih)
+    a.src = in_colour(a.inp, getattr(a, 'in_matrix', 'auto'))
+    if a.src[3]:
+        print('WARN untagged input: read as BT.709 (as it always was here) — declare --in-matrix bt601 for a source encoded BT.601')
     cmdfile = a.out + '.wbcmds.txt'
     vf = build(a, W, H, dur, cmdfile)
     cmd = ['ffmpeg', '-v', 'error', '-y', '-i', a.inp, '-vf', vf] + encode_args(a, has_audio) + [a.out]
@@ -227,7 +243,7 @@ def selftest():
         out = os.path.join(d, f'colour-{name}-wb{wb}.mp4')
         args = argparse.Namespace(inp=src_c, out=out, canvas='540x960', noise=0, denoise=4, drift=0.0, wb=wb, period=3.0,
                                   shake=0, cut_list=[], ae_step=0.0, bitrate='20M', audio='none', seed=0, dry_run=False, probe=False, ref=[])
-        args.src = in_colour(src_c, 540, 960)
+        args.src = in_colour(src_c)
         vf = build(args, 540, 960, 1.0, out + '.wbcmds.txt')
         r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', src_c, '-vf', vf] + encode_args(args, False) + [out], capture_output=True, text=True)
         if os.path.exists(out + '.wbcmds.txt'):
@@ -240,6 +256,41 @@ def selftest():
         good = r.returncode == 0 and err is not None and err <= limit
         ok &= good
         print(f'selftest colour {name} --wb {wb}: max err {err} (limit {limit}) ' + ('ok' if good else 'FAIL'))
+    # untagged inputs keep the treatment they always had here: an untagged SD (640x360) BT.709 card reads within the
+    # limit (a BT.601 guess from its size read 26), and an untagged-range luma-only clip keeps 16 / 128 / 235 (a forced
+    # YUV decode read 0 / 130 / 255)
+    sd, usd = os.path.join(d, 'card-sd.png'), os.path.join(d, 'card-sd-untagged.mp4')
+    subprocess.run([sys.executable, mc, 'card', sd, '--size', '640x360'], capture_output=True, text=True)
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-loop', '1', '-i', sd, '-t', '1', '-r', '24', '-vf',
+                    'scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p',
+                    '-c:v', 'libx264', '-crf', '4', usd], capture_output=True)
+    pgm, gry = os.path.join(d, 'bands.pgm'), os.path.join(d, 'bands-gray.mkv')
+    with open(pgm, 'wb') as f:
+        f.write(b'P5 540 960 255\n' + bytes([16] * 180 + [128] * 180 + [235] * 180) * 960)
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-loop', '1', '-i', pgm, '-t', '1', '-r', '24', '-vf',
+                    'format=gray,setparams=range=unknown', '-c:v', 'ffv1', gry], capture_output=True)
+    for name, src_c in (('untagged SD', usd), ('untagged gray', gry)):
+        out = os.path.join(d, 'colour-' + name.replace(' ', '-') + '.mp4')
+        args = argparse.Namespace(inp=src_c, out=out, canvas='540x960', noise=0, denoise=4, drift=0.0, wb=0, period=3.0,
+                                  shake=0, cut_list=[], ae_step=0.0, bitrate='20M', audio='none', seed=0, dry_run=False, probe=False, ref=[])
+        args.src = in_colour(src_c)
+        vf = build(args, 540, 960, 1.0, out + '.wbcmds.txt')
+        r = subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', src_c, '-vf', vf] + encode_args(args, False) + [out], capture_output=True, text=True)
+        if name == 'untagged SD':
+            m = subprocess.run([sys.executable, mc, 'measure', out, '--at', '0.1', '--size', '540x960', '--json'], capture_output=True, text=True)
+            try:
+                err = json.loads(m.stdout).get('max_err')
+            except Exception:
+                err = None
+            good = r.returncode == 0 and args.src[3] and err is not None and err <= 6
+            print(f'selftest colour {name}: untagged={args.src[3]} max err {err} (limit 6) ' + ('ok' if good else 'FAIL'))
+        else:
+            g = subprocess.run(['ffmpeg', '-v', 'error', '-i', out, '-frames:v', '1', '-vf', 'scale=in_range=tv:out_range=pc,format=gray',
+                                '-f', 'rawvideo', '-'], capture_output=True).stdout
+            lv = [round(sum(g[y * 540 + x] for y in range(400, 560, 8) for x in range(cx - 40, cx + 40, 4)) / 400) for cx in (90, 270, 450)] if len(g) >= 540 * 960 else []
+            good = r.returncode == 0 and args.src[2] == 'gray' and len(lv) == 3 and all(abs(a_ - b_) <= 3 for a_, b_ in zip(lv, (16, 128, 235)))
+            print(f'selftest colour {name}: levels {lv} (want 16/128/235 ±3) ' + ('ok' if good else 'FAIL'))
+        ok &= good
     print('PHONE-NATIVE SELFTEST ' + ('PASS' if ok else 'FAIL'))
     sys.exit(0 if ok else 1)
 
@@ -254,6 +305,8 @@ def main():
     ap.add_argument('--cuts', default='', help='timeline seconds of the edit\'s cuts, comma-separated'); ap.add_argument('--ae-step', type=float, default=0.06)
     ap.add_argument('--bitrate', default='12M'); ap.add_argument('--audio', choices=['copy', 'phone', 'none'], default='copy')
     ap.add_argument('--seed', type=int, default=7)
+    ap.add_argument('--in-matrix', dest='in_matrix', choices=['auto', 'bt709', 'bt601', 'bt2020nc'], default='auto',
+                    help="the input's YUV matrix when its tags are missing or wrong (auto: the tag, else BT.709)")
     ap.add_argument('--dry-run', action='store_true'); ap.add_argument('--probe', action='store_true')
     ap.add_argument('--ref', nargs='*', default=[], help='real phone clips whose band the output must land in (runs the probe)')
     ap.add_argument('--selftest', action='store_true')
