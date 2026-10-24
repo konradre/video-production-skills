@@ -464,7 +464,7 @@ a truncated mezzanine silently shortens the deliverable.
 
 | script | does |
 |---|---|
-| `phone_native.py --in --out [--canvas] [--noise] [--denoise] [--drift] [--wb] [--period] [--shake] [--cuts] [--ae-step] [--bitrate] [--audio copy\|phone\|none] [--ref …] [--probe] [--dry-run]` · `--selftest` | the phone-native tier's temporal layer and encode at delivery resolution (§ 5): a denoise or fine sensor-style noise, a slow exposure drift, a stepped white-balance drift, an auto-exposure step at each cut, a handheld micro-shake, the phone-class H.264; `--ref` probes the output against real phone clips and says IN BAND / ABOVE / BELOW per metric; prints the filtergraph it ran |
+| `phone_native.py --in --out [--canvas] [--noise] [--denoise] [--drift] [--wb] [--period] [--shake] [--cuts] [--ae-step] [--bitrate] [--audio copy\|phone\|none] [--in-matrix auto\|bt709\|bt601\|bt2020nc] [--ref …] [--probe] [--dry-run]` · `--selftest` | the phone-native tier's temporal layer and encode at delivery resolution (§ 5): a denoise or fine sensor-style noise, a slow exposure drift, a stepped white-balance drift, an auto-exposure step at each cut, a handheld micro-shake, the phone-class H.264; every input is brought into BT.709 tv-range YUV at the first scale (an RGB, BT.601-tagged or full-range source is converted; an untagged one is read as BT.709 with a WARN — `--in-matrix bt601` declares an SD source encoded BT.601); `--ref` probes the output against real phone clips and says IN BAND / ABOVE / BELOW per metric; prints the filtergraph it ran |
 
 ## Cross-references
 
