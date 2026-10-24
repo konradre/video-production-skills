@@ -108,11 +108,16 @@ are placements paid for by trimming the loosest stretch, never appends; generati
 dependency-bound; the edit is locked before finishing. Characters told apart by colour, face and
 outline only (no fine markers at 480p), human in manner never in movement; a species comes from
 reference sheets, never from text; the reveal is never pre-loaded; a look plate per light context, mapped
-to the shot list before it is generated; the pre-flight gate on every prompt.
-[`references/MUSIC-VIDEO.md`](references/MUSIC-VIDEO.md).
+to the shot list before it is generated; the pre-flight gate on every prompt. Every word of the known lyrics on a
+visible sung line is timed before a cut or a scene window is placed — the venue's hosted analysis, then local word
+timestamps checked by ear, then forced alignment of the known lyrics to a vocal stem on a GPU host; vocals outside the
+sheet are labelled estimates — and a cut that introduces a line lands on the last beat at or before its first-word
+onset plus 20 ms (it may fall a few ms into that word, never inside the previous one); on-screen lyrics follow the karaoke rules (highlight never ahead of the voice).
+[`references/MUSIC-VIDEO.md`](references/MUSIC-VIDEO.md) § 9.
 
-**Done when:** the track map and the gens table cover every second, each beat sits on a hit, and the
-generation order is written.
+**Done when:** the track map and the gens table cover every second, each beat sits on a hit, every word of the known
+lyrics on a visible sung line has a measured onset from the first rung that timed it (vocals outside the sheet carried
+as labelled estimates; a piece with no sung line needs none), and the generation order is written.
 
 ## 6b. The pre-production core — before the first reference or prompt
 

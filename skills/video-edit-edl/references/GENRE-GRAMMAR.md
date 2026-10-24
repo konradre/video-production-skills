@@ -75,6 +75,13 @@ operator corrects, never a taste of their own.
   number: `spot-audio-assembly/scripts/beat_grid.py` fits the tracked beats' line and accepts it only within ±15 ms and
   10 ms of kick drift, phase from the kicks; a BEAT-MAP verdict (a drifting tempo — a generated track that breathes)
   makes the tracked beat times the grid.
+- **Cuts derive from the lyrics on that grid**: a cut that introduces a sung line lands on the last beat at or before
+  the line's first-word onset plus 20 ms, and never inside the previous word (widen that line's tolerance to the next
+  beat when it falls within ~50 ms after the onset, else cut at the boundary between the words — the previous word's end); a section ends on a
+  measured song analysis's section start when it falls at or after the last word's end, else on the first downbeat at
+  or after that end (the first beat, until downbeats are measured) — never inside the last word; lines are found by their content, never by a typed time, from onsets measured by
+  the lyric-timing ladder (`film-preprod` MUSIC-VIDEO.md § 9). On-screen lyrics follow its karaoke rules: the highlight
+  never runs ahead of the voice.
 - The operator cuts to the track; the EDIT is locked before finishing; the flattened master carries
   the cut's own processed audio (no VO stem, no captions).
 - Generation order is dependency-bound: a shot that continues another waits for its last state.
