@@ -324,11 +324,11 @@ does (it shifts the upstream generation mode).
    Dehancer hero. ⚠ `.drx` and `.cube` are PARALLEL renderers of one look, never stacked — `look-library/GUIDE.md`.
 5. Accept the residual timing, or re-roll. **A post retime is judged by eye, never by its metric.**
 
-**What the three defaults cost, 7 s, in the order they were ruled.** Omni 720p + a `sync-lipsync/v3` pass ≈ **$1.63**
-(09-17 morning) → Higgsfield CLI 1080p native 63 cr ≈ **$3.15** (09-17 evening) → **treg 720p $1.87 + a $0 lanczos**
-(09-18). The middle ruling bought a real quality step and is the reason the raster question is not a free one: at 1080p
+**What the three defaults cost, 7 s, oldest first.** Omni 720p + a `sync-lipsync/v3` pass ≈ **$1.63**
+→ Higgsfield CLI 1080p native 63 cr ≈ **$3.15** → **treg 720p $1.87 + a $0 lanczos**.
+The middle default bought a real quality step and is the reason the raster question is not a free one: at 1080p
 native the skin keeps individual stubble hairs and pores where the lipsync chain returned a waxy chin and jaw with the
-stubble rendered as a texture patch. **What 2026-09-18 changes is the raster, never the audio-driven method** — the
+stubble rendered as a texture patch. **What the 720p default changes is the raster, never the audio-driven method** — the
 lipsync pass stays gone, so the waxy-chin failure does not come back with it; what returns is a 1.5× scale, which is a
 resample, not a reconstruction. A shot that cannot afford even that goes to treg at 1080p for $3.23.
 
@@ -336,11 +336,11 @@ resample, not a reconstruction. A shot that cannot afford even that goes to treg
 $8/min — **but it is WEB-UI ONLY**: absent from all 91 CLI job types and all 22 workflows (only `dubbing` and
 `voice_change` are there). Not automatable today.
 
-<details><summary>The superseded default — Omni Flash 1.1 + fal lipsync (same-day ruling, kept for the evidence)</summary>
+<details><summary>The superseded default — Omni Flash 1.1 + fal lipsync (superseded the same day, kept for the evidence)</summary>
 
 **Every talking head starts on Omni Flash 1.1 and gets a `fal-ai/sync-lipsync/v3` pass against the locked VO.** UGC and
 commercial ads alike; Seedance 2.5 keeps product-in-hand, the 30 s story and — through treg's unrestricted row — a real
-person's likeness. The ruling is the operator's, from a two-version A/B on a 30 s trust-series episode (2026-09-17):
+person's likeness. It was chosen from a two-version A/B on a 30 s trust-series episode:
 Seedance 2.5 480p + lipsync against Omni Flash 1.1 720p + lipsync, two of the four lines swapped, judged by eye.
 
 **Two things carry it beyond one judgement.** *Price parity at a higher native raster:* Omni is **$0.10/s at 720p**
