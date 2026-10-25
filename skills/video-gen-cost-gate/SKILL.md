@@ -231,8 +231,8 @@ the ones that bind every ask:
   set IS the product: before any refs-only call, and before any batch over ~30 cr on any mode, ONE still is
   generated from the SAME reference set with a condensed prompt at the clip's aspect (`gen_stills.py`, cents) and
   read for identity, wardrobe, setting and look; its path rides in the cost line, so the GO is given against a
-  seen preview, never a description. A still costs cents; a wrong reference costs the whole batch (operator
-  ruling 2026-09-13; COST-AND-GO.md § The reference dress rehearsal).
+  seen preview, never a description. A still costs cents; a wrong reference costs the whole batch
+  (COST-AND-GO.md § The reference dress rehearsal).
 - **A new cast member is stress-locked before the first video that shows them** — the rehearsal's once-per-member form:
   at least ten stills across three angles, three shot sizes, every light they appear in and a two-shot beside every
   co-star, 10 of 10 for a character (`video-refs-continuity` § 3, `scripts/cast_stress.py`). Its matrix is its own cost
