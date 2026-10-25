@@ -53,8 +53,16 @@ good and it failed anyway; a piece that fronts a subject cannot wear another sub
   three adjectives for the feeling to leave behind · the palette, sourced from the subject's own artefacts, in hex ·
   the display face, chosen for character (not the first grotesk that renders) · one background language · one motion
   signature, the move that repeats as identity · one special moment where the most expensive effect is spent, once.
+  The form is [`STYLE-BRIEF.md`](STYLE-BRIEF.md): eleven fixed sections and a block `style_brief_check.py` reads before
+  any composition exists. A worked one: [`STYLE-BRIEF-EXAMPLE.md`](STYLE-BRIEF-EXAMPLE.md).
 - **Two different subjects differ in at least three of four**: palette, display face, background language, motion
-  signature. Two builds that share three of them are one build with the copy changed.
+  signature. Two builds that share three of them are one build with the copy changed. `style_brief_check.py --prev
+  <last build's brief>` reads it, and fails at two shared.
+- **A catalogue names neighbours and lends grammar, never a look.** [`STYLE-CATALOGUE.md`](STYLE-CATALOGUE.md) holds 66
+  published styles in our words: their essence lines name what a brief must stay clear of, their camera rows and native
+  moves are moves a brief may borrow. A catalogue style is never a base, and neither is another subject's brief; the one
+  derivation allowed is from this subject's own accepted brief, through the creative checkpoint's change steps
+  (`ad-spot-preprod` § 6).
 - **A starter's values are placeholders.** Its greys, its system font, its background: if any of them survives into
   the render, the style was never derived. Don't open the last project for "an example" either — what carries across
   builds is the rules in this file, not the look.
@@ -68,7 +76,8 @@ good and it failed anyway; a piece that fronts a subject cannot wear another sub
 The instructive half of this is the failure. A rule reading "something must move every second" was answered by the
 same streaking bars in two consecutive upstream builds under two different names, each justified backwards from the
 subject. A want phrased without a menu gets met by whatever is cheapest to write, twice. So both axes are chosen
-from a list, named in the style brief, and **different from the last build**.
+from a list, named in the style brief (by the ids in [`STYLE-BRIEF.md`](STYLE-BRIEF.md)), and **different from the last
+build**.
 
 **Background language — one per build** (two only when the background changes with a chapter): a still textured
 ground with only the camera breathing · a large gradient drifting or rotating slowly · two to four blurred colour

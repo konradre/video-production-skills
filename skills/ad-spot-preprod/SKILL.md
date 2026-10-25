@@ -191,6 +191,21 @@ any cut-down. A written standard ("brand-appropriate, licensed") does not replac
 look at the device in motion was the fourth full build, and every version to that point was rejected on the typeface and
 the device together (2026-09-15). A campaign whose kit is already accepted skips this.
 
+**A change to an accepted style is DERIVED from it, and the checkpoint reads the change.** A new season, a second
+product in the same campaign, a client note on the look: the base is this subject's own accepted brief
+(`designed-elements` STYLE-BRIEF), never a catalogue style or another subject's brief.
+- Sort each wanted change by the brief's section: **safe** — the palette within its colour logic (§ 3), type sizes and
+  roles (§ 4), the motion's tempo or how much moves (§ 5), the sound's density (§ 7), one native move added or swapped
+  (§ 8); **changes its character** — materials and rendering (§ 2), the colour logic itself (§ 3), the camera grammar
+  (§ 6), each with one line on what the style loses; **not a change** — the essence and what it is not (§ 1), the
+  renderer (§ 10): that is a new brief, written from the subject.
+- Write a CHANGES table beside the brief, one row per change: section · base · now · why. The operator approves the
+  table; the motion test is read against it.
+- At most five changes a round; more cannot be judged.
+- Render one style frame on the project's own frames beside the same frame in the accepted style, then the
+  checkpoint's motion test (a few seconds, one raster, the real footage and words) with every change on screen at least
+  once; name the second each change can be seen.
+
 **Done when:** the cost lines are answered, the first round's references are listed by name, and the
 plan is saved in the project with its path in the ask.
 

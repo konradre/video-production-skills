@@ -49,7 +49,16 @@ card whose rows reveal one at a time passes `card_read_time.py` on the plan befo
 
 ## 2. Build from the kit, customised per SKU
 
+The style brief comes first, before any composition exists: [`references/STYLE-BRIEF.md`](references/STYLE-BRIEF.md) —
+eleven sections and a block, written from the subject, approved with the scene plan, checked by `style_brief_check.py`
+(`--prev` against the last build's brief). A campaign whose brief is accepted reuses it; a change goes through the
+creative checkpoint's change steps (`ad-spot-preprod` § 6). A campaign whose kit was accepted before this form existed
+has its brief written from that kit at its next designed build, approved with that build's plan; the kit itself does
+not change for it. Styles to name as neighbours, and camera grammar to borrow:
+[`references/STYLE-CATALOGUE.md`](references/STYLE-CATALOGUE.md).
+
 ```bash
+python3 ~/.claude/skills/designed-elements/scripts/style_brief_check.py style-brief.md --prev <last build>/style-brief.md
 python3 ~/.claude/skills/designed-elements/scripts/hyper_new.py --out hyper/<name>-<len> --kind card|turntable|layer --dur 2.5 --canvas 2160x3840 --seed 606
 ```
 
@@ -66,8 +75,10 @@ A NEW device or typeface is the operator's pick from rendered options before the
 motion test of the device on the project's own frames, and the message line set in three to five typefaces
 (`ad-spot-preprod` § 6, the creative checkpoint); a written standard does not stand in for the pick.
 
-**Done when:** the project renders its full length from local assets with a seed, and its sync constant
-(the burst's `T0`, the wall's opaque frame, the ding times) is written in the composition.
+**Done when:** for a new subject or a changed style, the style brief passes `style_brief_check.py` and is approved; the
+project renders its full length from
+local assets with a seed, and its sync constant (the burst's `T0`, the wall's opaque frame, the ding times) is written
+in the composition.
 
 ## 3. Render, then read the render
 
@@ -188,6 +199,7 @@ and the delivered frame re-read.
 
 | script | does |
 |---|---|
+| `style_brief_check.py <style-brief.md> [--prev <last build's brief>]` · `--selftest` | the style brief before any composition: the eleven sections each carrying content, the block's keys (three adjectives, ≥ 2 neighbours, a `#RRGGBB` palette with its source, a face that is not the scaffold's placeholder or a generic family, menu ids for the background and for ≥ 2 transition kinds with one of depth, a render class in the HyperFrames lane, `webgl-3d` a WARN; CommonMark fences); `--prev` FAILs a repeated background, the same transition set, or two of palette (ΔE 10) · face · background · signature (word overlap, both lines printed) shared; WARN on a scaffold colour; exit 1 on a FAIL, 2 on usage, an unreadable file or a `--prev` brief that does not validate |
 | `hyper_new.py --out --kind card\|turntable\|layer [--dur --canvas --seed]` | scaffolds a composition that obeys the contract |
 | `render_hyper.sh --dir --name --format mp4\|png-sequence [--host --push --pull] [--keep-out <zone>]… [--check-only] [--no-check] [--check-timeout 600] [--hf-matrix bt601\|bt709]` | runs `hyperframes check` REPORT-ONLY first — a `--caption-zone` run per zone of the project's declared safe band (`video-production` `safe_zones.py`; the strict ad union when none is declared), the full report alone and the other zones at once, each under the check timeout, then `check_summary.py`'s read — then renders locally (Node ≥ 22) or on the render host; `RENDER-END` only once the output exists, `RENDER-FAILED` and exit 1 otherwise; an mp4 is re-encoded once after the render with the BT.709 matrix NAMED (HyperFrames 0.8.18 encodes BT.601 and tags bt709 — up to 40 levels off on saturated colour, measured 2026-10-21), through 16-bit RGB; `--hf-matrix` names what the HyperFrames encode used — re-measure with `video-finish-qc` `matrix_check.py` on every `--hf-version` change |
 | `check_summary.py <check.json>…` · `--selftest` | the read of a `hyperframes check --json` report: per-section counts, every lint error, the lint warnings that are render traps by message (a blank slot, DOM measured in a callback, a substituted font, a runaway repeat, two tweens on one property) and every lint warning counted, LAYOUT NOT SAMPLED when lint stopped the layout audit, every zone hit (a warning, so `ok` stays true), a switched-off section as `off`; exits 0 on findings |
@@ -202,7 +214,8 @@ and the delivered frame re-read.
 ## Cross-references
 
 - [`references/HYPERFRAMES-CONTRACT.md`](references/HYPERFRAMES-CONTRACT.md) · [`references/KIT.md`](references/KIT.md) ·
-  [`references/CRAFT.md`](references/CRAFT.md).
+  [`references/CRAFT.md`](references/CRAFT.md) · [`references/STYLE-BRIEF.md`](references/STYLE-BRIEF.md) ·
+  [`references/STYLE-CATALOGUE.md`](references/STYLE-CATALOGUE.md).
 - `video-refs-continuity` — the silhouette sheet and plate pieces the sprites are cut from; `video-edit-edl` —
   where events and layers sit; `spot-audio-assembly` — the sting, the chimes, the bed; `video-finish-qc` — the
   finish that composites layers and the QC that reads the card.

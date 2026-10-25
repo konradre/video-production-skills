@@ -89,7 +89,7 @@ hand mid-phase. What each stage becomes:
 | the scaffold | `--spot-type product` | `--spot-type ugc` (no product, card or wipe rules); the gens table, the refs gate and the fill marked N/A in the header with the reason |
 | the references and the refs gate | before every generation | not applicable; a generated OPEN or insert (a still chain, a bridging shot) brings them back for that call only (`video-refs-continuity`) |
 | the grade | the genre's cube on generated takes | the same cube on the client's footage, picked from the look sheet (§ 3) |
-| the creative checkpoint | the first keeper | the motion test of the designed device and the typeface pick (§ 6) — before the second raster and any cut-down |
+| the creative checkpoint | the first keeper | the motion test of the designed device and the typeface pick (§ 6) — before the second raster and any cut-down; a change to an accepted style brings its CHANGES table and the side-by-side style frame (§ 6) |
 | the sound | VO, sfx, cues through the cost line | the recorded sound by microphone position, cleaned by the ladder in `spot-audio-assembly` § 4; a short bed looped before a longer cue is priced |
 | the finish and QC | unchanged | unchanged, plus the source-geometry row and the still-run threshold the project sets |
 
