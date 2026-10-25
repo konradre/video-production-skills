@@ -85,7 +85,7 @@ had invalidated the `vol` sized against the old stem without a sound.
 | VO placement | `qc_vo_placement.py` — 10 ms RMS envelopes, 300–4000 Hz, NCC vs the EDL `at` | every line < 15 ms |
 | VO ↔ sfx clash | the sheet (`beat_sheet.py`) + a listen at the signature and every hit | no line under a hit or the signature |
 | native artifacts | `audio_head_scan.py` on every take; the ear on the delivered file at each cut | no tone/drone the ear catches; no click at a cut |
-| the sound table | `sound_table.py` — each music cue's presence at three points across its span, each suck-out's depth, the real silences before `qc.turn`, the loudest 400 ms moments and what sits there, 20–60 Hz against the band; both channels kept, their powers added | INFO only (operator, 2026-10-25): 25–30 dB · ≥ 2 before the turn (films, music videos) · the designed impacts · about −15 dB — read, listened to, no verdict yet |
+| the sound table | `sound_table.py` — each music cue's presence at three points across its span, each suck-out's depth, the real silences before `qc.turn`, the loudest 400 ms moments and what sits there, 20–60 Hz against the band; both channels kept, their powers added | INFO only: 25–30 dB · ≥ 2 before the turn (films, music videos) · the designed impacts · about −15 dB — read, listened to, no verdict yet |
 | the VO script | the `text` table quoted in the ask | matches the client script's lines verbatim |
 
 A waveform cross-correlation is NOT the placement instrument: under loudnorm + AAC it read 0.08 where

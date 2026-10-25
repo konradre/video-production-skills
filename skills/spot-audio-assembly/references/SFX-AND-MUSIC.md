@@ -50,7 +50,7 @@ WAV.
 lemo-opuscar judges a film by its sound first (`DIRECTOR.md` §§ 6, 11; `styles/satellite-briefing/STYLE.md` § Mix; the
 suck-outs in its `demo/mix.py` files). These hold for every genre unless a line says otherwise.
 
-- **Two real silences before the turn — films and music videos** (operator, 2026-10-25: a 15 s ad already carries its one
+- **Two real silences before the turn — films and music videos** (a 15 s ad already carries its one
   silence, before the hit). At least two silences or near-silences before the turn or the emotional peak, and the first
   sound after one is among the most important sounds in the piece. A suck-out is its own rule, never one of the two. The
   EDL names the turn's marker in `qc.turn`.
@@ -68,7 +68,7 @@ suck-outs in its `demo/mix.py` files). These hold for every genre unless a line 
   its `at`, read around its sync point when it has one (`qc_deliverable.py`'s sfx row), each sync point on its event
   (`edl_check.py`), and each music cue's presence across its span, each suck-out's depth, the silences before the turn, the
   loudest moments and the low end (`scripts/sound_table.py` — INFO rows only until the reads are measured on two real
-  deliverables, operator 2026-10-25).
+  deliverables).
 
 ## Music
 

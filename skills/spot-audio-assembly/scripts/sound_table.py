@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """sound_table.py — the sound table read on the DELIVERED file: every designed sound the EDL places, measured where it
 landed, so "every row of the sound table is in the mix" is a reading, not a belief. INFO rows only, no verdict, until
-the reads have been measured on two real deliverables (operator, 2026-10-25).
+the reads have been measured on two real deliverables.
 
   (each sfx's presence at its `at` — around its sync point when it has one — is qc_deliverable's sfx row; its sync point
    on its event is edl_check's sum — neither is repeated here)

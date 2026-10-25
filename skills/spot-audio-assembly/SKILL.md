@@ -209,7 +209,7 @@ python3 ~/.claude/skills/spot-audio-assembly/scripts/sound_table.py --root <proj
 - The VO ↔ sfx clash and the head tones are listened for at every hit, the signature and every cut.
 - The sound table on the delivered file: each music cue's presence across its span, each suck-out's depth, the real
   silences before the turn, the loudest moments and what sits there, the low end — INFO rows, read and listened to, never a
-  verdict yet (operator, 2026-10-25).
+  verdict yet.
 
 The mix graph the finisher implements (a static sum — no loudness processing in the master), the loudness
 pass (one measured static gain, a limiter at 192 kHz before the resample and again after it, the limiting the
