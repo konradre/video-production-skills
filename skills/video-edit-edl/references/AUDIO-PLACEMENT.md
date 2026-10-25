@@ -57,7 +57,11 @@ cut ("persist what remains of the last word") is the same device.
   peak or end, `s` seconds into the sound as played, on a marker (by name) or a time. A plan entry may omit `at` and the
   builder places it; either way the gate holds `at + s` on the event within half a frame, and an insert moves a synced
   sound with its event even when the sound starts before the insertion point (a riser). The entry's `derived` block
-  (`sfx_onsets.py --sync` prints it) makes a swapped sound FAIL the build until its point is re-measured.
+  (`sfx_onsets.py --sync` prints it) makes a swapped sound FAIL the build until its point is re-measured. **A rounding
+  goes late, never early:** when a frame grid or a builder must round an event that cannot sit exactly, the sound lands on
+  its frame or up to one frame after, never before. Audio leading the picture by more than ~45 ms is detected (ITU-R
+  BT.1359), and one frame is 42 ms at 24 fps. The tolerances above stay as they are (nicceasy/3d-product
+  `references/sound-design.md` § 2).
 - A suck-out is a music duck with its own ramps ending on the impact's marker — `[{"marker": "HIT", "offset": -0.35},
   "HIT", 0.03, 0.06, 0]` in the plan; an insert at the impact moves it whole with the hit when its cue plays on past it, and
   a cue that ENDS on the hit (a before-cue) keeps its suck-out with it and is re-cut to the moved hit (the insert WARNs). An

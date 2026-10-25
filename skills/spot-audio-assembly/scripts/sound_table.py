@@ -12,12 +12,26 @@ the reads have been measured on two real deliverables.
   silences  with --turn or qc.turn (a marker name): the runs of ≥ 0.25 s at least 20 dB under the programme's level before
             the turn; a run inside the union of the suck-outs is tagged and never counted (films and music videos: at least
             two); after each, the FIRST audible sound's level, and the loudest in the half-second after it
-  loudest   the three loudest 400 ms moments and what the EDL places there (the designed impacts should be these)
+  loudest   the three loudest 400 ms moments by momentary loudness (K-weighted: a steady DC offset reads nothing, a sub
+            rumble about 13 dB down at 20 Hz) and what the EDL places there (the designed impacts should be these)
   low end   20–60 Hz power against the 20 Hz–20 kHz band (the rule: about 15 dB under)
+  steps     the steepest moves of the short-term loudness (BS.1770, 3 s windows CENTRED on their time, so a step lines up
+            with its mark instead of lagging it by half a window): LU/s over 1 s, the three largest outside the designed
+            steps. Calibrated here: a hard 6 dB step reads ~3.0, 10 dB ~6.0, 6 dB over 3 s ~1.9 (upstream gates 3.5 on ITS
+            metric). A suck-out, an impact and a cue that slams in are named exceptions, read from
+            the EDL's ducks and cue starts, never counted
+  entries   each entry after a near-silence (≥ 0.5 s at least 30 dB under the programme): its rise time on the 400 ms
+            momentary loudness, from 30 dB to 3 dB under its plateau. Calibrated here on synthetic entries: a hard one
+            ~0.2 s, a 1.5 s raised cosine ~0.85 s, a 2 s fade from -40 dB ~1.35 s (upstream wants ≥ 1.2 s on ITS metric).
+            The rule is for a bed or a cue fading up: an entry on a line, an sfx, a designed hit or a slam-in cue is named
+            and not judged
+  range     the short-term loudness range (10th–95th percentile, gated -70 LUFS and -20 LU) — reported, never gated
+  limiter   with edit/mezz/<deliverable>.limiter.json (finish_spot.py writes it at deliver): the delivery limiter's deepest cut
+            inside each designed impact's window, and anywhere; the loudest rows say what the limiter took there
 Levels and spectra keep both channels — a level is the mean of the channels' powers, so stereo content in opposite
 polarity is measured, never cancelled by a downmix, and a dBFS reads as it does per channel. Self-test first on synthetic mixes with known answers, or nothing is printed (exit 2).
 
-  sound_table.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--turn <marker>] [--json <out.json>]
+  sound_table.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--turn <marker>] [--limiter <json>] [--json <out.json>]
   sound_table.py --selftest
 Exit 0 (the rows are information) · 2 = self-test failed or the file is unreadable.
 """
@@ -104,8 +118,13 @@ def depth(x, a, b, ri):
 
 
 def loudest(x, k=3, win=0.4, hop=0.1, sep=1.0):
-    x = st(x); w, h = int(win * SR), int(hop * SR); n = max(1, (len(x) - w) // h + 1)
-    lv = np.array([db_of(x[i * h:i * h + w]) for i in range(n)]); picks = []
+    """the k loudest 400 ms windows by BS.1770 momentary loudness (K-weighted, channel powers summed, LUFS): the K
+    filter's high-pass reads a steady DC offset as nothing and a sub rumble about 13 dB down at 20 Hz (a loud one still
+    counts), where raw power once named a quiet clip riding a 0.45 offset as the loudest moment of a delivered master;
+    the step where an offset switches on or off still reads"""
+    from scipy.signal import lfilter
+    x = st(x); y = lfilter(*K_HP, lfilter(*K_SHELF, x, axis=0), axis=0); w, h = int(win * SR), int(hop * SR); n = max(1, (len(x) - w) // h + 1)
+    lv = np.array([-0.691 + 10 * np.log10(float(np.mean(y[i * h:i * h + w] ** 2, axis=0).sum()) + 1e-18) for i in range(n)]); picks = []
     for i in np.argsort(-lv):
         t = i * hop
         if all(abs(t - p[0]) >= sep for p in picks): picks.append((round(t, 2), round(float(lv[i]), 1)))
@@ -120,6 +139,102 @@ def low_end(x, seg=1.0):
     P = sum(np.mean([np.abs(np.fft.rfft(x[i * n:(i + 1) * n, c] * win)) ** 2 for i in range(m)], axis=0) for c in range(x.shape[1]))   # channel powers added
     f = np.fft.rfftfreq(n, 1 / SR); lo = P[(f >= 20) & (f <= 60)].sum(); full = P[(f >= 20) & (f <= 20000)].sum()
     return round(10 * np.log10(lo / full + 1e-12), 1) if full > 0 else None
+
+
+K_SHELF = ([1.53512485958697, -2.69169618940638, 1.19839281085285], [1.0, -1.69065929318241, 0.73248077421585])
+K_HP = ([1.0, -2.0, 1.0], [1.0, -1.99004745483398, 0.99007225036621])   # ITU-R BS.1770 K-weighting at 48 kHz
+
+
+def lufs_curve(x, win, hop=0.1):
+    """(times, LUFS) — K-weighted, channel powers SUMMED (BS.1770), each window CENTRED on its time"""
+    from scipy.signal import lfilter
+    x = st(x); y = lfilter(*K_HP, lfilter(*K_SHELF, x, axis=0), axis=0)
+    h = int(hop * SR); m = len(y) // h
+    if m == 0: return np.zeros(0), np.zeros(0)
+    ms = (y[:m * h] ** 2).reshape(m, h, y.shape[1]).mean(axis=1).sum(axis=1)
+    k = max(1, int(round(win / hop))); c = np.convolve(ms, np.ones(k) / k, 'same'); L = -0.691 + 10 * np.log10(c + 1e-18)
+    L[:k // 2] = np.nan; L[len(L) - k // 2:] = np.nan                         # a window that runs off either end reads nothing
+    return (np.arange(m) + 0.5) * hop, L
+
+
+def designed_steps(edl):
+    """[(t, what)] — the steps the mix is MEANT to make: each suck-out's ramp and its impact, each cue that slams in"""
+    out = []
+    for d in suckouts(edl): out += [(d['from'] - d['ramp_in'], f"suck-out {d['cue']}"), (d['to'], f"impact after {d['cue']}'s suck-out")]
+    for name, m in ((edl.get('audio') or {}).get('music') or {}).items():
+        if isinstance(m, dict) and 'tl' in m and 'fade_in' in m and not float(m['fade_in'] or 0): out.append((float(m['tl'][0]), f'{name} slams in (fade_in 0)'))   # declared only: an absent fade_in is judged
+    return out
+
+
+def _mid(t, L, i, h=25):
+    """the step's time: where the power crosses halfway between 2.5 s before and after (the 3 s window's whole transition)
+    — an ideal step lands ON its mark, where the steepest dB slope sits ~0.9 s early on a rise"""
+    ok = np.nonzero(~np.isnan(L))[0]; a, b = max(int(ok[0]), i - h), min(int(ok[-1]), i + h); P = 10 ** (L[a:b + 1] / 10)
+    if b <= a or np.isnan(P).any(): return float(t[i])
+    tgt = (P[0] + P[-1]) / 2; k = np.nonzero(np.sign(P[-1] - P[0]) * (P - tgt) >= 0)[0]
+    return float(t[a + k[0]]) if len(k) else float(t[i])
+
+
+def steps(x, edl, k=3, pad=1.6):
+    t, L = lufs_curve(x, 3.0); ex = designed_steps(edl)
+    if np.sum(~np.isnan(L)) < 12: return [], 0
+    gate = np.nanmedian(L[L > np.nanmax(L) - 30]) - 20; d = 5                       # 0.5 s each side: the slope over 1 s, in LU/s
+    sl = np.full(len(L), np.nan); sl[d:-d] = L[2 * d:] - L[:-2 * d]
+    sl[(np.roll(L, d) < gate) | (np.roll(L, -d) < gate)] = np.nan             # a move out of or into near-silence is an entry
+    picks, skipped = [], 0
+    for i in np.argsort(-np.abs(np.nan_to_num(sl))):
+        if np.isnan(sl[i]): continue
+        tm = _mid(t, L, i)                                                     # the RESOLVED event time is what an exception is matched on
+        if any(abs(tm - e) <= pad for e, _ in ex): skipped |= int(abs(sl[i]) > 2.0); continue
+        if picks and min(abs(tm - p[0]) for p in picks) < 2.0: continue
+        picks.append((round(tm, 1), round(float(sl[i]), 2)))
+        if len(picks) == k: break
+    return picks, skipped
+
+
+def entries(x, edl, db, ref):
+    """[(t, rise s | None, label)] — every entry after a near-silence (≥ 0.5 s, 30 dB under the programme): the time from
+    30 dB to 3 dB under its plateau on the 400 ms momentary loudness"""
+    au = edl.get('audio') or {}; t, M = lufs_curve(x, 0.4, hop=0.02)
+    ex = designed_steps(edl) + [(float(s['at']), f'sfx {k}') for k, s in (au.get('sfx') or {}).items() if isinstance(s, dict) and 'at' in s] \
+        + [(float(v['at']), f'line {k}') for k, v in (au.get('vo') or {}).items() if isinstance(v, dict) and 'at' in v]   # a line lands hard by nature
+    out = []; dur = len(st(x)) / SR; Mref = np.nanmedian(M[M > np.nanmax(M) - 30]) if np.sum(~np.isnan(M)) else None
+    for a, b in runs_under(db, ref - 30, min_s=0.5):
+        if b >= dur - 0.1 or Mref is None: continue                            # a silence that runs to the end has no entry after it
+        j0 = max(0, int(round((b - 0.5) / 0.02))); seg = M[j0:j0 + int(3.5 / 0.02)]   # from 0.5 s before: the window is centred
+        if np.sum(~np.isnan(seg)) < 10: continue
+        pl = np.nanmax(seg)
+        if pl < Mref - 20 or not np.nanmin(seg[:max(1, int(0.6 / 0.02))]) < pl - 30: continue   # an audible return, crossed upward
+        lo = np.nonzero(seg >= pl - 30)[0]; hi = np.nonzero(seg >= pl - 3)[0]
+        rise = round(float((hi[0] - lo[0]) * 0.02), 2) if len(lo) and len(hi) else None
+        near = [w for e, w in ex if b - 0.25 <= e <= b + 0.5]
+        out.append((round(b, 2), rise, ', '.join(near)))
+    return out
+
+
+def loud_range(x):
+    t, L = lufs_curve(x, 3.0); L = L[~np.isnan(L)]; g = L[L > -70]
+    if len(g) < 10: return None
+    g = g[g > 10 * np.log10(np.mean(10 ** (g / 10))) - 20]
+    return round(float(np.percentile(g, 95) - np.percentile(g, 10)), 1)
+
+
+def limiter_rows(lim, picks):
+    """rows from finish_spot.py's <deliverable>.limiter.json, and a note per loudest pick on what the limiter took there"""
+    rows = []
+    if lim is None: return [('limiter', '—', 'N/A — no edit/mezz/<deliverable>.limiter.json (finish_spot.py writes it at deliver)')], {}
+    if lim.get('stale'): return [('limiter', '—', f"N/A — the record belongs to another render of this file ({lim['stale']})")], {}
+    if lim.get('failed'): return [('limiter', '—', f"the finisher's limiter read failed for this render: {lim['failed']}")], {}
+    for w in lim.get('windows', []):
+        rows.append(('limiter', f"{w['from']:.2f}–{w['to']:.2f} s", f"deepest cut {w['deepest_cut_db']:.1f} dB — {w['source']}"))
+    dp = lim.get('deepest') or {}
+    rows.append(('limiter', 'anywhere', f"deepest cut {dp.get('db', 0):.1f} dB at {dp.get('t', 0):.2f} s; static gain {lim.get('gain_db', 0):+.2f} dB, "
+                 f"{lim.get('limiting_db', 0):.2f} dB over TP {lim.get('tp_target')}"))
+    note = {}
+    for t0, _ in picks:
+        cuts = [w['db'] for w in lim.get('per_100ms', []) if t0 - 0.05 <= w['t'] <= t0 + 0.45]   # sparse: blocks cut ≥ 0.1 dB
+        note[t0] = max(cuts) if cuts else 0.0
+    return rows, note
 
 
 def first(pat, root='.'):
@@ -184,8 +299,9 @@ def placed_at(edl, t):
     return ', '.join(names) or 'no sfx or line — music or a native bed'
 
 
-def read(edl, x, turn_name=None, cue_pcm=None):
-    """every row, from the delivered mix x ((n, 2) or mono, SR) and a loader cue_pcm(music entry, offset s, dur s)"""
+def read(edl, x, turn_name=None, cue_pcm=None, lim=None):
+    """every row, from the delivered mix x ((n, 2) or mono, SR), a loader cue_pcm(music entry, offset s, dur s) and the
+    finisher's limiter record lim (finish_spot.py's edit/mezz/<deliverable>.limiter.json, or None)"""
     rows = []; db = block_db(x); ref = programme_level(db); mk = edl.get('markers') or {}
     if cue_pcm is not None:
         for what, val in music_rows(edl, x, cue_pcm): rows.append(('music', what, val))
@@ -208,8 +324,17 @@ def read(edl, x, turn_name=None, cue_pcm=None):
                 rows.append(('silence', f"{a:.2f}–{b:.2f}{' (a suck-out, not counted)' if so_ else ''}", after))
             rows.append(('silences', turn_name, f'{real} before the turn at {tt:.2f} s, suck-outs not counted (films and music videos: at least 2)'))
     else: rows.append(('silences', '—', 'N/A — no turn named (--turn or qc.turn: a film or a music video names its turn)'))
-    for t, lv in loudest(x): rows.append(('loudest', f'{t:.2f} s', f'{lv:.1f} dBFS (400 ms) — {placed_at(edl, t + 0.2)}'))
+    picks = loudest(x); lrows, lnote = limiter_rows(lim, picks)
+    for t, lv in picks: rows.append(('loudest', f'{t:.2f} s', f'{lv:.1f} LUFS (400 ms momentary) — {placed_at(edl, t + 0.2)}' + (f'; the limiter cut {lnote[t]:.1f} dB here' if t in lnote else '')))
+    rows += lrows
     le = low_end(x); rows.append(('low end', '20–60 Hz', f'{le} dB against the full band (rule: about -15)' if le is not None else 'too short to read'))
+    sp, skipped = steps(x, edl)
+    for t, s in sp: rows.append(('step', f'{t:.1f} s', f'{s:+.2f} LU/s over 1 s (this read: a hard 6 dB step ~3.0, 10 dB ~6.0, 6 dB over 3 s ~1.9; upstream gates 3.5 on its own metric)'))
+    if not sp: rows.append(('step', '—', 'too short to read'))
+    if skipped: rows.append(('step', 'designed', 'steeper moves sit on the EDL\'s designed steps (suck-outs, impacts, slam-ins) and are not counted'))
+    for b, rise, near in entries(x, edl, db, ref):
+        rows.append(('entry', f'{b:.2f} s', (f'a designed entry ({near}) — not judged; ' if near else '') + (f'rises in {rise:.2f} s (this read: a hard entry ~0.2, a 1.5 s raised cosine ~0.85, a 2 s fade from -40 dB ~1.35; upstream wants ≥ 1.2 on its own metric)' if rise is not None else 'no plateau within 3 s')))
+    lr = loud_range(x); rows.append(('range', 'short-term', f'{lr} LU (10th–95th percentile, reported, never gated)' if lr is not None else 'too short to read'))
     return rows, ref
 
 
@@ -249,6 +374,28 @@ def selftest():
     pf = rng.integers(-1, 2, (n, 2)) / 2 ** 23; tt = np.arange(int(0.02 * SR)) / SR
     for t0 in (1.0, 2.6, 4.2): pf[int((t0 - 0.02) * SR):int(t0 * SR)] = 0.8 * np.sin(2 * np.pi * 1000 * tt)[:, None]   # a loud 20 ms just before each read point
     pf_ = music_rows({'audio': {'music': {'bed': {'file': 'z', 'tl': [0, 6], 'vol': 0.7}}}}, pf, loader)
+    n12 = int(12 * SR); t12 = np.arange(n12) / SR; pr = lambda env: 0.1 * rng.standard_normal((n12, 2)) * env[:, None]
+    def ent(kind):
+        e = np.ones(n12); e[t12 < 3] = 0
+        if kind == 'rc': m = (t12 >= 3) & (t12 < 4.5); e[m] = 0.5 - 0.5 * np.cos(np.pi * (t12[m] - 3) / 1.5)
+        if kind == 'fade': m = (t12 >= 3) & (t12 < 5); e[m] = 10 ** ((-40 + 40 * (t12[m] - 3) / 2) / 20)
+        xx = pr(e); dd = block_db(xx); return entries(xx, {}, dd, programme_level(dd))
+    def stp(dj, ramp=0):
+        g = np.ones(n12); g[t12 >= 6] = 10 ** (dj / 20)
+        if ramp: mm = (t12 >= 6) & (t12 < 6 + ramp); g[mm] = 10 ** (dj * (t12[mm] - 6) / ramp / 20)
+        return pr(g)
+    eh, er, ef = ent('hard'), ent('rc'), ent('fade'); s10, _ = steps(stp(10), {}); s6r, _ = steps(stp(6, 3), {})
+    sd, sk = steps(stp(10), {'audio': {'music': {'m': {'tl': [0, 12], 'fade_in': 1, 'duck': [[5.6, 6.0, 0.03, 0.06, 0]]}}}})
+    sc, _ = steps(pr(np.ones(n12)), {})
+    g15 = np.ones(n12); g15[t12 >= 8] = 10 ** (15 / 20); sl15, sk15 = steps(pr(g15), {'audio': {'music': {'c': {'tl': [8, 12], 'fade_in': 0}}}})
+    tr = np.ones(n12); tr[t12 >= 8] = 0; ttr = pr(tr); dtr = block_db(ttr); etr = entries(ttr, {}, dtr, programme_level(dtr))
+    lim = {'gain_db': 4.0, 'limiting_db': 2.5, 'tp_target': -2.4, 'deepest': {'t': 4.02, 'db': 3.1},
+           'windows': [{'from': 4.0, 'to': 4.4, 'source': 'impact after bed\'s suck-out', 'deepest_cut_db': 3.1}], 'per_100ms': [{'t': 4.0, 'db': 3.1}, {'t': 4.1, 'db': 1.2}]}
+    rl, _ = read(edl, x, 'TURN', lim=lim); lrow = [r for r in rl if r[0] == 'limiter']; ld = [r for r in rl if r[0] == 'loudest']
+    n8 = int(8 * SR); t8 = np.arange(n8) / SR; dcx = np.repeat((0.05 * np.sin(2 * np.pi * 1000 * t8))[:, None], 2, 1)
+    dcx[2 * SR:4 * SR] = 0.45 + 0.02 * np.sin(2 * np.pi * 1000 * t8[:2 * SR])[:, None]                 # a quieter tone on a 0.45 DC offset
+    dcx[6 * SR:int(6.4 * SR)] = 0.3 * np.sin(2 * np.pi * 1000 * t8[:int(0.4 * SR)])[:, None]            # the loudest sound
+    ldc = loudest(dcx)
     chk = [('suck-out: the mix fell at least 25 dB', len(so) == 1 and float(so[0][2].split('fell ')[1].split(' dB')[0]) >= 25),
            ('silences: three runs before the turn, the last one the suck-out', len(si) == 3 and '(a suck-out' in si[2][1] and '(a suck-out' not in si[0][1]),
            ('silences: the count is 2 — the suck-out is not one of them', any(r[0] == 'silences' and r[2].startswith('2 before') for r in rows)),
@@ -256,6 +403,8 @@ def selftest():
            ('first sound: the first audible block after the silence, not the louder one 0.25 s later', len(sil3) == 1 and f'first sound at 1.50 s, {block_db(fs)[30] - ref3:+.1f} dB' in sil3[0][2] and block_db(fs)[30] - ref3 < -10 and f'next 0.5 s {block_db(fs)[30:40].max() - ref3:+.1f}' in sil3[0][2]),
            ('loudest: the impact at 4.0 s first', len(lo) == 3 and abs(float(lo[0][1].split(' ')[0]) - 4.0) <= 0.2),
            ('loudest: the impact is named by what the EDL places there', len(lo) == 3 and 'sfx hit' in lo[0][2]),
+           ('loudest: a quiet tone riding a DC offset is not loud — the loudest sound comes first (K-weighted, the offset reads nothing)',
+            len(ldc) == 3 and abs(ldc[0][0] - 6.0) <= 0.1 and not any(1.7 <= p[0] <= 4.0 for p in ldc[:1])),
            ('low end: equal power at 40 Hz and 1 kHz reads -3.0 dB', abs(low_end(pair) - (-3.0)) <= 0.3),
            ('low end, stereo: a 40 Hz mid with a 1 kHz side still reads -3.0 dB (no downmix cancels the side)', abs(low_end(ms) - (-3.0)) <= 0.3),
            ('level, stereo: a tone in opposite polarity on the two channels reads its power, not silence', abs(db_of(anti) - 10 * np.log10(0.045)) <= 0.1),
@@ -264,6 +413,21 @@ def selftest():
            ('music: a bed in the mix under a louder voice is found at all three points', len(with_) == 1 and 'weak' not in with_[0][1] and with_[0][1].count(',') >= 2),
            ('music: a bed missing from the mix reads weak', len(without_) == 1 and 'weak or missing' in without_[0][1]),
            ('music: a bed missing after loud prefixes and a one-LSB floor reads weak (no cumulative-sum cancellation)', len(pf_) == 1 and 'weak or missing' in pf_[0][1] and all(float(v) <= 1.0 for v in pf_[0][1].split('correlation ')[1].split(' at')[0].split(', '))),
+           ('entry: a hard entry rises in ≤ 0.35 s', len(eh) == 1 and eh[0][1] is not None and eh[0][1] <= 0.35),
+           ('entry: a 1.5 s raised cosine rises in 0.6–1.1 s, a 2 s fade from -40 dB in ≥ 1.2 s', len(er) == 1 and 0.6 <= er[0][1] <= 1.1 and len(ef) == 1 and ef[0][1] >= 1.2),
+           ('step: a hard 10 dB step reads ≥ 5 LU/s, placed within 0.3 s of its mark (power midpoint, centred windows)', bool(s10) and s10[0][1] >= 5 and abs(s10[0][0] - 6.0) <= 0.3),
+           ('step: 6 dB over 3 s reads ≤ 2.2 LU/s', bool(s6r) and abs(s6r[0][1]) <= 2.2),
+           ('step: the same 10 dB step on a suck-out\'s impact is a designed step — not counted, and said so', sk == 1 and not any(abs(p[0] - 6.0) <= 1.6 and abs(p[1]) >= 2 for p in sd)),
+           ('step: a steady programme moves < 0.5 LU/s — the half-window edges read nothing', bool(sc) and max(abs(p[1]) for p in sc) < 0.5),
+           ('step: a cue declared fade_in 0 jumping 15 dB, with no duck, is a designed step — no ≥ 2 LU/s pick near it, said so',
+            sk15 == 1 and not any(abs(p[0] - 8.0) <= 1.6 and abs(p[1]) >= 2 for p in sl15)),
+           ('entry: a silence that runs to the end of the file is no entry', etr == []),
+           ('limiter: a failed read and a stale record each read as such, never as a cut', 'failed' in limiter_rows({'failed': 'x'}, [])[0][0][2]
+            and 'another render' in limiter_rows({'stale': 'x'}, [])[0][0][2]),
+           ('range: steady noise ≤ 0.5 LU; two 6 s halves 10 dB apart read 9.5–10.5', loud_range(pr(np.ones(n12))) <= 0.5 and 9.5 <= loud_range(pr(np.where(t12 < 6, 1, 10 ** (-10 / 20)))) <= 10.5),
+           ('limiter: the impact window and the anywhere row print, and the impact\'s loudest row says what the limiter took',
+            len(lrow) == 2 and '3.1 dB' in lrow[0][2] and any('the limiter cut 3.1 dB here' in r[2] for r in ld)),
+           ('limiter: no record beside the file reads N/A, never a zero cut', any(r[0] == 'limiter' and 'N/A' in r[2] for r in rows)),
            ('duck forms: 3, 4 and 5 numbers parse; 2 raises', duck_parts([1, 2, .5])[3] == 0.25 and duck_parts([1, 2, .5, .1])[4] == 0.1 and duck_parts([1, 2, .5, .1, 0])[4] == 0.0 and _raises(lambda: duck_parts([1, 2])))]
     for name, ok in chk: print(f"{'ok  ' if ok else 'FAIL'} {name}")
     ok = all(v for _, v in chk); print(f"SELFTEST {'PASS' if ok else 'FAIL'} ({sum(v for _, v in chk)}/{len(chk)})"); return ok
@@ -272,6 +436,7 @@ def selftest():
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--edl'); ap.add_argument('--deliv'); ap.add_argument('--json'); ap.add_argument('--selftest', action='store_true')
+    ap.add_argument('--limiter', help='the finisher\'s limiter record (default edit/mezz/<deliverable>.limiter.json)')
     ap.add_argument('--turn', help="the turn's marker name (else the EDL's qc.turn, entered by hand like every qc key)")
     a = ap.parse_args()
     if not selftest(): print('SELF-TEST FAILED — the instrument is broken; no rows printed'); sys.exit(2)
@@ -284,7 +449,13 @@ def main():
         f = first(m.get('file'))
         if not f: raise FileNotFoundError(f"no file for {m.get('file')}")
         return pcm(f, ss=off, t=d)
-    rows, ref = read(edl, x, a.turn or (edl.get('qc') or {}).get('turn'), cue_pcm)
+    lp = a.limiter or f'edit/mezz/{os.path.basename(a.deliv)}.limiter.json'; lim = json.load(open(lp)) if os.path.exists(lp) else None
+    if lim is not None:                                                        # the record is this render's only when its hash says so
+        import hashlib; h = hashlib.sha256()
+        with open(a.deliv, 'rb') as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b''): h.update(chunk)
+        if lim.get('sha256') != h.hexdigest(): lim = {'stale': f"its sha256 {str(lim.get('sha256'))[:12]} ≠ the file's {h.hexdigest()[:12]}"}
+    rows, ref = read(edl, x, a.turn or (edl.get('qc') or {}).get('turn'), cue_pcm, lim)
     print(f'{a.deliv}: {len(x) / SR:.3f} s, programme level {ref:.1f} dBFS (50 ms blocks, the mean of the channels\' powers)')
     for kind, what, val in rows: print(f'INFO {kind:9} {what}: {val}')
     if a.json: json.dump([{'row': k, 'what': w, 'reading': v} for k, w, v in rows], open(a.json, 'w'), indent=1)

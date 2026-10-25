@@ -67,8 +67,9 @@ suck-outs in its `demo/mix.py` files). These hold for every genre unless a line 
 - **Every row of the sound table is in the mix, and the EDL's audio block is the table.** On the delivered file: each sfx at
   its `at`, read around its sync point when it has one (`qc_deliverable.py`'s sfx row), each sync point on its event
   (`edl_check.py`), and each music cue's presence across its span, each suck-out's depth, the silences before the turn, the
-  loudest moments and the low end (`scripts/sound_table.py` — INFO rows only until the reads are measured on two real
-  deliverables).
+  loudest moments and the low end, plus the loudness steps, the entries after a near-silence, the loudness range and what
+  the delivery limiter took inside each designed impact (`scripts/sound_table.py` — INFO rows only until the reads are
+  measured on two real deliverables; MIX-AND-QC.md § Loudness steps and entries).
 
 ## Music
 
@@ -85,6 +86,39 @@ suck-outs in its `demo/mix.py` files). These hold for every genre unless a line 
   transcode before anything reads them: `ffmpeg -i <cue>.m4a -ar 48000 -c:a pcm_s24le <cue>.wav`. The vendor
   exposes no balance endpoint — track spend from the receipts. No music client ships here: the call above is
   the whole contract, and the vendor publishes its own skill for it.
+- **A music take is measured before it is trusted** (nicceasy/3d-product `references/sound-design.md` §§ 5, 8, 10, MIT).
+  Generators ignore the requested key and tempo, so before a sweetener is tuned or a cue is cut,
+  `scripts/music_take_read.py <take>` reads:
+  - the key, with its confidence (r > 0.7 solid) and a near-tie WARN when the runner-up sits within 0.05 (a relative key
+    shares the notes; the tonic is a listening call);
+  - the tuning in cents from A440, and its spread (≤ ~3–5 c is one tuning);
+  - the tempo drift between the first and last third (≤ ~2–3 %), with no verdict when the onsets are weakly periodic (a
+    piano ballad);
+  - the tail: the commonest fault sits in the decay — energy above 6 kHz rising, the 100–500 Hz channel correlation
+    falling or going negative, the mid band turning to noise.
+
+  A surprising number is checked by a second method before it is acted on: the tempo with `beat_grid.py`, the key by
+  ear. **Fixes, cheapest first:** regenerate with clean-ending wording → a tail-only cleanup crossfaded in over ~1 s, with
+  everything before it sample-identical → resynthesise the final chord's partials. An AI listener is triage only (its
+  passes disagreed on up to ~4 in 10, and it missed a tail the user called crunchy). Two generator traps: a distilled
+  ("turbo") model ignored the brief's negative constraints (vocals and keys on an instrumental brief), and some models
+  end a piece early, so ask for a longer piece and keep its natural ending. **Whose numbers:** upstream's are the key
+  confidence (r > 0.7), the tuning spread (≤ ~3–5 c), the drift (≤ ~2–3 %) and the tail's direction. Ours, set on
+  synthetic fixtures and two real takes and uncalibrated, are the near-tie margin (0.05), the drift gate (onset r 0.3),
+  the body correlation a decorrelation WARN needs (0.8), the level wobble (3 dB) and the pitch wobble (8 c). All are
+  defaults until measured on our takes. On two real Suno piano takes the drift read declined a verdict (onset periodicity
+  r 0.10 and 0.03), and `beat_grid.py`, run on one of them, returned BEAT-MAP with a 481 ms residual, so its beats were no
+  reliable cross-check there either. On two steady four-on-the-floor Suno takes asked at 124 it gave its first real verdict
+  (2026-10-26): −0.05 % and +0.05 % at 125.0 and 126.0 BPM, r 0.68 and 0.75, where `beat_grid.py`'s kicks agree (about
+  0.02 % over 90 s). That is the "no drift" side only: catching real drift is still proven on the synthetic ramp alone.
+  The onsets do not settle the tempo's OCTAVE. A clap on 2 and 4 made the strongest period two beats, so those takes once
+  read 62.5 and 63. A 120 BPM prior now picks among half, same and double (`octave_pick`), and the same prior lifts a
+  70 BPM kick with quiet offbeat hats to 140. So whenever the comb without the prior picks another octave, the tempo line
+  names it: "125.0 → 124.9 BPM (or 62.5 — the octave is a call)". `beat_grid.py`'s x0.5/x1/x2 rows or the ear decide
+  the call. A clap on 2 and 4 at 170 reads 85, unflagged. The drift is a ratio, so it holds in either octave. The
+  tail also reads its level wobble around the decay's trend
+  (≥ 3 dB) and, in a tonal tail only, its pitch wobble frame to frame (≥ 8 c); every spectrum adds the channels' powers,
+  so a take in opposite polarity never cancels a read.
 - **Every other music route is a FALLBACK and needs the operator's permission first** — the operator's own
   candidates under `audio/music/candidates/`, or a library bed with its licence line read. Name which route
   and why, then wait. A vendor outage or a refused cue is a reason to ask, never a reason to switch quietly.

@@ -92,7 +92,9 @@ python3 ~/.claude/skills/spot-audio-assembly/scripts/sfx_onsets.py audio/sfx/<re
   moments, 20–60 Hz about 15 dB under the band — [`references/SFX-AND-MUSIC.md`](references/SFX-AND-MUSIC.md) § Sound direction.
 - Music: the **AceDataCloud Suno API is the default route** — async, two takes a call, behind the cost
   line and a GO; the operator's own candidates and a library bed are FALLBACKS that need the operator's
-  permission first. A cue is CUT to the marker it ends on, the file name carries the length; a cue
+  permission first. **A take is measured before it is trusted** — `scripts/music_take_read.py <take>` reads its key, tuning,
+  tempo drift and tail (generators ignore the requested key and tempo; the commonest fault is in the decay), and a WARN is
+  heard before a sweetener is tuned or the cue is cut (SFX-AND-MUSIC.md § Music). A cue is CUT to the marker it ends on, the file name carries the length; a cue
   SHORTER than its span is looped on its own beat grid by whole bars, the take's ending kept
   (`scripts/music_loop.py`), before a longer cue is priced — a cue neither looped nor long enough just ends
   mid-shot and `edl_check` fails it; the earlier accepted cue wins; ducks under speech with ramps;

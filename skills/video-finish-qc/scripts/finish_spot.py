@@ -6,7 +6,9 @@ the EDL has one) → mix → downscale → encode. Three stages, each re-runnabl
   master   edit/mezz/<SPOT>-master-<W>x<H><tag>.mov   + layers + card, PCM 24-bit STATIC mix (the VO stem is REBUILT first); no
                                                       loudness processing — the master is a mix, the level is set once, at deliver
   deliver  deliver/<deliver_base><tag|-v1>.mp4        measure → ONE static gain to the EDL's I → aresample 192 kHz → alimiter at TP →
-                                                      aresample 48k → alimiter again (the limiting the target costs is printed);
+                                                      aresample 48k → alimiter again (the limiting the target costs is printed,
+                                                      and the limiter's deepest cut inside each designed impact → edit/mezz/
+                                                      <deliverable>.limiter.json, which spot-audio-assembly sound_table.py reads);
                                                       captions overlaid AFTER the downscale; H.264 High CRF 17 slow, AAC 256k,
                                                       faststart, the length capped at runtime_s
 The script-fidelity gate (beat_sheet.py) runs BEFORE stage 1 when the beats file exists: a FAIL = no finish. So does the
@@ -18,6 +20,7 @@ role:"endcard" event (a beat list may forbid a card) cuts its footage at the run
                  [--beat-gate <beat_sheet.py>] [--edge-gate <edge_audit.py>] [--stem-builder <build_vo_stem.py>] [--captions-builder <build_captions.py>] [--no-gate]
 Sources per event: designed → its own render at native raster; generated → <in-dir>/<id>.mov | <id>__*.mov | <id>.mp4,
 or the event's own `src` (a hero under a fresh name), sought by handle_head (a FULL-TAKE hero needs handle_head = in).
+  finish_spot.py --selftest-limiter      the limiter-cut read on a synthetic master with a known answer
 Prints FINISH-END <stage> as the sentinel; a log without it is a failure whatever the file sizes say.
 Before any stage the HOST drive's free space is read; under the floor (--min-free-gb 40, or 3x the spot's estimated mezzanine
 pair) the finish WARNS with the numbers and runs — the floor is a buffer, not a gate (since 2026-10-09). A
@@ -70,7 +73,71 @@ def provenance(path, parent=None):
               open(f'edit/mezz/{os.path.basename(path)}.finish.json', 'w'), indent=1)
 
 
+def impact_windows(au, dur=0.4):
+    """[(from, to, source)] — each designed impact: the hit a suck-out releases ON (a music duck with gain ≤ 0.1 lasting
+    0.2–0.7 s, spot-audio-assembly SFX-AND-MUSIC.md § Sound direction); the EDL marks impacts no other way"""
+    out = []
+    for name, m in ((au or {}).get('music') or {}).items():
+        for dk in (m.get('duck') or []) if isinstance(m, dict) else []:
+            a, b, g = (float(v) for v in dk[:3])
+            if g <= 0.1 and 0.2 <= b - a <= 0.7: out.append((round(b, 3), round(b + dur, 3), f"impact after {name}'s suck-out at {b:.2f} s"))
+    return sorted(out)
+
+
+def limiter_cut(master, gain_db, lim, windows, blk=0.01):
+    """the delivery limiter's gain reduction, read by rendering the master twice — the static gain alone, and the gain plus the
+    limiter chain the deliverable gets — and comparing 10 ms block peaks. Returns {per_100ms (sparse: ≥ 0.1 dB), windows
+    (each impact's deepest cut; with no impact in the EDL, the three loudest 400 ms windows stand in, named so), deepest}."""
+    import numpy as np
+    def peaks(af):
+        n = int(48000 * blk) * 2; pr = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', master, '-af', af, '-f', 'f32le', '-ac', '2', '-ar', '48000', '-'], stdout=subprocess.PIPE)
+        out, buf = [], b''
+        while True:
+            ch = pr.stdout.read(4 * n * 2000)
+            if not ch: break
+            buf += ch; m = len(buf) // (4 * n)
+            if m: out.append(np.abs(np.frombuffer(buf[:m * 4 * n], np.float32).reshape(m, n)).max(axis=1)); buf = buf[m * 4 * n:]
+        if pr.wait(): raise RuntimeError(f'ffmpeg failed rendering {af}')
+        return np.concatenate(out) if out else np.zeros(0)
+    rs = f"volume={gain_db:.3f}dB,aresample=192000"                          # both through the same resample path: only the limiters differ
+    pre = peaks(f"{rs},aresample=48000"); post = peaks(f"{rs},{lim},aresample=48000,{lim}")
+    k = min(len(pre), len(post)); pre, post = pre[:k], post[:k]
+    gr = np.where(pre > 1e-4, 20 * np.log10(np.maximum(pre, 1e-9) / np.maximum(post, 1e-9)), 0.0).clip(min=0)
+    per = [{'t': round(i * 0.1, 2), 'db': round(float(v), 2)} for i, v in enumerate(gr[:len(gr) // 10 * 10].reshape(-1, 10).max(axis=1)) if v >= 0.1]
+    if not windows:
+        e = np.convolve(pre ** 2, np.ones(40) / 40, 'valid'); picks = []
+        for i in np.argsort(-e):
+            if all(abs(i * blk - p) >= 1.0 for p in picks): picks.append(i * blk)
+            if len(picks) == 3: break
+        windows = [(round(p, 2), round(p + 0.4, 2), 'a loudest 400 ms window (no suck-out in the EDL marks an impact)') for p in sorted(picks)]
+    wins = [{'from': a, 'to': b, 'source': s, 'deepest_cut_db': round(float(gr[int(a / blk):int(b / blk) + 1].max(initial=0.0)), 2)} for a, b, s in windows]
+    i = int(np.argmax(gr)) if len(gr) else 0
+    return {'per_100ms': per, 'windows': wins, 'deepest': {'t': round(i * blk, 2), 'db': round(float(gr[i]) if len(gr) else 0.0, 2)}}
+
+
+def selftest_limiter():
+    """a -30 dBFS bed with one loud hit at 4.0 s, gained +12 dB into a -2.4 dBTP limiter: the hit is cut, the bed is not"""
+    import numpy as np, tempfile
+    sr = 48000; rng = np.random.default_rng(11); n = 6 * sr; x = 0.03 * rng.standard_normal((n, 2))
+    k = np.arange(int(0.4 * sr)); x[4 * sr:4 * sr + len(k)] += (0.5 * rng.standard_normal(len(k)) * np.exp(-k / (0.1 * sr)))[:, None]
+    d = tempfile.mkdtemp(prefix='limiter-selftest-'); wav = os.path.join(d, 'master.wav')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'f32le', '-ar', str(sr), '-ac', '2', '-i', '-', '-c:a', 'pcm_s24le', wav], input=np.clip(x, -1, 1).astype(np.float32).tobytes(), check=True)
+    lim = f"alimiter=limit={10 ** (-2.4 / 20):.4f}:attack=5:release=60:level=false:latency=1"
+    au = {'music': {'bed': {'tl': [0, 6], 'duck': [[3.6, 4.0, 0.03, 0.06, 0]], 'fade_in': 1}}}
+    r = limiter_cut(wav, 12.0, lim, impact_windows(au)); q = limiter_cut(wav, 12.0, lim, [(1.0, 1.4, 'the bed alone')])
+    r0 = limiter_cut(wav, 12.0, lim, [])
+    chk = [('the impact window comes from the suck-out: 4.00–4.40 s', [(w['from'], w['to']) for w in r['windows']] == [(4.0, 4.4)]),
+           ('the hit is cut ≥ 3 dB inside its window', r['windows'][0]['deepest_cut_db'] >= 3),
+           ('the bed alone is cut < 0.2 dB', q['windows'][0]['deepest_cut_db'] < 0.2),
+           ('the deepest cut anywhere sits inside the impact window', 4.0 <= r['deepest']['t'] <= 4.4),
+           ('per 100 ms is sparse: no block of the bed (0–3.5 s) carries a cut', not any(e['t'] < 3.5 for e in r['per_100ms'])),
+           ('no suck-out: the loudest 400 ms windows stand in, and the first one holds the hit', any(w['from'] <= 4.0 <= w['to'] + 0.05 for w in r0['windows']) and 'no suck-out' in r0['windows'][0]['source'])]
+    for name, ok in chk: print(f"{'ok  ' if ok else 'FAIL'} {name}")
+    ok = all(v for _, v in chk); print(f"LIMITER SELFTEST {'PASS' if ok else 'FAIL'} ({sum(v for _, v in chk)}/{len(chk)})"); return ok
+
+
 def main():
+    if '--selftest-limiter' in sys.argv[1:]: sys.exit(0 if selftest_limiter() else 2)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--edl', required=True); ap.add_argument('--stage', default='all', choices=['cut', 'master', 'deliver', 'all'])
     ap.add_argument('--look', default='ads-clean'); ap.add_argument('--in-dir', default='edit/upscale-out'); ap.add_argument('--tag', default='')
@@ -308,6 +375,23 @@ def main():
         # Measured on a real master (TP target -2.4, AAC 192k): limiter after the resample only -> -1.0 dBTP; before only -> -2.0; both -> -2.1; none -> -1.9.
         run(['ffmpeg', '-v', 'error', '-y', '-i', MASTER] + cin + ['-filter_complex', chain, '-map', f'[{last}]', '-map', '0:a', '-af', af, '-ar', '48000', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-level', '4.1', '-g', str(2 * FPS), '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-t', f'{RUN}', DELIV])   # -t: the picture is authoritative — without it AAC priming + padding set the container duration
         print(probe(DELIV)); print(os.path.getsize(DELIV) / 1e6, 'MB', DELIV)
+        # the limiter's cut INSIDE each designed impact: the total hides a limiter that takes dB off exactly the loudest moments
+        # the mix was built around (makevoid/motion-graphics-music-video-skill sfx_mix.py). Rendered twice; a read, not a gate.
+        try:   # a read, never a gate: a failure here leaves the deliverable standing and says so
+            LJ = f'edit/mezz/{os.path.basename(DELIV)}.limiter.json'   # beside the provenance record, never in deliver/: the client folder
+            if over > -0.05: lc = limiter_cut(MASTER, g, lim, impact_windows(AU))
+            else: lc = {'per_100ms': [], 'deepest': {'t': 0.0, 'db': 0.0}, 'note': 'limiting-free: the peak after the gain sits under the TP target, so nothing was rendered',
+                        'windows': [{'from': a_, 'to': b_, 'source': s_, 'deepest_cut_db': 0.0} for a_, b_, s_ in impact_windows(AU)]}
+            lc.update({'deliverable': DELIV, 'sha256': _sha256(DELIV), 'gain_db': round(g, 3), 'tp_target': TPT, 'limiting_db': round(over, 2)})
+            json.dump(lc, open(LJ, 'w'), indent=1)
+            print('limiter: ' + '; '.join(f"{w['from']:.2f} s {w['deepest_cut_db']:.1f} dB ({w['source']})" for w in lc['windows'])
+                  + f"; deepest anywhere {lc['deepest']['db']:.1f} dB at {lc['deepest']['t']:.2f} s -> {LJ}", flush=True)
+        except Exception as ex:   # the record is REPLACED by a failure note: a previous render's cuts must never read as this one's
+            try:
+                json.dump({'deliverable': DELIV, 'sha256': _sha256(DELIV), 'failed': f'{type(ex).__name__}: {ex}'}, open(f'edit/mezz/{os.path.basename(DELIV)}.limiter.json', 'w'), indent=1)
+                said = 'the record says so'
+            except Exception as ex2: said = f'and its failure record could not be written either ({type(ex2).__name__}) — sound_table will read no record'
+            print(f'limiter: the read failed ({type(ex).__name__}: {ex}) — the deliverable stands; {said}', flush=True)
         provenance(DELIV, MASTER)
     print('FINISH-END stage', a.stage)
 

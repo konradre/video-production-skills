@@ -40,7 +40,14 @@ inherits a gain ride it cannot undo. A listener hears it as a second element was
 4. **The limiting the target costs is printed before anything is heard.** After the gain the peak sits at
    `TP_measured + g`; everything above the TP target is limited. The loudest LIMITING-FREE target is
    `I_measured − TP_measured + TP_target`: a mix measuring I −21.1 / TP −5.25 against a −1 dBTP target is
-   limiting-free up to −16.9 LUFS, and every louder target buys its loudness with limiting.
+   limiting-free up to −16.9 LUFS, and every louder target buys its loudness with limiting. **The total hides where it
+   is spent:** the designed impacts are the loudest moments the mix was built around, so a limiter that takes several dB
+   off exactly those windows undoes them. The finisher therefore renders the master twice (the gain alone, and the gain
+   plus the limiter chain, both through the same resample) and writes each impact window's deepest cut to
+   `edit/mezz/<deliverable>.limiter.json`, never into `deliver/`. An impact is the hit a suck-out releases on; with no
+   suck-out in the EDL, the three loudest 400 ms windows stand in. `sound_table.py` prints the cut beside the loudest
+   rows (makevoid/motion-graphics-music-video-skill `sfx_mix.py`). A failed read, or a record whose sha256 is another
+   render's, reads as such and never as a cut.
 5. **AAC overshoots the limited peaks by 0.4–1.0 dB, and the overshoot GROWS with how hard the limiter works**: the
    EDL's TP target sits under the platform's ceiling by at least that (−2.4 for a −1 dBTP delivery; a −1.5 target that
    delivered −0.9 on a quieter premix, where the earlier versions had overshot 0.2, is the measurement behind the range).
@@ -49,6 +56,43 @@ inherits a gain ride it cannot undo. A listener hears it as a second element was
    change.
 6. Captions are overlaid after the downscale in the same pass; `-t <runtime>` caps the length (without it AAC
    priming and padding set the container duration); `-movflags +faststart`.
+
+## Loudness steps and entries — the movement, not the number
+
+A listener's notes are about movement ("avoid big changes in volume", "come in almost inaudibly and fade up over two
+seconds"), never the integrated number (nicceasy/3d-product `references/sound-design.md` § 9, MIT). `sound_table.py`
+reads it on the delivered file as INFO rows:
+- **steps:** short-term loudness (BS.1770, 3 s windows CENTRED on their time, since a window stamped at its end lags its
+  cause by half a window), LU/s over 1 s, placed at the power midpoint;
+- **entries:** after a near-silence, the rise from 30 dB to 3 dB under the plateau on the 400 ms curve;
+- **range:** the short-term range, reported and never gated.
+
+Upstream gates a step at 3.5 LU/s and wants an entry to rise over ≥ 1.2 s, each on its own metric. Calibrated on synthetic
+signals, this implementation reads:
+
+| case | step (LU/s) | entry rise (s) |
+|---|---|---|
+| a hard 6 dB step | ~3.0 | — |
+| a hard 10 dB step | ~6.0 | — |
+| 6 dB over 3 s | ~1.9 | — |
+| a hard entry | — | ~0.2 |
+| a 1.5 s raised cosine | — | ~0.85 |
+| a 2 s fade from −40 dB | — | ~1.35 |
+
+A designed step is a named exception, read from the EDL and never counted: a suck-out and its impact, a cue declared
+`fade_in: 0` (an absent `fade_in` is judged), and an entry on a line or an sfx. A quiet beat dips ≤ ~4 LU — "a gentle
+dip, not a hole".
+
+**Notes → numbers.** Change only the named layer, then null-test the rest against the previous version:
+
+| note | change |
+|---|---|
+| "a bit" | −2 to −3 dB |
+| "half" | −6 dB |
+| "almost inaudibly" | ≤ −30 to −40 dB |
+
+Its trap: lowering a bed raises the next step. A bed lowered 4 dB doubled the step into the next song (~3.1 → ~6.2 LU/s),
+so re-read the steps after every level note.
 
 ## The loudness target
 
@@ -85,7 +129,7 @@ had invalidated the `vol` sized against the old stem without a sound.
 | VO placement | `qc_vo_placement.py` — 10 ms RMS envelopes, 300–4000 Hz, NCC vs the EDL `at` | every line < 15 ms |
 | VO ↔ sfx clash | the sheet (`beat_sheet.py`) + a listen at the signature and every hit | no line under a hit or the signature |
 | native artifacts | `audio_head_scan.py` on every take; the ear on the delivered file at each cut | no tone/drone the ear catches; no click at a cut |
-| the sound table | `sound_table.py` — each music cue's presence at three points across its span, each suck-out's depth, the real silences before `qc.turn`, the loudest 400 ms moments and what sits there, 20–60 Hz against the band; both channels kept, their powers added | INFO only: 25–30 dB · ≥ 2 before the turn (films, music videos) · the designed impacts · about −15 dB — read, listened to, no verdict yet |
+| the sound table | `sound_table.py` — each music cue's presence at three points across its span, each suck-out's depth, the real silences before `qc.turn`, the loudest 400 ms moments and what sits there (with the limiter's cut there), the limiter's deepest cut per designed impact, 20–60 Hz against the band, the loudness steps, the entries after a near-silence and the range; both channels kept, their powers added | INFO only: 25–30 dB · ≥ 2 before the turn (films, music videos) · the designed impacts · about −15 dB — read, listened to, no verdict yet |
 | the VO script | the `text` table quoted in the ask | matches the client script's lines verbatim |
 
 A waveform cross-correlation is NOT the placement instrument: under loudnorm + AAC it read 0.08 where
