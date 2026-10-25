@@ -133,9 +133,18 @@ the onset (the donor widened one line to 50 ms because the beat before fell insi
 moves to the boundary between the two words — the previous word's end, which on a legato line is the new word's onset —
 off the beat. A section ends on a measured song analysis's section start when that start falls at or after its last
 word's end, otherwise on the first downbeat **at or after** that end — never inside the last word (the donor's analysed
-outro starts inside the held last note; here the cut waits for the note to end). `beat_grid.py` gives beat times and
-beat phase, not bar phase: until downbeats are measured, that is the first beat at or after the last word's end, and the
-plan says so. Find lines by their **content** ("the line that starts 'sudden drop'"), never by a typed time, so a
+outro starts inside the held last note; here the cut waits for the note to end). `beat_grid.py --downbeats` gives the
+bar phase from the backbeat — read on the drums stem of a 4-stem Demucs split when one exists (a vocal-only roformer pass
+gives none), else on the mix, which it names. A backbeat fixes the bar only to half a bar, so pin one downbeat by ear
+(`--downbeat-at`) — nothing else settles it (a kick on 3 alone would read as beat 1), and the pin is trusted: one on beat 3
+labels every bar half a bar off, so pin a beat heard as the ONE (a section's first downbeat, a lyric known to land there). A
+dropped or added beat splits the map into stretches solved on their own, and a pin settles only its own stretch. Where
+its verdict labels no bar, the section ends on the first beat at or after the last word's end, and the plan says so.
+Measured 2026-10-25 on one generated 5-minute song: its drums stem showed the backbeat across 2.6–234 s, AMBIGUOUS until
+pinned (four-on-the-floor kicks), and none after; the mix read alone found it in one stretch at most and broke the map
+where the stem did not — read the drums stem. A section STARTS on the downbeat of the bar
+its first line starts in; a pickup under 2 beats stays in the previous section, a pickup of 2 beats or more starts the
+section at the pickup bar (the donor's choruses open on ~3-beat pickups) — `--line-starts` applies it. Find lines by their **content** ("the line that starts 'sudden drop'"), never by a typed time, so a
 re-timed lyric moves every cut with it — the spoken-phrase anchors of `explainer-video`, snapped to the beat grid
 (`spot-audio-assembly/scripts/beat_grid.py`). A generation boundary — a venue's scene window — is not a picture cut:
 it sits in silence or a phrase gap, never through a word, and takes a beat only when the beat falls in that gap.

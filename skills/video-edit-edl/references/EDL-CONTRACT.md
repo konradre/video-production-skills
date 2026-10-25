@@ -58,12 +58,18 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
   job id, a clone id, or `extracted_from: <path> @ <s>` (an excerpt of a finished mix carries its bed). `lip_synced:
   true` marks a line the picture was generated to: its `at` is re-measured against the take whenever the file
   changes. `floor_ok: "<why>"` admits a line whose gap floor the stem builder would refuse.
-- `music` — `{file (a|b alternatives, globs), tl:[a,b], vol, fade_in, fade_out, duck:[[from,to,gain]…],
-  duck_ramp}`. A cue SHORTER than its span just ends (no loop, no fade) — cut a longer excerpt. Ducks are
-  timeline seconds inside the cue span.
-- `sfx` — `{file, at, dur, vol, src_in?}`; `src_in` windows a longer file. A take's own sound re-timed
+- `music` — `{file (a|b alternatives, globs), tl:[a,b], vol, fade_in, fade_out, duck:[[from,to,gain(,ramp |
+  ,ramp_in,ramp_out)]…], duck_ramp}`. A cue SHORTER than its span just ends (no loop, no fade) — cut a longer excerpt. Ducks
+  are timeline seconds inside the cue span. A duck's own ramp(s) override `duck_ramp` either side; a suck-out before an
+  impact is `[from, to, 0.03, 0.06, 0]` — −30 dB, a 60 ms ramp in, full again AT `to` (`spot-audio-assembly`
+  SFX-AND-MUSIC.md § Sound direction). Any other length FAILS the gate, and a duck whose own ramp is under 0.1 s runs on 48-sample frames (every edge within
+  1 ms); a 3-value duck renders exactly as before, whatever its `duck_ramp`.
+- `sfx` — `{file, at, dur, vol, src_in?, sync?, derived?}`; `src_in` windows a longer file. A take's own sound re-timed
   (a knock a beat earlier, a word's tail over the next shot, a tear carried across the cut) is an sfx
-  cut from the take, with the native muted where it played.
+  cut from the take, with the native muted where it played. `sync` — `{kind: transient|peak|end, s, event}`: the sound's
+  sync point, `s` seconds into it as played, belongs on `event` (a marker name, kept as a name, or a time); the gate FAILS
+  `at + s` more than half a frame off the event, and `derived` stamps the file the point was read from
+  (`sfx_onsets.py --sync` prints both), so a swapped sound FAILS the build until it is re-measured.
 - `captions` — `[{line, words:[i,j]}]` word ranges on the narrator's lines ONLY; `caption_style` is the
   campaign standard (no punctuation; every key checked — `spot-audio-assembly` CAPTIONS.md); word times from
   `word_times` (Scribe or faster-whisper, hand patches preserved by `--only`). Two cards never share a frame; none
@@ -92,6 +98,8 @@ out-point re-cut is a four-minute re-render: offer the knob, never guess the tas
 - `qc.frame0_bg` (optional, `#rrggbb`) — a designed piece's background: frame 0 decoded must sit within 2 code values of it.
 - `qc.loop` (optional) — the deliverable loops on the platform: the last→first seam is read.
 - `qc.beat_data` (optional) — `spot-audio-assembly/scripts/beat_grid.py` JSON; every `on_beat` event is read against it.
+- `qc.turn` (optional, a marker name, entered by hand like every `qc` key) — the turn or the emotional peak:
+  `sound_table.py` counts the real silences before it (films and music videos: at least two).
 - `qc.accepted_flashes` (optional, timeline seconds, entered by hand) — a one-frame flash or snap the piece means to
   have: the delivery QC's pops and steps rows set those frames aside. The steps row reads the other frames the picture
   changes on purpose from the EDL itself: the joins, each event's `accepted_cuts`, every caption card's on and off.
@@ -141,7 +149,8 @@ constant is re-measured, then re-stamped). `--allow-stale-derived` builds anyway
 
 The plan is the EDL with every time replaced by a reference. `events[]` carry `take/in/out` (+ `src`,
 `look`, `source`, `role`, `card_trim_note`, `vol`, `native_from/to`, `zoom/anchor`, `accepted_cuts/accepted_cuts_note`, `in_matrix`, `note`);
-`vo` lines carry `file`, `at`, `text` (+ `source`, `lip_synced`, `floor_ok`); any entry may carry `derived`;
+`vo` lines carry `file`, `at`, `text` (+ `source`, `lip_synced`, `floor_ok`); `sfx` carry `file` and an `at`, a `sync`
+(an `at` then derived from it), or both (+ `dur`, `vol`, `src_in`); a duck's two times are refs; any entry may carry `derived`;
 `markers` are `{event, take}` MEASURED on the keeper; every `at` and `tl` is a **time ref**:
 
 | ref | resolves to |

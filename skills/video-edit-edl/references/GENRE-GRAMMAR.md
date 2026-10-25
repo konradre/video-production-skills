@@ -64,7 +64,8 @@ operator corrects, never a taste of their own.
 - **Coverage → sequence**: composition over coverage; restrained camera; a held close-up cuts on the
   breath, not on the action; the reveal's asset appears in no earlier shot (never pre-load the reveal).
 - **Sound leads**: motivated practical sources; the mix crests WITH the push-in, not before; no
-  irony/knowingness; a dark ending stays dark when the brief is a dark fairy tale.
+  irony/knowingness; a dark ending stays dark when the brief is a dark fairy tale. Two real silences before the turn, a
+  suck-out before each designed impact (`spot-audio-assembly` SFX-AND-MUSIC.md § Sound direction).
 - **Markers** are story beats measured on the keeper (a breath, a door, a light change) rather than a hit.
 
 ## Music video
@@ -79,9 +80,14 @@ operator corrects, never a taste of their own.
   the line's first-word onset plus 20 ms, and never inside the previous word (widen that line's tolerance to the next
   beat when it falls within ~50 ms after the onset, else cut at the boundary between the words — the previous word's end); a section ends on a
   measured song analysis's section start when it falls at or after the last word's end, else on the first downbeat at
-  or after that end (the first beat, until downbeats are measured) — never inside the last word; lines are found by their content, never by a typed time, from onsets measured by
+  or after that end (`beat_grid.py --downbeats`; the first beat where its verdict labels no bar) — never inside the last word; lines are found by their content, never by a typed time, from onsets measured by
   the lyric-timing ladder (`film-preprod` MUSIC-VIDEO.md § 9). On-screen lyrics follow its karaoke rules: the highlight
   never runs ahead of the voice.
+- **A section STARTS on a downbeat** (pdoom-video `analysis/analyze.py`): on the downbeat of the bar its first line starts
+  in; a pickup under 2 beats stays in the previous section, a pickup of 2 beats or more starts the section at the pickup
+  bar. A backbeat fixes the bar only to half a bar, so one downbeat is pinned by ear (`--downbeat-at`) — nothing else
+  settles it; `--line-starts` then applies the rule, and a line in a stretch with no labelled bars stays unresolved. Two real silences before the turn and a suck-out before each designed
+  impact hold here as for film.
 - The operator cuts to the track; the EDIT is locked before finishing; the flattened master carries
   the cut's own processed audio (no VO stem, no captions).
 - Generation order is dependency-bound: a shot that continues another waits for its last state.

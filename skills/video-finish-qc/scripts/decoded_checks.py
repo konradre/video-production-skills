@@ -16,7 +16,8 @@ thumbnail from frame 0), video-shotcraft's final review (every SFX audible in th
               opening flashes for one frame at autoplay (showtime's bake guard); a WARN line, never a FAIL
   sfx         every audio.sfx cue found in the delivered mix at its time: normalised cross-correlation of the cue (at its
               vol) with the mix over ±20 ms, and its level against the mix; a sample over 5 s with no `dur` is flagged
-              (bound it to its action)
+              (bound it to its action). The 0.6 s read is the cue's head, or the window around its `sync` point when it has
+              one (a riser by its end, the hit it drives into), or its loudest 0.6 s when the head is silent
   beat_cuts   every event declaring on_beat: its cut within 3 frames of the nearest beat of qc.beat_data
               (spot-audio-assembly/scripts/beat_grid.py JSON — the checked grid, or the beat map)
 
@@ -183,17 +184,26 @@ def sfx(p, root, sfx_map):
         if not f: rows.append((name, False, f"no file for {s.get('file')}")); continue
         cue = _pcm(f, float(s.get('src_in') or 0.0), s.get('dur')) * float(s.get('vol', 1)); fd = len(cue) / 48000
         long_note = ' · a sample over 5 s with no dur — bound it to its action' if fd > 5 and not s.get('dur') else ''
-        L = min(len(cue), int(0.6 * 48000)); cue = cue[:L]
+        L = min(len(cue), int(0.6 * 48000)); off = 0; how = ''; sy = s.get('sync')
+        if isinstance(sy, dict) and sy.get('kind') in ('transient', 'peak', 'end') and 's' in sy:   # read the window that carries the sync point
+            c = int(round(float(sy['s']) * 48000)); off = c if sy['kind'] == 'transient' else c - L // 2 if sy['kind'] == 'peak' else c - L
+            off = int(np.clip(off, 0, len(cue) - L)); how = f" (read around its {sy['kind']}, {off / 48000:.2f}–{(off + L) / 48000:.2f} s into it)"
+        elif len(cue) > L:   # a head 30 dB under the cue's loudest 0.6 s: read that window instead of a silence
+            m = len(cue) // 480; bl = (cue[:m * 480].reshape(m, 480) ** 2).sum(1); en = np.convolve(bl, np.ones(L // 480), 'valid')   # 10 ms blocks summed directly
+            if len(en) and en[0] < 1e-3 * en.max(): off = int(np.argmax(en)) * 480; how = f" (its head is silent: read its loudest 0.6 s, {off / 48000:.2f} s into it)"
+        cue = cue[off:off + L]
         if L < 480 or not np.abs(cue).max(): rows.append((name, False, 'the cue is silent')); continue
-        mix = _pcm(p, max(0.0, float(s['at']) - 0.02), L / 48000 + 0.04)
-        if len(mix) < L: rows.append((name, False, f"the mix ends before {s['at']} s")); continue
-        best = 0.0
-        for k in range(0, len(mix) - L + 1, 24):   # ±20 ms in 0.5 ms steps
-            seg = mix[k:k + L]; den = np.linalg.norm(seg) * np.linalg.norm(cue)
-            if den: best = max(best, float(np.dot(seg, cue) / den))
+        mix = _pcm(p, max(0.0, float(s['at']) + off / 48000 - 0.02), L / 48000 + 0.04)
+        if len(mix) < L: rows.append((name, False, f"the mix ends before {float(s['at']) + off / 48000:.3f} s")); continue
+        # ±20 ms at EVERY sample lag: a noisy cue decorrelates within a sample, and a 0.5 ms stride missed a cue placed on a frame
+        # (1/24 s through the finisher's ms-rounded delay lands 974 samples into the window, off every 24-sample step)
+        # each window's energy summed DIRECTLY: a difference of cumulative sums cancels after a loud prefix, so a near-silent window
+        # read zero energy and a missing cue a correlation in the millions (measured 2026-10-25); a silent window reads 0
+        nw = np.sqrt(np.convolve(mix ** 2, np.ones(L), 'valid')); nc = np.linalg.norm(cue); num = np.correlate(mix, cue, 'valid')
+        best = float(np.where(nw > 0, num / np.where(nw > 0, nw * nc, 1.0), 0.0).max()) if nc else 0.0
         rel = 20 * np.log10((np.sqrt((cue ** 2).mean()) + 1e-12) / (np.sqrt((mix[:L] ** 2).mean()) + 1e-12))
         ok = best >= 0.2   # presence IS the correlation (a cue 14 dB under the mix still reads ~0.2); its level is context only
-        rows.append((name, ok, f"at {s['at']} s: correlation {best:.2f} with the mix, its level {rel:+.1f} dB against the mix" + long_note
+        rows.append((name, ok, f"at {s['at']} s: correlation {best:.2f} with the mix, its level {rel:+.1f} dB against the mix" + how + long_note
                      + ('' if ok else ' — buried or missing in the delivered file')))
     return rows
 
@@ -647,6 +657,26 @@ def selftest():
         cues = {'hit': {'file': 'sfx/hit.wav', 'at': 1.2, 'vol': 1}}
         chk.append(('a cue in the mix at its time is found', all(ok for _, ok, _ in sfx(mixp, r, cues))))
         chk.append(('a cue missing from the mix is flagged', not any(ok for _, ok, _ in sfx(quiet, r, cues))))
+        ff = lambda *a: subprocess.run(['ffmpeg', '-v', 'error', '-y', *a], check=True)
+        ff('-f', 'lavfi', '-i', "aevalsrc='0.6*(t/2)^3*sin(2*PI*700*t)':s=48000:d=2", os.path.join(r, 'sfx', 'riser.wav'))   # builds to its end, the hit, at 2.0 s
+        ff('-f', 'lavfi', '-i', 'anoisesrc=a=0.02:d=3.5:r=48000', '-i', os.path.join(r, 'sfx', 'riser.wav'), '-filter_complex',
+           '[1:a]adelay=1000|1000[h];[0:a][h]amix=inputs=2:normalize=0', '-c:a', 'aac', '-b:a', '192k', os.path.join(r, 'riser-full.mp4'))
+        ff('-f', 'lavfi', '-i', 'anoisesrc=a=0.02:d=3.5:r=48000', '-i', os.path.join(r, 'sfx', 'riser.wav'), '-filter_complex',
+           '[1:a]atrim=0:0.6,adelay=1000|1000[h];[0:a][h]amix=inputs=2:normalize=0', '-c:a', 'aac', '-b:a', '192k', os.path.join(r, 'riser-head.mp4'))
+        rc = {'riser': {'file': 'sfx/riser.wav', 'at': 1.0, 'dur': 2.0, 'vol': 1, 'sync': {'kind': 'end', 's': 2.0, 'event': 3.0}}}
+        chk.append(('an end-synced riser in the mix is found around its end', all(ok for _, ok, _ in sfx(os.path.join(r, 'riser-full.mp4'), r, rc))))
+        chk.append(('an end-synced riser whose end is missing is flagged (only its head is in the mix)', not any(ok for _, ok, _ in sfx(os.path.join(r, 'riser-head.mp4'), r, rc))))
+        ff('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-i', os.path.join(r, 'sfx', 'hit.wav'), '-filter_complex', '[0:a]atrim=0:1[z];[z][1:a]concat=n=2:v=0:a=1', os.path.join(r, 'sfx', 'late.wav'))
+        ff('-f', 'lavfi', '-i', 'anoisesrc=a=0.05:d=3:r=48000', '-i', os.path.join(r, 'sfx', 'late.wav'), '-filter_complex',
+           '[1:a]adelay=1200|1200[h];[0:a][h]amix=inputs=2:normalize=0', '-c:a', 'aac', '-b:a', '192k', os.path.join(r, 'late.mp4'))
+        ff('-f', 'lavfi', '-i', 'anoisesrc=a=0.3:d=0.5:r=48000:seed=3', os.path.join(r, 'sfx', 'whoosh.wav'))
+        ff('-f', 'lavfi', '-i', 'anoisesrc=a=0.05:d=3:r=48000:seed=4', '-i', os.path.join(r, 'sfx', 'whoosh.wav'), '-filter_complex',
+           '[1:a]adelay=1042|1042[h];[0:a][h]amix=inputs=2:normalize=0', '-c:a', 'aac', '-b:a', '192k', os.path.join(r, 'frame.mp4'))   # at 25/24 s, the ms-rounded delay
+        chk.append(('a noise cue placed on a frame (25/24 s) is found: every sample lag searched', all(ok for _, ok, _ in sfx(os.path.join(r, 'frame.mp4'), r, {'w': {'file': 'sfx/whoosh.wav', 'at': 25 / 24, 'vol': 1}}))))
+        ff('-f', 'lavfi', '-i', "aevalsrc='if(between(t\\,0.01\\,0.03)\\,0.8*sin(2*PI*1000*t)\\,(random(1)-0.5)/4194304)':s=48000:d=1", '-c:a', 'pcm_s24le', os.path.join(r, 'prefix.wav'))
+        chk.append(('a cue missing after a loud prefix and a one-LSB floor is flagged (no cumulative-sum cancellation)',
+                    not any(ok for _, ok, _ in sfx(os.path.join(r, 'prefix.wav'), r, {'w': {'file': 'sfx/whoosh.wav', 'at': 0.03, 'vol': 1}}))))
+        chk.append(('a cue with a silent first second is found by its loudest window, not called silent', all(ok for _, ok, _ in sfx(os.path.join(r, 'late.mp4'), r, {'late': {'file': 'sfx/late.wav', 'at': 1.2, 'vol': 1}}))))
         json.dump({'verdict': 'grid', 'bpm': 120, 'beats': [i * 0.5 for i in range(20)]}, open(os.path.join(r, 'beats.json'), 'w'))
         ev = [{'id': 'A', 'tl': [0.0, 1.0]}, {'id': 'B', 'tl': [1.0, 2.04], 'on_beat': True}, {'id': 'C', 'tl': [2.04, 3.0]}]
         chk.append(('a declared cut on the beat passes', beat_cuts(ev, 'beats.json', 24, r)[0]))

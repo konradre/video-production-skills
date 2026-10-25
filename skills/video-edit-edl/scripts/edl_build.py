@@ -15,7 +15,9 @@ Plan (full field list: references/EDL-CONTRACT.md § The plan):
               spans its whole file (in 0, out its length) — card_trim_note says why when a trim is meant (edl_check).
               accepted_cuts = take seconds of cuts inside the window that the take COMPOSED and the operator kept.
   markers     {NAME: {event, take}} — MEASURED on the keeper (an RMS peak, a word onset), never guessed.
-  vo / sfx    at = a time ref;  music tl = [ref, ref];  post_layers at = ref.
+  vo / sfx    at = a time ref;  music tl = [ref, ref];  post_layers at = ref.  A duck's from/to are refs (+ its gain and
+              optional ramps, kept). An sfx with a sync {kind, s, event} and no at is placed so its sync point sits on
+              the event (at = event - s); an unstamped sync file WARNs (a swapped sound would keep the old point).
               a vo line may carry source (a TTS job id, a clone id, extracted_from: <path> @ <s>), lip_synced, floor_ok.
   time ref    number | "start" | "end" | "<MARKER>" | "<EVENT-ID>" (its tl start) | "<EVENT-ID>.end"
               | {"marker": M, "offset": s} | {"event": E, "take": s} (a take time inside E)
@@ -170,14 +172,23 @@ def main():
     for k, m in P.get('music', {}).items():
         s, e2 = resolve(m['tl'][0], who=f'music {k}'), resolve(m['tl'][1], who=f'music {k}'); assert e2 > s, (k, 'empty cue span')
         music[k] = {'file': m['file'], 'tl': [round(s, 6), round(e2, 6)], 'vol': m.get('vol', 0.7), **{q: m[q] for q in ('fade_in', 'fade_out', 'duck', 'duck_ramp', 'derived') if q in m}, 'note': m.get('note', '')}
-        if m.get('duck'): music[k]['duck'] = [[round(resolve(da, who=k), 6), round(resolve(db, who=k), 6), g] for da, db, g in m['duck']]
+        if m.get('duck'):
+            assert all(isinstance(dk, list) and len(dk) in (3, 4, 5) for dk in m['duck']), (k, 'a duck is [from, to, gain] + an optional ramp or ramp_in, ramp_out')
+            music[k]['duck'] = [[round(resolve(dk[0], who=k), 6), round(resolve(dk[1], who=k), 6), *dk[2:]] for dk in m['duck']]
         f = first(m['file'])
         if f and probe(f) + 1e-3 < e2 - s: print(f'WARN music {k}: {f} is {probe(f):.2f} s < span {e2 - s:.2f} s — the cue just ENDS; cut a longer excerpt', flush=True)
     sfx = {}
     for k, s in P.get('sfx', {}).items():
-        f = first(s['file'])
-        sfx[k] = {'file': s['file'], 'at': round(resolve(s['at'], who=f'sfx {k}'), 6), 'dur': s.get('dur') if s.get('dur') is not None else (round(probe(f), 3) if f else None),
-                  'vol': s.get('vol', 1.0), **{q: s[q] for q in ('src_in', 'alt') if q in s}, 'note': s.get('note', '')}
+        f = first(s['file']); sy = s.get('sync')   # {kind, s, event}: the sound's sync point, s seconds into it as played, on the visual event
+        if sy is not None:
+            assert isinstance(sy, dict) and sy.get('kind') in ('transient', 'peak', 'end') and 's' in sy and 'event' in sy, (k, 'sync is {kind: transient|peak|end, s, event}')
+            ev_t = resolve(sy['event'], who=f'sfx {k} sync')
+            sy = {**sy, 'event': sy['event'] if isinstance(sy['event'], str) and sy['event'] in markers else round(ev_t, 6)}   # a marker name stays a name: edl_check re-reads it
+            if s['file'] not in (s.get('derived') or {}).get('from', []):
+                print(f"WARN sfx {k}: sync with no derived stamp on its file — swapping the sound will not invalidate the measured sync point (sfx_onsets.py --sync prints the block)", flush=True)
+        at = resolve(s['at'], who=f'sfx {k}') if 'at' in s else ev_t - float(sy['s']) if sy is not None else sys.exit(f'sfx {k}: no at and no sync')
+        sfx[k] = {'file': s['file'], 'at': round(at, 6), 'dur': s.get('dur') if s.get('dur') is not None else (round(probe(f), 3) if f else None),
+                  'vol': s.get('vol', 1.0), **{q: s[q] for q in ('src_in', 'alt') if q in s}, **({'sync': sy} if sy is not None else {}), 'note': s.get('note', '')}
     layers = [{'id': L['id'], 'frames': L['frames'], 'at': round(resolve(L['at'], who=L['id']), 6), 'dur': float(L['dur']), 'note': L.get('note', '')} for L in P.get('post_layers', [])]
     au = {'vo': vo, 'music': music, 'sfx': sfx, 'captions': P.get('captions', []), 'loudnorm': P.get('loudnorm', {'I': -14, 'TP': -1, 'LRA': 9})}
     for q in ('captions_dir', 'word_times', 'caption_style', 'silence'):

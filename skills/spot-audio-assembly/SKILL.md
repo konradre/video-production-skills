@@ -85,6 +85,11 @@ python3 ~/.claude/skills/spot-audio-assembly/scripts/sfx_onsets.py audio/sfx/<re
 
 - **VO never overlaps an sfx**; the audio signature sits on the END CARD and its hit lands on the card's
   burst (`card + 0.02`).
+- **Every sound sits by its sync point** — a hit's transient, a whoosh's pass-by peak, a riser's end — on the visual event
+  it belongs to: `sfx_onsets.py <file> --sync transient|peak|end --event <T>` prints the `at`, the `sync` block and its
+  `derived` stamp, and the gate holds it. **Sound direction:** two real silences before the turn (films and music videos),
+  a 0.25–0.6 s suck-out 25–30 dB down before each designed impact (a duck with its own ramps), the impacts the loudest
+  moments, 20–60 Hz about 15 dB under the band — [`references/SFX-AND-MUSIC.md`](references/SFX-AND-MUSIC.md) § Sound direction.
 - Music: the **AceDataCloud Suno API is the default route** — async, two takes a call, behind the cost
   line and a GO; the operator's own candidates and a library bed are FALLBACKS that need the operator's
   permission first. A cue is CUT to the marker it ends on, the file name carries the length; a cue
@@ -186,6 +191,7 @@ never a total score:
 ```bash
 python3 ~/.claude/skills/spot-audio-assembly/scripts/qc_vo_placement.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4
 ffmpeg -v info -i deliver/<file>.mp4 -af ebur128=peak=true -f null - 2>&1 | tail -12      # I · LRA · true peak
+python3 ~/.claude/skills/spot-audio-assembly/scripts/sound_table.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--turn <marker>]
 ```
 
 - Placement by **envelope** correlation (10 ms RMS, 300–4 kHz): a waveform correlation reads 0.08 under
@@ -201,6 +207,9 @@ ffmpeg -v info -i deliver/<file>.mp4 -af ebur128=peak=true -f null - 2>&1 | tail
   disk by ordinal and path, the instruments stand in for the ear, and a listen queue — timecodes and what to
   listen for — rides the handoff; nothing is final until the operator has done the queue.
 - The VO ↔ sfx clash and the head tones are listened for at every hit, the signature and every cut.
+- The sound table on the delivered file: each music cue's presence across its span, each suck-out's depth, the real
+  silences before the turn, the loudest moments and what sits there, the low end — INFO rows, read and listened to, never a
+  verdict yet (operator, 2026-10-25).
 
 The mix graph the finisher implements (a static sum — no loudness processing in the master), the loudness
 pass (one measured static gain, a limiter at 192 kHz before the resample and again after it, the limiting the
@@ -235,11 +244,12 @@ and the listen at each hit found no clash.
 | `vo_word_times.py --root --edl [--engine local\|scribe] [--only]` | word times per line; `--only` preserves hand patches |
 | `build_vo_stem.py --root --edl [--out] [--floor-max]` | every placed line on the stem at target LUFS with a peak cap; each line's gap floor (refuses a line carrying a mix) and its source; each line decoded on its presentation clock (a timestamp gap becomes silence, never a shift) |
 | `build_captions.py --root --edl [--out-dir] [--fonts-dir]` | cards at delivery resolution + manifest; the script's words on the transcript's times; every style key checked; `highlight: none` = one plain layer per card |
-| `sfx_onsets.py <file> [--cut a:b --out]` | the syllable map by ordinal; sample-exact cuts with fades |
+| `sfx_onsets.py <file> [--cut a:b --out]` · `--sync transient\|peak\|end [--ordinal] [--src-in --dur] [--event T]` | the syllable map by ordinal; sample-exact cuts with fades; a sound's sync point (a hit's transient, a whoosh's pass-by peak, a riser's end) and the `at`, `sync` block and `derived` stamp that put it on its event |
 | `audio_head_scan.py --root (--edl \| --files)` | stable tones/drones in each take's head, labelled |
 | `roomtone_synth.py --ref --ss --t --dur --out` | stationary room tone coloured by a clean slice |
 | `voice_ab_reel.py --out <reel.wav> name=<file> … [--gap 0.3]` | the A/B reel of voice treatments — each variant once, a gap between, the index printed and written beside the reel; `--selftest` |
-| `beat_grid.py --audio [--out <beat_data.json>] [--residual-ms 15] [--drift-ms 10] [--hpss] [--start --dur]` · `--selftest` | a beat grid that checks itself: the tracked beats' least-squares line, accepted within ±15 ms residual and 10 ms kick drift, its phase from the kicks, 0.5x/1x/2x candidates printed; exit 3 = BEAT-MAP (the tempo moves — the tracked beats are the grid) |
+| `beat_grid.py --audio [--out <beat_data.json>] [--residual-ms 15] [--drift-ms 10] [--hpss] [--start --dur]` · `[--downbeats [--drums <stem>] [--downbeat-at <s>] [--line-starts <s,…>]]` · `--selftest` | a beat grid that checks itself: the tracked beats' least-squares line, accepted within ±15 ms residual and 10 ms kick drift, its phase from the kicks, 0.5x/1x/2x candidates printed; exit 3 = BEAT-MAP (the tempo moves — the tracked beats are the grid). `--downbeats`: the bar phase from the backbeat (4/4), settled only by a pin (the kicks print as evidence), else AMBIGUOUS; a dropped or added beat splits the map into stretches; `--line-starts` applies the section-pickup rule |
+| `sound_table.py --root --edl --deliv [--turn <marker>] [--json]` · `--selftest` | the sound table on the delivered file, INFO rows: each music cue's presence across its span, each suck-out's depth, the real silences before the turn (suck-outs not counted, back-to-back ones as one), the first sound after each, the loudest 400 ms moments and what the EDL places there, 20–60 Hz against the band — channel powers added, never a downmix |
 | `music_loop.py --take --bars --a-target [--bpm --first-beat] [--xfade] [--out]` | a short bed looped on its own beat grid by whole bars, the take's ending kept and its hit moved by exactly the jump; a new file, never an overwrite; `--selftest` |
 | `qc_vo_placement.py --root --edl --deliv` | envelope-NCC placement of every line on the delivered file |
 

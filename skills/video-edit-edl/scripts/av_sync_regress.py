@@ -13,15 +13,23 @@ Fixtures — each a scratch project, nothing written outside a temp dir:
   late     the take's audio track starts 300 ms after its video (the container's start time; the content is aligned)
   gap      the take's audio misses packets from 3.0 to 3.5 s (Matroska keeps the gap on the clock)
   vo       VO lines placed at their EDL times by build_vo_stem.py; one line's file carries a 0.4 s timestamp gap
+  duck     a tone bed under three duck forms: [from, to, gain] at the cue's 0.25 s ramp, [.., ramp] both sides, and a
+           suck-out [.., ramp_in, 0] — about 30 dB down inside, full again within 1.1 ms of a `to` set off every audio-frame
+           boundary, and the master exactly the runtime long
+  placement  no finisher: a plan → edl_build.py → edl_check.py — an sfx placed by its sync point with no `at`, a suck-out duck
+           on a marker ref kept whole, the gate's sync sum (a riser moved off its hit FAILS with the at that fixes it), the
+           duck forms, the suck-out WARNs (a knock and a take's own sound inside it; the riser synced on the hit exempt), and an
+           edl_insert before the hit (its riser and its suck-out move with it)
 The tolerance is the measurement's, not a budget: one output frame for a flash (plus 5 ms for a pulse's 5 ms RMS bucket).
 
-  av_sync_regress.py [--only offgrid,native,late,gap,vo] [--events 40] [--fps 24] [--seed 7] [--grid] [--keep <dir>]
+  av_sync_regress.py [--only offgrid,native,late,gap,vo,duck,placement] [--events 40] [--fps 24] [--seed 7] [--grid] [--keep <dir>]
 Exit 0 = every fixture PASS · 1 = any FAIL. Sentinel: AV-SYNC-REGRESS-END.
 """
 import argparse, json, os, random, shutil, subprocess, sys, tempfile
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__)); SK = os.path.abspath(os.path.join(HERE, '..', '..'))
+BUILD, CHECK = os.path.join(HERE, 'edl_build.py'), os.path.join(HERE, 'edl_check.py')
 FINISH = os.path.join(SK, 'video-finish-qc', 'scripts', 'finish_spot.py')
 STEM = os.path.join(SK, 'spot-audio-assembly', 'scripts', 'build_vo_stem.py')
 SR, TAKE_S, CANVAS = 48000, 12.0, (108, 192)
@@ -130,8 +138,82 @@ def events(E, per, fps, absent=None):
     return req, allowed
 
 
+def level(x, a, b):
+    s = x[int(a * SR):int(b * SR)].astype(np.float64); return 20 * np.log10(np.sqrt(np.mean(s ** 2)) + 1e-12)
+
+
+def duck_fixture(d, fps, a):
+    """the finisher's duck forms on a steady tone: each read as a level against the bed's own"""
+    per = take(os.path.join(d, 'takes', 't.mp4'), fps); E = edl(d, 'takes/t.mp4', 10, fps, a.seed, False); run = E['runtime_s']
+    os.makedirs(os.path.join(d, 'audio'), exist_ok=True)   # 4 kHz: a 1 ms window holds four cycles, so a 1 ms level reads steady
+    ff('-f', 'lavfi', '-i', f'sine=f=4000:r={SR}:d={run + 1}', '-af', 'volume=0.3', '-c:a', 'pcm_s24le', os.path.join(d, 'audio', 'tone.wav'))
+    TO = 2.4013   # the hit sits off every audio-frame boundary (1024, 256 or 48 samples)
+    E['audio']['music'] = {'bed': {'file': 'audio/tone.wav', 'tl': [0, run], 'vol': 0.7, 'duck': [[1.0, 1.5, 0.5], [2.0, TO, 0.03, 0.06, 0], [3.0, 3.3, 0.1, 0.05]]}}
+    json.dump(E, open(os.path.join(d, 'edit', 'RG-EDL.json'), 'w'), indent=1); out = finish(d, fps, os.path.join(d, 'finish.log'))
+    x = np.frombuffer(subprocess.run(['ffmpeg', '-v', 'error', '-i', out['master'], '-map', '0:a', '-f', 'f32le', '-ac', '1', '-ar', str(SR), '-'], capture_output=True, check=True).stdout, np.float32)
+    L = level(x, 0.4, 0.7); ret = next((i / SR for i in range(int(2.38 * SR), int(2.6 * SR), 12) if level(x, i / SR, i / SR + 0.001) >= L - 1.0), None)   # 0.25 ms steps, 1 ms windows
+    rows = [('3 values: -6 dB inside, full before its 0.25 s ramp', -6.5 <= level(x, 1.1, 1.4) - L <= -5.5 and abs(level(x, 0.6, 0.74) - L) <= 0.5),
+            ('5 values (a suck-out): about 30 dB down inside', -32 <= level(x, 2.1, 2.38) - L <= -28),
+            ('5 values: full again within 1.1 ms of its to, 2.4013 (off every frame boundary; the times print to the ms)', ret is not None and abs(ret - TO) <= 0.0011),
+            ('the master holds exactly the runtime: the small frames neither lengthen nor shorten the cue', len(x) == round(run * SR)),
+            ('5 values: full until its 0.06 s ramp in', abs(level(x, 1.90, 1.93) - L) <= 0.5),
+            ('4 values: -20 dB inside, full before and after its 0.05 s ramps', -21 <= level(x, 3.1, 3.25) - L <= -19 and abs(level(x, 2.9, 2.94) - L) <= 0.5 and abs(level(x, 3.36, 3.45) - L) <= 0.5)]
+    return all(v for _, v in rows), [f"{'ok  ' if v else 'FAIL'} {n}" for n, v in rows] + [f'bed {L:.1f} dBFS; the suck-out back within 1 dB at {ret} s ({(ret - TO) * 1000 if ret else float("nan"):+.2f} ms)']
+
+
+def placement_fixture(d, fps, a):
+    """plan → build → gate, no finisher"""
+    import copy
+    for sub in ('audio', 'edit'): os.makedirs(os.path.join(d, sub), exist_ok=True)
+    take(os.path.join(d, 'takes', 't.mp4'), fps)
+    ff('-f', 'lavfi', '-i', 'sine=f=440:r=48000:d=8', '-c:a', 'pcm_s24le', os.path.join(d, 'audio', 'tone.wav'))
+    ff('-f', 'lavfi', '-i', 'anoisesrc=d=1.2:a=0.3,afade=t=in:d=0.6:curve=cub', '-ar', '48000', os.path.join(d, 'audio', 'riser.wav'))
+    P = {'spot': 'FX', 'fps': fps, 'canvas': list(CANVAS), 'markers': {'HIT': {'event': 'B', 'take': 4.0}}, 'vo': {'stem': 'edit/mix/FX-vo-stem.wav'},
+         'events': [{'id': 'A', 'take': 'takes/t.mp4', 'src': 'takes/t.mp4', 'in': 0.5, 'out': 3.5}, {'id': 'B', 'take': 'takes/t.mp4', 'src': 'takes/t.mp4', 'in': 4.0, 'out': 6.0}],
+         'music': {'bed': {'file': 'audio/tone.wav', 'tl': ['start', 'end'], 'duck': [[{'marker': 'HIT', 'offset': -0.3}, 'HIT', 0.03, 0.06, 0]]}},
+         'sfx': {'riser': {'file': 'audio/riser.wav', 'sync': {'kind': 'end', 's': 1.2, 'event': 'HIT'}}, 'knock': {'file': 'audio/riser.wav', 'at': 2.5, 'dur': 0.4}}}
+    json.dump(P, open(os.path.join(d, 'edit', 'plan.json'), 'w'), indent=1)
+    b = subprocess.run([sys.executable, BUILD, '--root', d, '--plan', 'edit/plan.json', '--out', 'edit/FX-EDL.json', '--no-lufs'], capture_output=True, text=True)
+    E = json.load(open(os.path.join(d, 'edit', 'FX-EDL.json'))) if b.returncode == 0 else {'audio': {}}; au = E['audio']
+    def gate(e):
+        json.dump(e, open(os.path.join(d, 'edit', 'G-EDL.json'), 'w'), indent=1)
+        r = subprocess.run([sys.executable, CHECK, '--root', d, '--edl', 'edit/G-EDL.json', '--fps', str(fps)], capture_output=True, text=True); return r.returncode, r.stdout
+    rows = [('build: exit 0', b.returncode == 0),
+            ('build: the riser placed by its sync point, at = HIT 3.0 - 1.2 = 1.8', abs(au.get('sfx', {}).get('riser', {}).get('at', -1) - 1.8) < 1e-6),
+            ('build: its sync kept, the event still the marker name', au.get('sfx', {}).get('riser', {}).get('sync', {}).get('event') == 'HIT'),
+            ('build: the suck-out duck resolved, all five values kept', au.get('music', {}).get('bed', {}).get('duck') == [[2.7, 3.0, 0.03, 0.06, 0]]),
+            ('build: WARN on a sync with no derived stamp on its file', 'sync with no derived stamp' in b.stdout)]
+    if b.returncode == 0:
+        rc, out = gate(E)
+        rows += [('gate: PASS on the built EDL', rc == 0), ('gate: WARN, the knock inside the suck-out', 'sfx knock plays inside the suck-out' in out),
+                 ('gate: no WARN for the riser synced on the hit', 'sfx riser plays inside' not in out),
+                 ("gate: WARN, event A's own sound inside the suck-out", "A's own sound plays inside the suck-out" in out)]
+        for what, mut, want in (('a riser moved off its hit FAILS with the at that fixes it', lambda e: e['audio']['sfx']['riser'].update(at=1.7), 'at 1.800 puts it there'),
+                                ('a 2-value duck FAILS', lambda e: e['audio']['music']['bed'].update(duck=[[2.7, 3.0]]), 'duck [2.7, 3.0]'),
+                                ('an unknown sync kind FAILS', lambda e: e['audio']['sfx']['riser']['sync'].update(kind='boom'), 'sfx riser: sync'),
+                                ('a sync event that is no marker FAILS', lambda e: e['audio']['sfx']['riser']['sync'].update(event='NOPE'), "'NOPE' is no marker")):
+            e2 = copy.deepcopy(E); mut(e2); rc, out = gate(e2); rows.append((f'gate: {what}', rc == 1 and want in out))
+        json.dump(E, open(os.path.join(d, 'edit', 'I-EDL.json'), 'w'), indent=1)   # an insert before the hit: the hit moves, and so do its riser and its suck-out
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'edl_insert.py'), '--root', d, '--edl', 'edit/I-EDL.json', '--after', 'A', '--id', 'A2', '--take', 'takes/t.mp4',
+                            '--in', '1.0', '--out', '1.5', '--src', 'takes/t.mp4'], capture_output=True, text=True)
+        I = json.load(open(os.path.join(d, 'edit', 'I-EDL.json'))); rc, out = gate(I)
+        rows += [('insert: the riser moves with its synced hit, 1.8 → 2.3', r.returncode == 0 and abs(I['audio']['sfx']['riser']['at'] - 2.3) < 1e-6),
+                 ('insert: the suck-out ending on the insertion point moves whole, ramps kept', I['audio']['music']['bed']['duck'] == [[3.2, 3.5, 0.03, 0.06, 0]]),
+                 ('insert: the unsynced knock before the insert stays at 2.5', abs(I['audio']['sfx']['knock']['at'] - 2.5) < 1e-6),
+                 ('insert: the gate PASSES the result', rc == 0)]
+        J = copy.deepcopy(E); J['audio']['music']['bed']['tl'] = [0, 3.0]; J['audio']['sfx'] = {}   # a before-cue cut to the hit, its suck-out on its end
+        json.dump(J, open(os.path.join(d, 'edit', 'J-EDL.json'), 'w'), indent=1)
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'edl_insert.py'), '--root', d, '--edl', 'edit/J-EDL.json', '--after', 'A', '--id', 'A2', '--take', 'takes/t.mp4',
+                            '--in', '1.0', '--out', '1.5', '--src', 'takes/t.mp4'], capture_output=True, text=True); K = json.load(open(os.path.join(d, 'edit', 'J-EDL.json')))
+        rows.append(('insert before a cue that ends on the hit: the cue and its suck-out stay together, and a WARN says re-cut it',
+                     r.returncode == 0 and K['audio']['music']['bed']['duck'] == [[2.7, 3.0, 0.03, 0.06, 0]] and 'WARN music cue ends on the insertion point' in r.stdout))
+    return all(v for _, v in rows), [f"{'ok  ' if v else 'FAIL'} {n}" for n, v in rows]
+
+
 def run_fixture(name, root, a):
     d = os.path.join(root, name); os.makedirs(os.path.join(d, 'takes'), exist_ok=True); fps = a.fps; lines = []; ok = True
+    if name == 'duck': return duck_fixture(d, fps, a)
+    if name == 'placement': return placement_fixture(d, fps, a)
     tol_f, tol_p, tol_a = 1.0 / fps + 1e-6, 1.0 / fps + 0.005, 0.005   # a flash: one frame · flash→pulse: a frame + a bucket · audio→EDL: a bucket
     if name == 'vo':
         per = take(os.path.join(d, 'takes', 't.mp4'), fps)
@@ -178,7 +260,7 @@ def run_fixture(name, root, a):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--only', default='offgrid,native,late,gap,vo'); ap.add_argument('--events', type=int, default=40)
+    ap.add_argument('--only', default='offgrid,native,late,gap,vo,duck,placement'); ap.add_argument('--events', type=int, default=40)
     ap.add_argument('--fps', type=int, default=24); ap.add_argument('--seed', type=int, default=7); ap.add_argument('--keep')
     ap.add_argument('--debug', action='store_true', help='list every expected event with no detection, and every stray detection')
     ap.add_argument('--grid', action='store_true', help='frame-aligned in/out points (a diagnostic: off-grid is the default and the stress)')

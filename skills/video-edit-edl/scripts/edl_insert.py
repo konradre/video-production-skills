@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """edl_insert.py — insert (or re-time) one event in an EDL and shift everything downstream by its duration: the
 events after the anchor, post_layers.at, audio.vo.*.at, audio.sfx.*.at, audio.music.*.tl, runtime_s. A music cue that
-SPANS the insertion point keeps playing under the insert (only its end moves). A second run with --replace re-times an
+SPANS the insertion point keeps playing under the insert (only its end moves). An sfx with a `sync` moves with its event,
+wherever it starts (a riser starts before its hit); a suck-out duck ending on the insertion point moves whole with the hit
+when its cue plays on past it, and stays with a cue that ENDS there (a WARN: re-cut that cue to the moved hit); an insert
+that would leave a duck outside its cue writes nothing. A second run with --replace re-times an
 existing insert (the previous shift is undone first). Writes <edl>.bak-<ts>-pre-insert beside the EDL first.
 
   edl_insert.py --root <project> --edl edit/<SPOT>-EDL.json --after <EVENT-ID> --id <NEW-ID> --take takes/<take>.mp4
@@ -12,7 +15,7 @@ source), so a FULL-TAKE hero (take -> upscale -> hero pass, untrimmed) needs han
 source pre-trimmed to (in - handle). Writing 0.0 regardless of in shipped four versions of a spot 0.3 s late.
 Times are rounded to 1/1000 s; tl spans stay == out - in.
 """
-import argparse, json, os, shutil, time
+import argparse, json, os, shutil, sys, time
 
 
 def main():
@@ -36,12 +39,26 @@ def main():
             if L['at'] >= t0 - 1e-6: L['at'] = r(L['at'] + d)
         for v in au.get('vo', {}).values():
             if isinstance(v, dict) and 'at' in v and v['at'] >= t0 - 1e-6: v['at'] = r(v['at'] + d)
+        mk = e.get('markers', {})
         for v in au.get('sfx', {}).values():
-            if isinstance(v, dict) and v.get('at') is not None and v['at'] >= t0 - 1e-6: v['at'] = r(v['at'] + d)
+            if not (isinstance(v, dict) and v.get('at') is not None): continue
+            sy = v.get('sync') or {}; ev_ = mk.get(sy.get('event')) if isinstance(sy.get('event'), str) else sy.get('event')
+            if isinstance(ev_, (int, float)):   # a synced sound moves with the event it belongs to, wherever it starts (a riser starts before its hit)
+                if ev_ >= t0 - 1e-6:
+                    v['at'] = r(v['at'] + d)
+                    if not isinstance(sy.get('event'), str): sy['event'] = r(ev_ + d)
+            elif v['at'] >= t0 - 1e-6: v['at'] = r(v['at'] + d)
         for v in au.get('music', {}).values():
             if isinstance(v, dict) and 'tl' in v:
                 s, t = v['tl']; v['tl'] = [r(s + d) if s >= t0 - 1e-6 else s, r(t + d) if t > t0 + 1e-6 else t]   # a spanning cue keeps playing
-                if v.get('duck'): v['duck'] = [[r(da + d) if da >= t0 - 1e-6 else da, r(db + d) if db > t0 + 1e-6 else db, g] for da, db, g in v['duck']]
+                if v.get('duck'):   # a ramp travels with its duck; a suck-out (gain <= 0.1, 0.2-0.7 s) ending on the insertion point moves whole
+                    # with the hit it clears — when its cue plays on past that point. A cue that ENDS there (a before-cue cut to the hit) keeps
+                    # its suck-out with it: that cue must be re-cut to the moved hit, and the WARN says so
+                    so = lambda dk: float(dk[2]) <= 0.1 and 0.2 <= dk[1] - dk[0] <= 0.7 and abs(dk[1] - t0) <= 1e-6 and t > t0 + 1e-6
+                    if any(float(dk[2]) <= 0.1 and 0.2 <= dk[1] - dk[0] <= 0.7 and abs(dk[1] - t0) <= 1e-6 for dk in v['duck']) and abs(t - t0) <= 1e-6:
+                        print(f"WARN music cue ends on the insertion point {t0} with its suck-out: both stay; the hit moved {d:+.3f} s, so re-cut the cue (and its suck-out) to the new hit", flush=True)
+                    v['duck'] = [[r(dk[0] + d), r(dk[1] + d), *dk[2:]] if so(dk) else
+                                 [r(dk[0] + d) if dk[0] >= t0 - 1e-6 else dk[0], r(dk[1] + d) if dk[1] > t0 + 1e-6 else dk[1], *dk[2:]] for dk in v['duck']]
         for k, v in e.get('markers', {}).items():   # absolute markers move with the picture they sit on
             if isinstance(v, (int, float)) and v >= t0 - 1e-6: e['markers'][k] = r(v + d)
         e['runtime_s'] = r(float(e['runtime_s']) + d)
@@ -57,6 +74,10 @@ def main():
            'native_audio_vol': a.native_vol, 'look': 'none', 'src': a.src or a.src_pattern.format(id=a.id, stem=stem),
            'note': a.note or f'insert after {a.after}, trimmed {a.tin}->{a.tout} of the take'}
     ev.insert(ev.index(anchor[0]) + 1, ins)
+    bad = [f"music {k}: duck {dk} now lies outside the cue {v['tl']}" for k, v in au.get('music', {}).items() if isinstance(v, dict) and 'tl' in v
+           for dk in v.get('duck', []) if not (v['tl'][0] - 1e-6 <= dk[0] < dk[1] <= v['tl'][1] + 1e-6)]
+    if bad: sys.exit('NOT WRITTEN — the insert would leave a duck outside its cue (a suck-out moved with its hit past the cue\'s end): '
+                     + '; '.join(bad) + ' — extend that cue past the hit first (a longer excerpt), then insert')
     shutil.copy(a.edl, f"{a.edl}.bak-{time.strftime('%Y%m%d-%H%M%S')}-pre-insert")
     json.dump(e, open(a.edl, 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
     print(f"inserted {a.id} at tl {ins['tl']} ({dur} s); runtime {e['runtime_s']} s")

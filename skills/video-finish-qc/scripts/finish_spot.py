@@ -243,12 +243,20 @@ def main():
             if fd + 1e-3 < d: print(f"WARNING {name}: {f} is {fd:.2f} s but its span is {d:.2f} s -> the cue just ENDS at tl {t0 + fd:.2f} (no loop, no fade); cut a longer excerpt", flush=True)
             if m.get('fade_in'): ch += f",afade=t=in:st=0:d={m['fade_in']}"
             fo = m.get('fade_out', 0.15); ch += f",afade=t=out:st={max(0, d - fo):.3f}:d={fo}"
-            if m.get('duck'):                              # ducks [[tl_from, tl_to, gain]] in TIMELINE seconds — linear ramps of duck_ramp s either side, per frame in cue-local time
-                r = float(m.get('duck_ramp', 0.25)); ex = '1'
-                for da, db, dg in m['duck']:
+            if m.get('duck'):                              # ducks [[tl_from, tl_to, gain(, ramp | , ramp_in, ramp_out)]] in TIMELINE seconds — linear ramps (duck_ramp s unless the duck names its own) either side, per frame in cue-local time
+                r = float(m.get('duck_ramp', 0.25)); ex = '1'; fine = False
+                for dk in m['duck']:
+                    assert len(dk) in (3, 4, 5), (name, 'a duck is [from, to, gain] + an optional ramp or ramp_in, ramp_out', dk)
+                    da, db, dg = dk[:3]; ri = float(dk[3]) if len(dk) > 3 else r; ro = float(dk[4]) if len(dk) > 4 else ri
+                    assert ri >= 0 and ro >= 0, (name, 'a negative ramp', dk); fine |= len(dk) > 3 and min(ri, ro) < 0.1   # a 3-value duck renders exactly as before
                     la, lb = da - t0, db - t0; assert 0 <= la < lb <= d + 1e-6, (name, 'duck outside the cue span', da, db, t0, t1)
-                    ex = f"({ex})*if(lt(t\\,{la - r:.3f})\\,1\\,if(lt(t\\,{la:.3f})\\,1-(1-{dg})*(t-{la - r:.3f})/{r}\\,if(lt(t\\,{lb:.3f})\\,{dg}\\,if(lt(t\\,{lb + r:.3f})\\,{dg}+(1-{dg})*(t-{lb:.3f})/{r}\\,1))))"
-                ch += f",volume=volume={m.get('vol', 0.7)}*{ex}:eval=frame,adelay={ms(t0)}[{name}]"
+                    up = f"1-(1-{dg})*(t-{la - ri:.3f})/{ri}" if ri > 0 else f"{dg}"     # ramp 0: straight to the gain at `from`
+                    dn = f"{dg}+(1-{dg})*(t-{lb:.3f})/{ro}" if ro > 0 else "1"           # ramp_out 0: back to full AT `to` — a suck-out's hit
+                    ex = f"({ex})*if(lt(t\\,{la - ri:.3f})\\,1\\,if(lt(t\\,{la:.3f})\\,{up}\\,if(lt(t\\,{lb:.3f})\\,{dg}\\,if(lt(t\\,{lb + ro:.3f})\\,{dn}\\,1))))"
+                # eval=frame steps the gain once per audio frame (1024 samples, 21 ms): a duck carrying its own ramp under 0.1 s gets
+                # 48-sample (1 ms) frames — measured 2026-10-25: 1024-sample frames returned a suck-out 7–17 ms after its hit; a
+                # 256-sample frame still left an unaligned `to` 4.3 ms late; 48 holds every edge within 1 ms
+                ch += (",asetnsamples=n=48:p=0" if fine else "") + f",volume=volume={m.get('vol', 0.7)}*{ex}:eval=frame,adelay={ms(t0)}[{name}]"
             else: ch += f",volume={m.get('vol', 0.7)},adelay={ms(t0)}[{name}]"
             au.append(ch); mix.append(f'[{name}]'); used[name] = f
         for e in ev:                                   # the take's own audio as a bed, only when the keeper earned it

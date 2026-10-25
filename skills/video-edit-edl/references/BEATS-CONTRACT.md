@@ -31,8 +31,8 @@ to each shipped once before the gate did.
 |---|---|
 | `markers` | `{event, take}` — a take time inside an event; the gate converts it to the timeline through that event's `tl` and `in`. MEASURED on the keeper (RMS peak of the hit, a word onset by whisper, the frame a wall clears). The builder rewrites them when a pick moves. |
 | `beat` · `events` · `script` | the beat id, the EDL events that realise it (in order), the script line verbatim |
-| `vo` · `sfx` | lines and sounds that must sit inside the beat's span (`[t0 − 0.05, t1)`) |
-| `order` | `sfx:` / `vo:` / `marker:` names that must occur in this order (sfx → O.S. line → the reaction word) |
+| `vo` · `sfx` | lines and sounds that must sit inside the beat's span (`[t0 − 0.05, t1)`) — a synced sfx by where its sync point lands (`at + sync.s`) |
+| `order` | `sfx:` / `vo:` / `marker:` names that must occur in this order (sfx → O.S. line → the reaction word); a synced sfx by its landing |
 | `vo_ends_before` | a MARKER name; every listed line must end at or before it (the narrator clears the hit) |
 | `music_end_at` / `music_start_at` | `[cue, marker]` — a cue edge within 2 ms of the marker; `"event"` = the beat's first event |
 | `layer_before_next` | `[layer id, lead]` — the layer starts `lead` s before the NEXT beat's first event |

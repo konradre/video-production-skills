@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """beat_sheet.py — the SCRIPT-FIDELITY GATE. Prints the EDL as a beat sheet against the spot's beat list and checks
-it BY CODE: every non-optional beat's events present IN ORDER; each beat's VO/SFX inside the beat's span; audio order
+it BY CODE: every non-optional beat's events present IN ORDER; each beat's VO/SFX inside the beat's span (a synced sfx by
+where its sync point lands, at + sync.s); audio order
 rules (sfx:knock -> vo:OS -> marker:ME); a VO ending before a marker; music cue edges on a marker or on the beat's
 first event; a post layer placed N s before the next beat; minimum durations; every placed VO line claimed by a beat;
 every EDL event claimed by a beat (an unclaimed event = an INVENTED beat); forbidden EVENT and LAYER ids absent.
@@ -33,6 +34,10 @@ def main():
     def mark(name):
         m = B['markers'][name]; x = ev[m['event']]; return round(x['tl'][0] + m['take'] - x['in'], 6)
 
+    def sfx_t(s):   # where an sfx LANDS: its sync point when it has one (a riser starts before the beat its hit belongs to)
+        sy = s.get('sync') if isinstance(s, dict) else None
+        return round(float(s['at']) + float(sy['s']), 6) if isinstance(sy, dict) and 's' in sy else s['at']
+
     rows, fails, seen = [], [], set()
 
     def chk(cond, msg): (rows if cond else fails).append(('PASS ' if cond else 'FAIL ') + msg)
@@ -48,11 +53,11 @@ def main():
         for L in b.get('vo', []):
             v = vo.get(L); chk(v is not None and t0 - 0.05 <= v['at'] < t1, f"{b['beat']} VO {L} at {v['at'] if v else None} inside [{t0},{t1}]"); seen.add(L)
         for S in b.get('sfx', []):
-            s = sfx.get(S); chk(s is not None and t0 - 0.05 <= s['at'] < t1, f"{b['beat']} SFX {S} at {s['at'] if s else None} inside [{t0},{t1}]")
+            s = sfx.get(S); chk(s is not None and t0 - 0.05 <= sfx_t(s) < t1, f"{b['beat']} SFX {S} {'lands' if s and s.get('sync') else 'at'} {sfx_t(s) if s else None} inside [{t0},{t1}]")
         if 'order' in b:
             ts = []
             for o in b['order']:
-                k, n = o.split(':'); ts.append(sfx[n]['at'] if k == 'sfx' else vo[n]['at'] if k == 'vo' else mark(n))
+                k, n = o.split(':'); ts.append(sfx_t(sfx[n]) if k == 'sfx' else vo[n]['at'] if k == 'vo' else mark(n))
             chk(ts == sorted(ts), f"{b['beat']} audio order {b['order']} = {ts}")
         if 'vo_ends_before' in b:
             for L in b.get('vo', []):
@@ -80,7 +85,7 @@ def main():
         beat = next((b['beat'] for b in B['beats'] if x['id'] in b['events']), '—')
         print(f" {x['tl'][0]:7.3f}–{x['tl'][1]:7.3f} {x['id']:9} {beat:9} {os.path.basename(x['take']):28} take {x['in']:.3f}–{x['out']:.3f}  {x.get('note', '')[:70]}")
     lines = [(v['at'], f"VO {k} «{v.get('text', '')}» {v['at']:.2f}–{v['at'] + vdur(v):.2f}") for k, v in vo.items() if isinstance(v, dict) and 'file' in v]
-    lines += [(s['at'], f"SFX {k} {s['at']:.2f}–{s['at'] + s.get('dur', 0):.2f}") for k, s in sfx.items()]
+    lines += [(s['at'], f"SFX {k} {s['at']:.2f}–{s['at'] + (s.get('dur') or 0):.2f}" + (f" ({s['sync'].get('kind')} lands {sfx_t(s):.2f})" if isinstance(s.get('sync'), dict) else '')) for k, s in sfx.items()]
     lines += [(m['tl'][0], f"MUSIC {k} {m['tl'][0]:.2f}–{m['tl'][1]:.2f}") for k, m in mus.items()]
     lines += [(l['at'], f"LAYER {l['id']} {l['at']:.2f}–{l['at'] + l['dur']:.2f}") for l in e.get('post_layers', [])]
     lines += [(mark(m), f"MARKER {m} {mark(m):.3f}") for m in B.get('markers', {})]

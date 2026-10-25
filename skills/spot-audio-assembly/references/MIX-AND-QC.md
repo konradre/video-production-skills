@@ -17,6 +17,8 @@ a line at its previous version's time. Before a line is placed, its gap floor is
 ```
 [vo stem] + [sfx: atrim src_in/dur, afade out 0.1 s, volume, adelay at]
          + [music: atrim to span, afade in/out, ducks as a per-frame volume expression, adelay tl[0]]
+             (a duck of 3, 4 or 5 numbers — its own ramps; a duck whose own ramp is under 0.1 s runs on 48-sample frames,
+              because a 1024-sample frame returned a suck-out 7–17 ms after its hit, measured 2026-10-25)
          + [native beds: -ss from -t (to−from) of the take, afade in 0.02 / out 0.03 when windowed, volume, adelay]
   → amix normalize=0 → atrim 0:runtime → PCM 24-bit master          a STATIC sum: no loudness processing here
 ```
@@ -83,6 +85,7 @@ had invalidated the `vol` sized against the old stem without a sound.
 | VO placement | `qc_vo_placement.py` — 10 ms RMS envelopes, 300–4000 Hz, NCC vs the EDL `at` | every line < 15 ms |
 | VO ↔ sfx clash | the sheet (`beat_sheet.py`) + a listen at the signature and every hit | no line under a hit or the signature |
 | native artifacts | `audio_head_scan.py` on every take; the ear on the delivered file at each cut | no tone/drone the ear catches; no click at a cut |
+| the sound table | `sound_table.py` — each music cue's presence at three points across its span, each suck-out's depth, the real silences before `qc.turn`, the loudest 400 ms moments and what sits there, 20–60 Hz against the band; both channels kept, their powers added | INFO only (operator, 2026-10-25): 25–30 dB · ≥ 2 before the turn (films, music videos) · the designed impacts · about −15 dB — read, listened to, no verdict yet |
 | the VO script | the `text` table quoted in the ask | matches the client script's lines verbatim |
 
 A waveform cross-correlation is NOT the placement instrument: under loudnorm + AAC it read 0.08 where

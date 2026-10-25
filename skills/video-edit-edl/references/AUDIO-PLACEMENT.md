@@ -51,6 +51,20 @@ rides over the surprise shot; a tear carries into the next cut; a take's own kno
 earlier becomes an sfx at the new time with the native muted from the raps. A word remainder across a
 cut ("persist what remains of the last word") is the same device.
 
+## Sync points and suck-outs
+
+- A sound sits by its sync point on the event it belongs to: `sfx.<k>.sync = {kind, s, event}` — its transient, pass-by
+  peak or end, `s` seconds into the sound as played, on a marker (by name) or a time. A plan entry may omit `at` and the
+  builder places it; either way the gate holds `at + s` on the event within half a frame, and an insert moves a synced
+  sound with its event even when the sound starts before the insertion point (a riser). The entry's `derived` block
+  (`sfx_onsets.py --sync` prints it) makes a swapped sound FAIL the build until its point is re-measured.
+- A suck-out is a music duck with its own ramps ending on the impact's marker — `[{"marker": "HIT", "offset": -0.35},
+  "HIT", 0.03, 0.06, 0]` in the plan; an insert at the impact moves it whole with the hit when its cue plays on past it, and
+  a cue that ENDS on the hit (a before-cue) keeps its suck-out with it and is re-cut to the moved hit (the insert WARNs). An
+  insert that would leave any duck outside its cue writes nothing. The foley inside it is ended by
+  placement, and the gate warns on any sfx, take sound or line left inside (`spot-audio-assembly` SFX-AND-MUSIC.md
+  § Sound direction).
+
 ## Music
 
 - A cue is CUT to the marker it must end on (the before cue to the HIT) from the head of the candidate —
@@ -59,7 +73,8 @@ cut ("persist what remains of the last word") is the same device.
   cut before it; `fade_in: 0`.
 - A bed under the turntable and the card starts at the turntable's `tl[0]` and runs to the end.
 - Ducks: `[[from, to, gain]]` in timeline seconds under a line (−12 dB under the disclaimer, −6 dB under
-  a dub or a shout, −10 dB under the closer) with 0.25 s ramps — the music must never fight the VO.
+  a dub or a shout, −10 dB under the closer) with 0.25 s ramps — the music must never fight the VO. A duck may carry its own
+  ramps (§ Sync points and suck-outs).
 - When the client's reference stems exist, the bed's level under the voice and the duck are MEASURED from them
   (`spot-audio-assembly` MIX-AND-QC.md § The bed against the voice) and stamped with their inputs — never carried
   from an earlier round.

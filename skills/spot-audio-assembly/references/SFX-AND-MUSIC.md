@@ -22,6 +22,16 @@ WAV.
 
 ## Placement rules
 
+- **A sound is placed by its SYNC POINT on the visual event it belongs to, never by a guessed offset** (mg-styles-15
+  `lib/audio/README.md` § 1): a one-shot or an impact syncs on its transient, a whoosh on its pass-by peak (its loudest
+  moment), a riser, a reverse cymbal or a swell on its END — the hit it drives into. A riser placed by its start lands early
+  by however long its build runs. `scripts/sfx_onsets.py <file> --sync transient|peak|end [--src-in --dur] --event <T>`
+  reads the point (a one-shot trimmed tight to its hit included) and prints the `at` that puts it on T, the EDL's `sync`
+  block and the file's `derived` stamp; a plan sfx with a `sync` and no `at` is placed by it (`edl_build.py`), and
+  `edl_check.py` fails a sound whose sync point has left its event — a re-timed marker, an insert.
+- **Levels by construction**: bring every effect to one common level before it is placed (the donor normalises each to
+  ≈ −18 dB short-term, peak ≤ −1 dBFS, which sits it about 2 dB over its bed), so `vol` states intent only — about −6 dB
+  for a subtle sound, +2 for the hero hit — never a repair for a file that arrived at another level.
 - **VO never overlaps an sfx** — stagger; a couplet's halves sit either side of the sound.
 - **The audio signature sits on the END CARD** and its hit lands on the card's burst: the file starts
   a hair after the card cut (`card + 0.02`) so that the hit inside the file (at +T0, e.g. 0.83 s) meets
@@ -34,6 +44,31 @@ WAV.
 - **A creator-style spot has no music under the open** — room tone carries the hook; a cue may enter under the demo,
   ducked under every line; the disclosure line is never ducked over or covered by an sfx; no sign-off signature (the
   sub-genre carries none — `ad-spot-preprod` UGC-GRAMMAR.md § The beats, MIX-AND-QC.md § The phone-mic register).
+
+## Sound direction — silences, suck-outs, impacts, the low end
+
+lemo-opuscar judges a film by its sound first (`DIRECTOR.md` §§ 6, 11; `styles/satellite-briefing/STYLE.md` § Mix; the
+suck-outs in its `demo/mix.py` files). These hold for every genre unless a line says otherwise.
+
+- **Two real silences before the turn — films and music videos** (operator, 2026-10-25: a 15 s ad already carries its one
+  silence, before the hit). At least two silences or near-silences before the turn or the emotional peak, and the first
+  sound after one is among the most important sounds in the piece. A suck-out is its own rule, never one of the two. The
+  EDL names the turn's marker in `qc.turn`.
+- **A suck-out before each designed impact**: 0.25–0.6 s in which the music and the foley drop 25–30 dB, reached by a
+  50–80 ms ramp and released ON the impact (lemo's windows: 0.27–0.63 s at −26 to −30 dB, ramps of 50 and 80 ms). The
+  music's half is a duck carrying its own ramps, `[from, to, 0.03, 0.06, 0]` — −30 dB, a 60 ms ramp in, full again AT `to`,
+  the hit (`video-edit-edl` EDL-CONTRACT.md § audio). The foley's half is placement: an sfx ends at the suck-out's start
+  (its `dur`), a take's own sound at `native_audio_to` or a cut on the hit, and a riser or sweep that drives INTO the hit is
+  synced on it and stays. `edl_check.py` warns on any sfx, take sound or line that plays inside a suck-out.
+- **The two or three designed impacts are the loudest moments of the mix.** The master is a static sum, so nothing
+  compresses them; the read is the delivered file's loudest 400 ms windows and what the EDL places there.
+- **The low end stays lean**: 20–60 Hz about 15 dB under the full band, music and foley high-passed around 36–44 Hz (lemo's
+  mixes: 35–46 Hz). A cue that arrives heavier is filtered before it is placed.
+- **Every row of the sound table is in the mix, and the EDL's audio block is the table.** On the delivered file: each sfx at
+  its `at`, read around its sync point when it has one (`qc_deliverable.py`'s sfx row), each sync point on its event
+  (`edl_check.py`), and each music cue's presence across its span, each suck-out's depth, the silences before the turn, the
+  loudest moments and the low end (`scripts/sound_table.py` — INFO rows only until the reads are measured on two real
+  deliverables, operator 2026-10-25).
 
 ## Music
 
@@ -71,5 +106,6 @@ WAV.
   end; the hit shot and the line after it carry only native sound.
 - **Ducks** under speech, per cue: `[[from, to, gain]]` timeline seconds with 0.25 s linear ramps,
   rendered as a per-frame volume expression by the finisher — 0.25 under a disclaimer, 0.5 under a dub or
-  a shout, 0.32 under the closer; the music never fights the VO.
+  a shout, 0.32 under the closer; the music never fights the VO. A duck may carry its own ramp, `[from, to, gain, ramp]`,
+  or two, `[from, to, gain, ramp_in, ramp_out]` — a suck-out's `ramp_out` is 0 (§ Sound direction).
 - A cue spanning an insert keeps playing under it (`edl_insert.py` moves only its end).

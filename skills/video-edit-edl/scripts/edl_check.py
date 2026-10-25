@@ -3,7 +3,10 @@
 and every tl span equals out - in; every take exists and [in, out] lies inside it; every src (hero) resolves by the
 finisher's file rule ('a|b' alternatives, each a glob, the first that exists wins); a generated event with in > 0 and
 handle_head == 0 is flagged (the seek convention that shipped four versions 0.3 s late); exactly one endcard when
---require-endcard (a spot whose beat list forbids a card has none); every VO / music / sfx file exists; a music cue at
+--require-endcard (a spot whose beat list forbids a card has none); every VO / music / sfx file exists; every duck is 3, 4
+or 5 numbers inside its cue; an sfx `sync` puts its point on its event (`at + s` within half a frame; a marker name is
+re-read) — and a suck-out (a duck at gain <= 0.1 lasting 0.2–0.7 s) WARNs on any line, sfx or take sound inside it (a riser
+synced on the hit excepted); a music cue at
 least as long as its span (a short cue just ENDS mid-span — no loop, no fade); every VO line ends inside the runtime and
 records where its file came from (a WARN when `source` is absent); every EDL out-point sits at least one frame before the
 take's own next internal cut (rogue frames) when --cuts is given — except a cut the event DECLARES part of the keeper
@@ -96,10 +99,41 @@ def main():
         if not f: fail(f"music {k}: file missing {m.get('file')}"); continue
         span = m['tl'][1] - m['tl'][0]; d = probe(f)
         if d + 1e-3 < span: fail(f"music {k}: {f} is {d:.2f} s but its span is {span:.2f} s — the cue just ENDS at {m['tl'][0] + d:.2f}; cut a longer excerpt")
-        for da, db, g in m.get('duck', []):
+        for dk in m.get('duck', []):
+            if not isinstance(dk, list) or len(dk) not in (3, 4, 5): fail(f"music {k}: duck {dk} — [from, to, gain], + a ramp, or + ramp_in, ramp_out"); continue
+            da, db, g = dk[:3]
             if not (m['tl'][0] - 1e-6 <= da < db <= m['tl'][1] + 1e-6): fail(f"music {k}: duck [{da},{db}] outside the cue span {m['tl']}")
+            if any(float(v) < 0 for v in dk[3:]): fail(f"music {k}: duck {dk} has a negative ramp")
+            if float(g) <= 0.1 and 0.2 <= db - da <= 0.7:   # a suck-out: the silence before an impact carries no voice
+                for L, v in au.get('vo', {}).items():
+                    if not (isinstance(v, dict) and 'at' in v and v.get('file') and os.path.exists(v['file'])): continue
+                    vd = float(v.get('dur') or probe(v['file']))
+                    if v['at'] < db and v['at'] + vd > da: warn(f"music {k}: VO {L} plays inside the suck-out [{da},{db}] — the drop before the impact carries a voice")
+                for S, x in au.get('sfx', {}).items():   # foley drops with the music: a duck lowers music only, so the placement must
+                    if not (isinstance(x, dict) and 'at' in x): continue
+                    sd = float(x.get('dur') or (probe(first(x['file'])) if first(x.get('file')) else 0)); sy = x.get('sync') or {}
+                    ev_ = e.get('markers', {}).get(sy.get('event')) if isinstance(sy.get('event'), str) else sy.get('event')
+                    into_hit = isinstance(ev_, (int, float)) and abs(float(ev_) - db) <= 0.5 / a.fps + 1e-6   # a riser or sweep synced on the hit drives into it
+                    if x['at'] < db - 1e-6 and x['at'] + sd > da + 1e-6 and not into_hit:
+                        warn(f"music {k}: sfx {S} plays inside the suck-out [{da},{db}] — end it at {da} (its dur), or sync it on the hit if it drives into it")
+                for x in ev:
+                    if not x.get('native_audio_vol') or 'in' not in x: continue
+                    n0 = x['tl'][0] + float(x.get('native_audio_from', x['in'])) - x['in']; n1 = x['tl'][0] + float(x.get('native_audio_to', x['out'])) - x['in']
+                    if n0 < db - 1e-6 and n1 > da + 1e-6: warn(f"music {k}: {x['id']}'s own sound plays inside the suck-out [{da},{db}] — native_audio_to at the suck-out's start, or a cut on the hit")
+    mk = e.get('markers', {})
     for k, s in au.get('sfx', {}).items():
-        if isinstance(s, dict) and s.get('file') and not first(s['file']): fail(f"sfx {k}: file missing {s['file']}")
+        if not isinstance(s, dict): continue
+        if s.get('file') and not first(s['file']): fail(f"sfx {k}: file missing {s['file']}")
+        sy = s.get('sync')   # {kind, s, event}: the sound's sync point (s seconds into it as played) belongs on the event
+        if sy is None: continue
+        if not isinstance(sy, dict) or sy.get('kind') not in ('transient', 'peak', 'end') or 's' not in sy or 'event' not in sy:
+            fail(f"sfx {k}: sync {sy} — {{kind: transient|peak|end, s, event}}"); continue
+        ev_t = mk.get(sy['event']) if isinstance(sy['event'], str) else sy['event']
+        if not isinstance(ev_t, (int, float)): fail(f"sfx {k}: sync.event {sy['event']!r} is no marker and no number"); continue
+        if s.get('dur') is not None and not (0 <= float(sy['s']) <= float(s['dur']) + 1e-6): fail(f"sfx {k}: its sync point {sy['s']} s lies outside the {s['dur']} s it plays")
+        land = float(s['at']) + float(sy['s'])
+        if abs(land - float(ev_t)) > 0.5 / a.fps + 1e-6:
+            fail(f"sfx {k}: its {sy['kind']} lands at {land:.3f} but belongs on {sy['event']} at {float(ev_t):.3f} — at {float(ev_t) - float(sy['s']):.3f} puts it there")
     for L in e.get('post_layers', []):
         if not glob.glob(re.sub(r'%0?\d*d', '*', L['frames'])): fail(f"layer {L['id']}: no frames at {L['frames']}")
         if L['at'] + L['dur'] > t + 1e-3: warn(f"layer {L['id']}: ends {L['at'] + L['dur']:.3f} past the runtime {t:.3f}")
