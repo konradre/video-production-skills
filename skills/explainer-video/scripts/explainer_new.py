@@ -183,14 +183,18 @@ def scaffold(out, scenes, W, H, fps, target, seed, bg, hfv):
     (root / "script.md").write_text(
         f"# {name} — narration, written the way it must READ on screen\n\n"
         "<!-- One `## <scene-id> <title>` per scene, in order; the lines under it are spoken in that scene.\n"
-        "     One sentence per beat, 20 words at most. A pronunciation respelling lives only in the voice's input, never here. -->\n\n"
+        "     One sentence per beat, 20 words at most. A pronunciation respelling lives only in the voice's input, never here.\n"
+        "     The opening question (NARRATION.md): the one question the first sentence asks and the close answers — write it\n"
+        "     below this comment and above the first scene, beside the word and scene budget. -->\n\n"
         + "".join(f"## {s} {s.split('-', 1)[-1].replace('-', ' ').title()}\nWrite the first sentence spoken in this scene.\n\n" for s in scenes))
     (root / "storyboard.json").write_text(json.dumps({"scenes": [
         {"id": s, "anchor": "", "beats": {"title": ""}, "hero": "", "size": "a third of the content box at least",
          "light": "", "action": "", "camera": "", "angle": "", "entities": [], "join_in": "", "join_out": "",
          "set_piece": "", "emphasis": "", "small_print": [], "last_text": ""} for s in scenes]}, indent=1) + "\n")
     (root / "copy.md").write_text("# Approved on-screen copy — one string per line, exactly as it may appear\n\n")
-    (root / "facts.md").write_text("# Facts — every on-screen number, name, year and term, with its source URL and the date it was read\n\n")
+    (root / "facts.md").write_text("# Facts — every number, name, year and term said or shown, with its status, its source URL and the date it was read\n\n"
+                                   "status: established · reported · speculative · analysis · illustrative — the qualifier travels with the claim\n\n"
+                                   "| claim | status | source URL | read |\n|---|---|---|---|\n")
     (root / "hyperframes.json").write_text(json.dumps({"$schema": "https://hyperframes.heygen.com/schema/hyperframes.json",
                                                       "paths": {"blocks": "compositions", "components": "compositions/components", "assets": "assets"},
                                                       "media": {"autoProxy": True}}, indent=2) + "\n")
@@ -230,6 +234,7 @@ def selftest():
             "COPY object": "var COPY = {" in s1,
             "no unfilled placeholders": not re.search(r"%[A-Z_]+%", host + s1),
             "storyboard rows": len(json.loads((root / "storyboard.json").read_text())["scenes"]) == 2,
+            "facts.md carries a status column": "| claim | status | source URL | read |" in (root / "facts.md").read_text(),
             "dots move by transform, never left/top": "d.style.transform = 'translate(" in s1 and not re.search(r"style\.(left|top)\s*=", s1),
         }
         add_scene(root, "s03-close", 9)

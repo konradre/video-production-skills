@@ -18,12 +18,19 @@
 - **Structure**: the first chapter answers *why* (the problem, the metaphor, the hero's entrance, the source); the
   middle answers *how*, step by step ("step N" and its action); the last evaluates, names the limits, and returns to
   the metaphor to close.
+- **The opening asks what the close answers.** The first sentence asks one answerable question — the one the film
+  exists to answer — and the first frame shows the subject it is about (STORYBOARD § The row: the opening and the close);
+  the body answers it, and the close comes back to it in so many words. The question is written at the head of
+  `script.md` beside the budget.
 - **One running example** — the same case, names and numbers in every scene — and **one metaphor**, returned to at
   the end.
 - **Every sentence is drawable.** Name what the scene shows while writing the line; a line with no picture is
   rewritten or cut.
 - A term appears first in full with its abbreviation, then as the abbreviation.
 - A number comes only from `facts.md`, with the organisation and the year said; a number that ages carries "as of".
+- A claim is said with its status: a reported figure carries "reportedly" or its source; a proposal, a plan or a
+  prototype is said as one — "proposed", "planned", "a prototype" — never as a deal closed or a product shipping;
+  speculation and analysis are said as such.
 - Example data (a model, a score, a price) is marked illustrative in the delivery note.
 
 ## Display text and spoken text are different files

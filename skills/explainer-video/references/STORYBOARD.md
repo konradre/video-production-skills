@@ -22,6 +22,10 @@ file turns them into a scene plan.
 | `small_print` | `[{text, beat}]` | on the first beats; ≥ 2.5 s at ≥ 50 % opacity (checked) |
 | `last_text` | the last scene's last text beat | a closing window ≥ 1.0 s before the fade (checked) |
 
+**The opening and the close.** The first scene's hero is the subject of the film's opening question (NARRATION.md §
+script.md), on screen from frame 1 — for this scene the hero enters on the first beat, never the second — and something
+about it changes within the first 3 s; the last scene shows the answer to that question, on the hero.
+
 ## Patterns by concept type
 
 | the concept | draw it as | the hero |
