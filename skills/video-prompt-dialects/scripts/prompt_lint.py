@@ -5,7 +5,8 @@ prompt or in the GO ask.
 
   prompt_lint.py [--dialect seedance-2.5|seedance-2.0|minimax-h3|create-a-meme|kie] [--refs A,B,C]
                  [--cap N] [--caps-stoplist WORD,WORD] [--locked <first-line prompt>] [--strict] <prompt.txt>
-  prompt_lint.py --selftest     the photoreal rows L38-L41 against known-good and known-bad prompts
+  prompt_lint.py --selftest     the photoreal rows L38-L41 and the camera-while-the-product-works row L42 against
+                                known-good and known-bad prompts
 
 --refs   the reference NAMES in slot order (their count is the slot maximum the prompt may cite)
 --locked the prompt a model-voiced series was calibrated on (its first line): any sentence that differs outside the
@@ -65,19 +66,77 @@ def _selftest():
         ('minimax-h3', 'Live-action night footage from a full-frame cinema camera. A medium close-up frames a man.', 'L41', False),
         ('minimax-h3', 'integrated_multimodal_description: [Shot 1] Live-action, cinematic, a close shot begins on a glass.', 'L41', False),
         ('minimax-h3', 'The target video is live-action, natural colour. [Shot 1] A wide shot frames a ridge at dusk.', 'L41', False),
+        ('seedance-2.5', 'A close-up of the case on a desk; the camera pushes in slowly as the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the speaker; her thumb presses the button and the camera pans left.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the kettle; the camera arcs around it as the spout lifts and pours.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up; the camera pushes in while she presses the red button.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera dollies in as the lid of the case slowly opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera is panning left as the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the fan; the camera pushes in while the motor is spinning.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up; a slow camera push-in as two fingers press the button.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case on a desk, a locked-off camera; the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A medium shot; the camera tracks with the woman as she walks to the door and opens it.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera does not push in; the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', "A close-up of the case; the camera doesn't push in as the lid opens.", 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera pushes in while the lid does not open.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A locked-off close-up of the case; the lid opens as she pulls back her hand.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A wide street; a truck passes while the lid of the bin opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A medium shot; the camera pans left as the man in the cap turns toward the door.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A medium shot; the camera pushes in as she turns toward the screen.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'Cut 1 (0-3 s): a wide shot, the camera pushes in on the desk. Cut 2 (3-6 s): a close-up, locked off; the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('minimax-h3', '[Shot 1] Live-action, a wide shot, the camera pushes in on the desk. [Shot 2] Live-action, a close-up; the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the device; she says "the lid opens and the camera pushes in" to camera.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case on a desk; the camera pushes in slowly as the lid opens.', 'L42', False),   # no --mechanism: silent
+        ('seedance-2.5', 'A close-up of the case; the camera pushes in while the lid stays open.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera pushes in while the lid remains closed.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the lid opening; the camera pans left.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the fan; the camera pushes in with the motor spinning.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A medium shot; the camera pans left as the man in the red cap turns toward the door.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A static camera watches a hand pull back while the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up; Camera: slow pan left as the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera doesn’t push in as the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera cannot push in as the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera pushes in without sound as the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up; the camera pushes in as she presses the small red button.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', "A close-up; the camera pushes in; she doesn't press the button.", 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up; no push-in; the lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera slowly and steadily pushes in as the lid starts to open.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the camera pushes in while the lid is closed.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap']),
+        ('seedance-2.5', 'A close-up of the case; the lid opens. No abrupt push-in.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in while she does not actually press the button.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in as she opens her hand beside the button.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A locked-off close-up of a small pan on the hob; its lid opens.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in while the woman at the screen opens her eyes.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A medium shot; the camera pans left as the customer in the red cap turns toward the door.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up of the case; a slow pan left as the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up of the phone; the camera pushes in as the screen lights up.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; no sound as the camera pushes in and the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in while the woman at the screen is opening her eyes.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'The phone sits on the desk with its screen dark. The camera pans left as she opens the screen door.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A locked-off close-up; the lid opens. 【Maintain Consistency】 No hidden splice, jump cut, or abrupt push-in.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('minimax-h3', '[Shot 1] Live-action, a close-up, the camera pushes in on the case matching <Picture 1> (from [Shot 2]) while the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in as she opens the lid.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in as she presses the button firmly.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in while she avoids pressing the button.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in while she waits to press the button.', 'L42', False, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up. Without a cut, the camera pushes in as the lid opens.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in while she is pressing the button.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in as she starts to press the button.', 'L42', True, ['--mechanism', 'lid,button,spout,motor,cap,screen']),
+        ('seedance-2.5', 'A close-up; the camera pushes in as the 3-way valve opens.', 'L42', True, ['--mechanism', '3-way valve']),
+        ('seedance-2.5', 'A close-up of the 3-way valve, a locked-off camera; the 3-way valve opens.', 'L42', False, ['--mechanism', '3-way valve']),
         ('minimax-h3', 'For the target video, <Picture 1> (from [Shot 1]) is fully referenced. integrated_multimodal_description: '
                        '[Shot 1] Live-action, cinematic, the woman in <Picture 1> stays by the window.', 'L41', False),
     ]
     bad = 0
     with tempfile.TemporaryDirectory() as d:
-        for i, (dialect, prompt, row, fires) in enumerate(cases):
+        for i, (dialect, prompt, row, fires, *extra) in enumerate(cases):
             f = os.path.join(d, f'case{i}.txt')
             with open(f, 'w', encoding='utf-8') as fh:
                 fh.write(prompt)
-            out = subprocess.run([sys.executable, os.path.abspath(__file__), '--dialect', dialect, f],
-                                 capture_output=True, text=True).stdout
-            got = f' {row} ' in out
-            ok = got == fires
+            out = subprocess.run([sys.executable, os.path.abspath(__file__), '--dialect', dialect, *(extra[0] if extra else []), f],
+                                 capture_output=True, text=True)
+            got = f' {row} ' in out.stdout
+            ok = got == fires and out.returncode in (0, 1) and 'PROMPT-LINT' in out.stdout   # a crash is never a silent pass
             bad += not ok
             print(f'  {"PASS" if ok else "FAIL"}  {row} {"fires" if fires else "silent"}  [{dialect}] {prompt[:60]}')
     print(f'SELFTEST {"OK" if not bad else "FAIL"}  {len(cases) - bad}/{len(cases)}')
@@ -96,6 +155,7 @@ def main():
     ap.add_argument('--rules', help='refs-required.json — its ruled names and caps_stoplist join the ALL-CAPS stoplist')
     ap.add_argument('--strict', action='store_true')
     ap.add_argument('--duration', type=float, help='the call duration in seconds (it rides on the call, never in the prose) — scopes L34')
+    ap.add_argument('--mechanism', help='the product\'s own moving parts, comma-separated (lid,hinge,dial) — L42 runs only on a product beat, named by these')
     ap.add_argument('--locked', help='the first-line prompt this series was calibrated on — any sentence that differs outside the quoted line WARNs (L36)')
     a = ap.parse_args()
     text = open(a.prompt, encoding='utf-8').read()
@@ -199,6 +259,83 @@ def main():
     # L10 camera move vs diverging subjects
     if re.search(r'\b(push(?:es|ing)? in|dolly in|moves in|closes in)\b', low) and re.search(r'\b(diverge|run apart|scatter|separate|split up|spread out)\b', low):
         rows.append(('WARN', 'L10', 'a push-in while subjects diverge cannot hold them — bind the camera to ONE subject'))
+
+    # L42 a camera move in the same cut as a product part working — "two ideas at once"
+    # (the `3d-product` project, `video-production` CONTEXT-MAP: `skills/3d-product/references/animation.md` § 3)
+    # (and `elements.md` § 12b). An advisory heuristic with stated limits (LINT.md L42). It runs
+    # on a product beat only, which the text cannot tell from a story beat: --mechanism names the product's own moving
+    # parts, and without it the row is silent. The move must be the camera's; a negated move or action does not count.
+    mech_words = [w.strip() for w in (a.mechanism or '').split(',') if w.strip()]
+    if a.mechanism is not None and not mech_words: ap.error('--mechanism names no part')
+    if mech_words:
+        # An adjacency grammar, precision first: a word the grammar does not list breaks the match, so a negation ("does
+        # not open", "never moves") or a state ("stays open", "remains closed") never matches, and an unusual phrasing is
+        # a miss, not a false WARN.
+        parts = '|'.join(re.escape(w) for w in mech_words)
+        acts = (r'opens|opening|closes|closing|flips|flipping|(?:un)?folds|(?:un)?folding|slides|sliding|pops|popping|snaps|snapping'
+                r'|clicks|clicking|turns|turning|rotates|rotating|spins|spinning|lights up|lighting up|glows|glowing|comes on|coming on'
+                r'|extends|extending|retracts|retracting|lifts|lifting|lowers|lowering|presses|pressing|whirs|whirring|ejects|ejecting'
+                r'|dispenses|dispensing|unscrews|unscrewing|twists|twisting|pours|pouring')
+        base = r'open|close|flip|unfold|fold|slide|pop|snap|click|turn|rotate|spin|light up|glow|come on|extend|retract|lift|lower|press|eject|dispense|unscrew|twist|pour'
+        maux = r'is|are|and|slowly|gently|smoothly|quickly|suddenly|then|now|fully|halfway|silently|quietly|steadily|already'
+        hands = (r'press(?:es|ed|ing)?|turn(?:s|ed|ing)?|twist(?:s|ed|ing)?|flip(?:s|ped|ping)?|open(?:s|ed|ing)?|close[sd]?|closing'
+                 r'|lift(?:s|ed|ing)?|unscrew(?:s|ed|ing)?|pop(?:s|ped|ping)?|slides?|slid|sliding|push(?:es|ed|ing)?|pull(?:s|ed|ing)?'
+                 r'|spin(?:s|ning)?|spun|rotate[sd]?|rotating|click(?:s|ed|ing)?')
+        stopw = r'the|a|an|its|her|his|their|this|that|beside|by|near|on|in|at|with|under|over|next|to|of|from|behind|and|as|while'
+        mods = rf'(?:(?!(?:{stopw})\b)[a-z-]+\s+){{0,3}}'   # modifiers inside ONE noun phrase
+        part = lambda g: rf'\b(?P<{g}>{parts})s?(?:\s+of\s+(?:the|a|an|its)\s+[a-z-]+)?'   # the subject forms name their part
+        MECH = re.compile(rf'{part("pa")}\s+(?:(?:{maux})\s+)*(?:{acts})\b'
+                          rf'|{part("pb")}\s+(?:(?:{maux})\s+)*(?:starts|begins|starting|beginning) to\s+(?:{base})\b'
+                          rf'|\b(?:{hands})\s+(?:the|its|a|an|her|his|their|two|one|both|that|this)\s+{mods}(?:{parts})s?\b(?=\s*(?:[.,;:!?)\u3011]|$)|\s+(?:and|as|while|then|but|with|to|on|in|at|until|so|for|again|once|twice|slowly|gently|firmly|fully)\b)', re.I)
+        cam = (r'push(?:es|ing)? in|pull(?:s|ing)? (?:back|out|away)|doll(?:y|ies|ying)|tracks|tracking|trucks|trucking'
+               r'|cranes|craning|pans|panning|tilts|tilting|orbits|orbiting|arcs|arcing|zooms|zooming|moves|moving|drifts|drifting'
+               r'|glides|gliding|circles|circling|rises|rising|descends|descending|travels|travel(?:l)?ing|swings|swinging'
+               r'|sweeps|sweeping|creeps|creeping|follows|following|whips|whipping')
+        caux = r'and|is|keeps|starts to|begins to|then|now|slowly|gently|steadily|smoothly|quickly|briskly|subtly|immediately|also'
+        adj = r'slow|gentle|steady|smooth|quick|fast|subtle|long|short|small|tight'
+        camn = (r'push(?:-| )?in|pull(?:-| )?(?:back|out)|dolly(?:-| )(?:in|out|left|right)|pan (?:left|right|across|up|down)'
+                r'|tilt (?:up|down)|crane (?:up|down)|orbit|arc|track(?:ing)? (?:left|right|in|out|with)|zoom(?:-| )(?:in|out)|whip(?:-| )pan')
+        MOVE = re.compile(rf'\b(?:camera|shot)\s+(?:(?:{caux})\s+)*(?:{cam})\b'                        # the camera's own verb
+                          rf'|\bcamera\s*[:—–-]\s*(?:(?:{adj})\s+)?(?:{camn})\b'             # a "Camera: …" field
+                          rf'|\b(?:(?:{adj})\s+)?(?:push-in|pull-back|pull-out|dolly-in|dolly-out|whip[- ]pan|zoom-in|zoom-out'
+                          rf'|tracking shot|orbit(?:ing)? shot|(?:slow|quick|fast|gentle|smooth|steady) pan (?:left|right|across|up|down))\b', re.I)  # a camera noun
+        NEG = re.compile(r"(?:\b(?:no|not|never|without|cannot|nor)\b|n't|\bno longer\b)\s+(?:(?!(?:as|while|and|then|but|when)\b)[a-z-]+\s+){0,2}$", re.I)
+        PREP = re.compile(r"\b(?:in|with|wearing|holding|at|by|beside|near|behind|under|over|on|of|from|to|toward|towards)\s+"
+                          r"(?:the|a|an|his|her|their|its)\s+(?:[a-z-]+\s+){0,2}$", re.I)
+        HANDS_ING = {'pressing', 'turning', 'twisting', 'flipping', 'opening', 'closing', 'lifting', 'unscrewing', 'popping',
+                     'sliding', 'pushing', 'pulling', 'spinning', 'rotating', 'clicking'}
+        HANDS_BASE = {'press', 'turn', 'twist', 'flip', 'open', 'close', 'lift', 'unscrew', 'pop', 'slide', 'push', 'pull', 'spin',
+                      'rotate', 'click'}
+        def mv_noun(m):             # the match is a camera noun (push-in, whip pan…), not a clause
+            return m.re is MOVE and not m.group(0).lower().startswith(('camera', 'shot'))
+        def live(seg, m):           # no negation right before the match ("no push-in", "doesn't press the button"), and not
+            # inside a sentence that opens on one ("No hidden splice, jump cut, or abrupt push-in")
+            if NEG.search(seg[max(0, m.start() - 40):m.start()]): return False
+            head = m.group(0).lower()
+            if not head.startswith(('camera', 'shot')) and mv_noun(m):   # a camera NOUN inside a negated list
+                sent = re.split(r'[.;!?\n\u3011]', seg[:m.start()])[-1]
+                if re.match(r'\s*(?:no|never|without|avoid)\b(?:(?!\b(?:as|while|when|then|but)\b).)*$', sent, re.I): return False
+            fm = re.match(r'[a-z-]+', head); first = fm.group(0) if fm else ''   # a hand's verb that is not performed:
+            # "avoids pressing", "waits to press" (a part name may open the match and start with a digit: "3-way valve")
+            prev = (re.findall(r"[a-z']+", seg[max(0, m.start() - 20):m.start()].lower()) or [''])[-1]
+            if not mv_noun(m) and first in HANDS_ING and prev not in ('is', 'are', 'keeps', 'starts', 'begins', "'s"): return False
+            if not mv_noun(m) and first in HANDS_BASE and prev == 'to' and not re.search(r'\b(?:starts|begins) to\s*$', seg[max(0, m.start() - 20):m.start()], re.I): return False
+            return True
+        def owned(seg, m):          # "the man in the red cap turns", "the woman at the screen opens her eyes": the part sits in a
+            # prepositional phrase and the finite verb is another subject's; "with the motor spinning" (an -ing) stays the part's
+            absolute = re.search(r'ing(?: up| on)?$', m.group(0)) and not re.search(r'\b(?:is|are)\b', m.group(0))
+            return bool(m.group('pa') or m.group('pb')) and not absolute and bool(PREP.search(seg[max(0, m.start() - 45):m.start()]))
+        spoken_out = QUOTED.sub(' ', text).replace('’', "'")
+        segs = [(f'Cut {c[0]}', c[3]) for c in CUT.findall(spoken_out)]
+        if not segs:
+            shots = re.split(r'(?<!from )\[Shot (\d+)\](?!\))', spoken_out)
+            segs = [(f'Shot {shots[i]}', shots[i + 1]) for i in range(1, len(shots) - 1, 2)] or [('the prompt', spoken_out)]
+        for name, seg in segs:
+            mv = next((m for m in MOVE.finditer(seg) if live(seg, m)), None)
+            mc = next((m for m in MECH.finditer(seg) if live(seg, m) and not owned(seg, m)), None)
+            if mv and mc:
+                rows.append(('WARN', 'L42', f'{name}: a camera move ("{mv.group(0)[:40]}") while the product works ("{mc.group(0)[:50]}") — '
+                                            'two ideas at once; hold the camera while the part moves, move it while the product is still, or split the cut'))
 
     # L11 framing on its own clause + L12 beat density, per cut
     cuts = CUT.findall(text)

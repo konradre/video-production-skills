@@ -139,8 +139,9 @@ category referents and gait mechanics; "aerial view"; camera move vs diverging s
 is not on its own clause; beat density; the char cap; a prompt that repeats a reference's description;
 single-shot negatives on a long generation (`--duration`); a per-line prompt that drifted from its locked first line
 (`--locked`); the photoreal rows — quality words, grain asked of a still, an H3 negation naming a scene object, H3's
-style not first (`--selftest` proves each one fires and stays silent on MiniMax's own examples); and by eye, a look
-plate restated in prose and a citation that resolves to no asset.
+style not first (`--selftest` proves each one fires and stays silent on MiniMax's own examples); on a product beat,
+with `--mechanism <the product's moving parts>` (lid,hinge,dial), a camera move in the cut where a part works; and by
+eye, a look plate restated in prose and a citation that resolves to no asset.
 The lint is advisory except the slot and cap rows — but a warning row is answered in the prompt or in the
 GO ask, never ignored.
 

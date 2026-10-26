@@ -24,6 +24,7 @@ library (`video-prompting-skill`), the BytePlus 2.0/2.5 guides, fal's 2.5 guide,
   lands, a fan covers the lens) rather than stacked as camera words. A practitioner's claim from one take per engine
   (H3, Grok Imagine, Seedance 2.0 — `minimax-h3-agent-skills` practice, 2026-08-24), untested here: a candidate for the
   next action shot's A/B, not a rule yet.
+- **A product moves only by its own mechanism or a visible hand**: prompt the before state and the after state, with a cut or an on-screen hand between them, never the move itself — a product that slides, turns or settles with no cause reads as CG (the `3d-product` project, `video-production` CONTEXT-MAP: `skills/3d-product/references/editing.md` § 1; the take's read is `video-take-review` ACCEPTANCE-MATRIX row 5).
 - **Point, never describe**: a cited reference gets one narrow job and an exclusion, never adjectives
   (the most expensive lesson: the words beat the picture every time).
 - **A genre dialect layers on the model's.** A creator-style / UGC spot swaps the style prefix, the camera clause, the
