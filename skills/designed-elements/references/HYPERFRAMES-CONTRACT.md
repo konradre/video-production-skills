@@ -79,6 +79,18 @@ spot that should carry the new one — the round ledger lists which spots carry 
   and **pausing at a time suppresses the timeline's callbacks**, so an `onUpdate` that applies a camera or redraws a
   canvas never runs during a scrub — call it explicitly after the seek rather than relying on the tween to fire it.
   Every frame-level instrument in this kit reads frames produced this way.
+- **Expose a state probe (optional), and read it before the render.** `window.__probe = t => { __hfSeek(t); return {…};
+  }` returns the numbers that define the story at time t: the current beat and shot, the positions that matter, counts
+  of the things that should exist, the distances that define a contact, and the beats so far as `beat@time`. Like a
+  frame, it is a function of t alone: `history` lists the beats whose start is at or before t, read from the timeline's
+  own labels or beat table, never a list pushed while playing, which a cold seek leaves empty. Read it at chosen times
+  before any render: late arrivals, a skipped beat, an event firing at once, an element off the canvas and a `NaN` show
+  up there first (upstream's record, `papermotion`: a rope stretched 18 %, a touch that never happened, a school of fish
+  that never arrived, a `NaN` zoom that blanked whole layers). The read takes seconds where a render takes minutes:
+  serve the project on this machine only (`python3 -m http.server 8799 --bind 127.0.0.1` in `hyper/<name>` — without
+  `--bind` it listens on every interface; a Windows browser reaches WSL2's loopback as `localhost`), open it in a desktop
+  Chromium (WSL2's headless one hangs, § Rendering), and evaluate `[0.5, 2, 4.2].map(t => [t, __probe(t)])` in its console or through a devtools
+  tool. It is a read, never a gate: the frames still decide (designed-elements SKILL.md § 4).
 - Display copy lives in the HTML or in one `COPY = { … }` object in the script, whole — never assembled from fragments
   in code, which `literal_audit.py` cannot read.
 - No network at render for assets: fonts (`@font-face` from `assets/fonts/`), textures, cut-outs, sprites
@@ -92,6 +104,50 @@ spot that should carry the new one — the round ledger lists which spots carry 
   mp4). Save the art as plain sRGB values; `det_check.py source` lists any PNG that still carries one.
 - The composition's sound sync is a constant (`T0`, e.g. 0.83 s): the burst fires on the audio signature's hit,
   and it is the constant that moves when the sound is re-timed, never the sound (`spot-audio-assembly` § signature).
+
+## The operator layer — a filmed read on top of a planned move
+
+A planned move is exact, and a composition meant to read as filmed (a camera on a set, a product shot as if from a
+dolly) reads it as unnaturally steady. The layer that answers it imitates a real operator, whose motion is mostly slow
+drift, not tremor: recorded handheld shake puts 75–100 % of its power below 0.5 Hz, which is why noise-based shake —
+power spread evenly per octave, far too much of it above 2 Hz — reads synthetic. It is an option, off by default, named
+in the style brief's camera grammar (STYLE-BRIEF § 6) beside the moves it sits on, and it sits on top of the move: the
+move's generator, rate and lens stay as they are (CRAFT § Background motion and transitions, the two-dimension cap). Amounts are fractions of the frame width (upstream's pixels
+at 1920 wide), so they hold at 2160 and at a 1080 delivery alike.
+
+- **Drift** on the pan and the tilt (the stage's x and y in a flat composition): noise whose power falls as about
+  1/f^1.2–1.5, band-passed to 0.05–0.7 Hz, about 0.05–0.10 % of the frame width RMS per axis.
+- **Speed breathing**: the move's rate varies by ±1–2 % (about 1 % RMS) at 0.08–0.6 Hz.
+- **Follow lag**: a camera following a moving element trails it by 0.1–0.2 s (a first-order lag, gain about 0.9),
+  never riding it rigidly.
+- **The KEY stays exact** (CRAFT § Background motion and transitions: the frame the shot is designed around): each
+  channel is pulled to zero at the KEY's time — its value there subtracted under a Gaussian window of about 0.9 s — so
+  the KEY frame comes out exactly as designed.
+- **Under the visibility floors**: an offset reads as shake from about 0.03–0.04 % of the frame width, so everything
+  faster than the drift stays below that; drift against the frame edge reads from about 0.05–0.10 % of the width per
+  second, so the drift sits at or just above it.
+- **A function of t alone**, seeded per shot: the drift is a sum of sinusoids at seeded phases on log-spaced frequencies
+  across the band, with amplitudes falling as f^-(0.1–0.25) — log spacing adds its own 1/f of tone density, so the
+  power falls as 1/f^1.2–1.5 (amplitudes of f^-(0.6–0.75) belong to linear spacing); the lag is the element's own path weighted by the lag's
+  exponential, summed back from t over about five time constants at a fixed step. Never a filter stepped from the
+  previous frame (§ index.html: a tweened distance, never an accumulation), so a seek lands where a playthrough does —
+  the property `det_check.py prove` checks, not yet proved on a render of this layer. The bands, the amounts and the
+  gates below are upstream's (the 0.5 Hz share from the shake data it cites); this construction is ours.
+- **Read the layer before the render** (a pure function, so the state probe can return its offset). A seed shapes two
+  channels, the drift and the speed breathing. The drift's gates, over the shot at its frame rate: 0 at the KEY, a peak
+  of at most about 0.25 % of the frame width, a largest frame-to-frame step of at most about 0.04 %. Over at least 40 s
+  of the drift — it is a function of t, so it runs past the shot — at least 95 % of the power below 1.5 Hz, under 5 %
+  above 3 Hz, and at least 75 % below 0.5 Hz (recorded handheld's share). The shot alone cannot carry the spectrum read:
+  a 2 s window resolves nothing below 0.5 Hz. Measured on this construction: a 40 s read passed every one of 40 seeds
+  (the 0.5 Hz share 84 % at the lowest); on a 4–8 s shot the peak gate passed every one of 200 seeds at 0.05 % RMS and
+  about 5 in 6 at 0.10 %. A seed that misses a gate is replaced, never the gate widened. The speed breathing's gate:
+  within ±1–3 % of the move's rate on every frame, its seed replaced the same way. The follow lag is read by its own
+  numbers — its time and its gain — and not by the drift's gates: it moves the subject in frame on purpose (upstream's
+  ride keeps about 40 % of a slow bob), so a follow that moves it more than the shot wants takes a shorter lag (toward a
+  rigid follow) or has the lag switched off, never a re-seed — lowering the gain does the opposite, leaving the camera
+  further behind.
+- **The amount is the operator's pick**: one strength for the whole layer (1 = the approved amount), shown on the same shot with and without
+  the layer.
 
 ## Rendering
 

@@ -8,9 +8,10 @@ Dehancer plugin through their own interfaces, and the designed elements render w
 (Apache-2.0) fetched at render time.
 
 One reference is derived text: `skills/designed-elements/references/STYLE-CATALOGUE.md` paraphrases the style
-descriptions of two MIT-licensed libraries — lemo-opuscar (https://github.com/lemomo-ai/lemo-opuscar, Copyright (c)
-2026 LemoLab) and mg-styles-15 (https://github.com/Vincentwei1021/mg-styles-15, Copyright (c) 2026 Vincentwei1021).
-Both copyright notices and the MIT permission notice are reproduced in full at the end of that file.
+descriptions of three MIT-licensed sources — lemo-opuscar (https://github.com/lemomo-ai/lemo-opuscar, Copyright (c)
+2026 LemoLab), mg-styles-15 (https://github.com/Vincentwei1021/mg-styles-15, Copyright (c) 2026 Vincentwei1021) and
+papermotion (https://github.com/francozanardi/papermotion, Copyright (c) 2026 Franco Zanardi). All three copyright
+notices and the MIT permission notice are reproduced in full at the end of that file.
 
 ## ComfyUI-Darkroom — https://github.com/jeremieLouvaert/ComfyUI-Darkroom
 

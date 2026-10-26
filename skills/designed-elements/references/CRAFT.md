@@ -58,7 +58,7 @@ good and it failed anyway; a piece that fronts a subject cannot wear another sub
 - **Two different subjects differ in at least three of four**: palette, display face, background language, motion
   signature. Two builds that share three of them are one build with the copy changed. `style_brief_check.py --prev
   <last build's brief>` reads it, and fails at two shared.
-- **A catalogue names neighbours and lends grammar, never a look.** [`STYLE-CATALOGUE.md`](STYLE-CATALOGUE.md) holds 66
+- **A catalogue names neighbours and lends grammar, never a look.** [`STYLE-CATALOGUE.md`](STYLE-CATALOGUE.md) holds 67
   published styles in our words: their essence lines name what a brief must stay clear of, their camera rows and native
   moves are moves a brief may borrow. A catalogue style is never a base, and neither is another subject's brief; the one
   derivation allowed is from this subject's own accepted brief, through the creative checkpoint's change steps
@@ -102,6 +102,26 @@ edge and read as a page turn, then a sudden spin-and-blur that read as an editor
 
 A background change belongs behind 2–4, at the cut, never as a cross-fade mid-scene. One kind of transition at every
 cut is a deck with an expensive skin — `slide_structure_audit.py` R4 reads that off the source.
+
+**A camera move written in code animates at most two dimensions: one primary, and one secondary no larger than a quarter
+of it** (0.10–0.20 of it reads as one move), the two compared as on-screen travel over the shot: take the KEY frame's
+corner farthest from the aim, as the point on the plane through the aim parallel to the KEY's image, and measure how far
+that same point moves on screen under each dimension alone, as a fraction of the frame width (our measure; upstream
+states the ratio without one). Each is one generator — a push or pull about the aim, an arc about it, a crane, a truck,
+pedestal or slide, a pan or tilt of at most 10° — anchored on the shot's KEY: the one frame whose composition the shot
+is designed around, which the move passes through exactly. The pairs that keep the aim locked are a push or pull with a
+boom, and an arc with a push or pull; anything more is two shots and a cut. The cap counts the move's own dimensions;
+the breath (item 1, and the explainer's scene breath in `explainer-video` STORYBOARD) is not a move, and it stays under
+the move as before. No roll unless the brief names one. The shot's idea names the generator, and the composition its
+direction: a detail → push in · the whole, or its context → pull out or crane up · a form → arc · a row or a line →
+truck along it · an edge or a layer → pedestal over it. A move whose direction contradicts the idea reads as motion for
+its own sake. In a flat composition the camera is the stage's transform — a push is a scale about the aim, a truck or a
+pedestal a translation; an arc and a crane need depth (a `preserve-3d` stage, or three.js). A change of both scale and
+position between two framings is ONE push or pull when it is built as a scale about the one point the two framings share
+(a route map loosening from its origin to the whole route, built so, is one pull); zoom and centre tweened separately
+move that point, and the move is then two dimensions. A generated shot already takes one move (`video-prompt-dialects`
+DIALECTS); this is its code-side twin. A composition meant to read as filmed adds the operator layer on top
+([`HYPERFRAMES-CONTRACT.md`](HYPERFRAMES-CONTRACT.md) § The operator layer).
 
 ## Assets
 

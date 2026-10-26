@@ -1,8 +1,9 @@
 # Style catalogue — recognition and grammar, never skin
 
-Sixty-six motion and film styles from two published libraries, each read in full and rewritten here in our own words:
-fifty-one film styles from a library of style prompts (each a fixed eleven-section STYLE.md with a code-rendered demo) and
-fifteen motion-design styles from a set of one-prompt films (each with checkable signature techniques). A style brief
+Sixty-seven motion and film styles from three published sources, each read in full and rewritten here in our own words:
+fifty-one film styles from a library of style prompts (each a fixed eleven-section STYLE.md with a code-rendered demo),
+fifteen motion-design styles from a set of one-prompt films (each with checkable signature techniques), and one paper
+style from a paper-animation engine's skill and field notes (`papermotion`). A style brief
 ([`STYLE-BRIEF.md`](STYLE-BRIEF.md)) uses this file in two ways only:
 
 - **Recognition.** Each entry's **Essence** and **Not** lines say what a frame must show to read as that style, and what
@@ -29,9 +30,12 @@ their entries only; this kit ships no transition presets.
 
 **Provenance.** `lemomo-ai/lemo-opuscar` @ `b5e8ef9393` (2026-10-19), `styles/*/STYLE.md` — MIT License, Copyright (c)
 2026 LemoLab. `Vincentwei1021/mg-styles-15` @ `49052d80bf` (2026-10-05), `prompts/*.md` — MIT License, Copyright (c) 2026
-Vincentwei1021. The entries are paraphrased and condensed from those files; the libraries' MIT notices apply to this
-derived text, and both notices are reproduced in full under § Licence notices. Their demo films, code, palettes and copy are not reproduced. Where a style is defined by a named film,
-show or game, the entry describes its grammar and names none of them; a slug in backticks is the upstream folder name.
+Vincentwei1021. `francozanardi/papermotion` @ `433e7ce` (2026-10-15), `.claude/skills/papermotion/` and
+`docs/field-notes.md` — MIT License, Copyright (c) 2026 Franco Zanardi. The entries are paraphrased and condensed from
+those files; the sources' MIT notices apply to this derived text, and all three notices are reproduced in full under
+§ Licence notices. Their demo films, code, palettes and copy are not reproduced. Where a style is defined by a named film,
+show or game, the entry describes its grammar and names none of them; a slug in backticks is the upstream folder name,
+or for `papermotion` the repository's.
 
 ---
 
@@ -168,6 +172,7 @@ show or game, the entry describes its grammar and names none of them; a slug in 
 - **Not:** backlit shadow puppetry with hide and rods, flat vector art with strokes and gradients, a silhouette film.
 - **Camera:** extreme close-up following the scissor tip → making, a precise act · flat locked front view → the cut-out as an emblem, a title · slow pan across paper layers → a world laid out, a timeline · low wide with a shape standing up from the ground layer → threat, a deadline arriving · top-down tabletop → folding, cutting, sorting as the plot · push to a lit piece then pull back to many → one act spreading · page turn or sheet peel → day to night, chapters · pull back to the object in a room → the film was a thing someone made · rotation around a rosette → a cycle, a team.
 - **Native moves:** fold, cut, unfold on a strong beat (one cut becomes many — fits: one design mass-produced, one teacher many students) · holes are light (a backlit piece projects its pattern onto the world) · symmetry replicates (rosette → window flowers → fireworks — fits: a franchise, a song spreading) · scraps have a future (offcuts return as snow or stars — fits: recycling, small failures adding up) · everything is one flat sheet (a ridge stands up and becomes a creature) · a mirrored pair cut from one fold (fits: twins, a partnership).
+- **Close-up:** § Paper in close-up.
 
 #### Paper-cut lightbox (`paper-lantern`)
 - **Renders with:** three.js 3D.
@@ -175,6 +180,7 @@ show or game, the entry describes its grammar and names none of them; a slug in 
 - **Not:** flat paper-cut animation, shadow puppetry on a single screen, a 3D diorama — every element is a flat sheet parallel to the box front.
 - **Camera:** slow near-frontal dolly in → being drawn into a place · slow dolly out → loneliness, the whole place · rack focus between layers → attention moving in depth, now and then · lateral travel with depth parallax → a journey · top-down on the layer stack → a made thing as a craftsman sees it · push into or pull out of the box → the frame as an object, a story told · locked frame with only the light changing → a vigil, a night passing · tilt up or down the stack → a mountain, a well · near-plane occluder wipe → a curtain between chapters.
 - **Native moves:** the lamp turns on (source, far layers, then windows one by one — fits: a shop at dawn, a stadium before a match) · two windows, one light (two places sharing one moon — fits: a long-distance friendship, sister cities) · depth as distance (layers move by depth — fits: a migration, shipping a parcel) · paper that writes itself on the spoken word · the box as keepsake in a real room (fits: an anniversary, an unboxing) · light bursting from an opened thing · a silhouette in a window.
+- **Close-up:** § Paper in close-up.
 
 ### Print and printmaking
 
@@ -228,6 +234,7 @@ show or game, the entry describes its grammar and names none of them; a slug in 
 - **Not:** flat vector motion graphics, a halftone print, a Swiss grid, a gadget-and-gun-barrel spy parody.
 - **Camera:** wide on a full credit line, then truck in → reading, then action · lateral track in one screen direction → pursuit, a delivery · hard cut on a brass stab → a new location · graphic match cut (same shape, same place) → rhyme, acceleration · locked single shape on a flat ground → mystery, an icon · silhouette against a giant circle → the hero moment · diagonal split into a grid → fragmentation, a team · vertical pan down a column of type → descent, a roster · push into a letter until it is a place → a door, a tunnel.
 - **Native moves:** type is the set (each location is one credit line built as architecture — fits: a conference programme as a city, a menu as a restaurant) · credits as rhythm, landing on beats (fits: a feature list, a festival line-up) · graphic match cuts on an interval that shrinks as tension rises (fits: coin → planet → clock) · the diagonal grid that multiplies and later assembles something (fits: a logo assembled) · silhouette puppets acting in outline and timing (fits: a courier on a deadline) · the stop-time gag (freeze on a stab in silence — fits: a near miss, a price reveal) · the object of the chase becomes the title (fits: a product launch).
+- **Close-up:** § Paper in close-up.
 
 #### Art deco (`art-deco`)
 - **Renders with:** Canvas 2D.
@@ -392,6 +399,15 @@ show or game, the entry describes its grammar and names none of them; a slug in 
 - **Not:** a backlit one-colour papercut, a round-modelled 3D cartoon, squishing claymation.
 - **Camera:** eye-level macro track with shallow focus → inside the story at the actors' size · pull up to a three-quarter view of the spread → the mechanism, a map · descending dolly from human height → entering the book's scale · push-in on a face → a wish, a fear · reverse shot from inside the book to the blurred room → the world beyond the page is huge · rack focus paper ↔ real object → cause and effect, a real product in a paper story · top-down over the open spread → a board game, two sides of the gutter · locked frame on a pull-tab → the trick is the event · rising crane leaving the book small → aftermath, time passing.
 - **Native moves:** the book opens and the world pops up (fits: a project launch, a first school day) · page turn = scene change, old pieces folding as new ones spring (fits: a farm's seasons, a biography's chapters) · pull-tab mechanisms (flipping slats, sliding strips, a hinged door — fits: a forecast, old way/new way) · paper as character, crumpled, torn, taped (fits: a rejected draft becoming the design) · the edge of the page, crossing between paper and the room (fits: a drawing coming true) · the real object plays a part (a lamp as a sun, a mug as a tower) · typed bubbles and ratings (fits: a tutorial, a small victory).
+- **Close-up:** § Paper in close-up.
+
+#### Lit torn-paper diorama (`papermotion`)
+- **Renders with:** Canvas 2D — every sheet, torn edge and shadow drawn from a seed; its springs, its follow camera and its boiling edges written as functions of the timeline's time, never stepped forward frame by frame ([`HYPERFRAMES-CONTRACT.md`](HYPERFRAMES-CONTRACT.md) § index.html: a tweened distance, never an accumulation).
+- **Essence:** torn paper sheets standing at depths in parallax under ONE directional light — every sheet carries a rim on the side facing the light, a core shadow on the side turned away and a drop shadow on the layer behind; each character is one sheet; far layers take the colour of the air; nothing near the camera is a single flat tone; torn edges boil; motion is continuous, on springs, never stepped.
+- **Not:** front-lit cut paper laid flat and stepped at 12 fps (`papercut-red`), a backlit shadow box whose depth is a value ladder (`paper-lantern`), flat four-ink cut paper (`spy-titles`), a stepped photo collage (`06-collage`), a pop-up book on a real desk under a real lamp (`paper-popup`).
+- **Camera:** layers moving by depth → a place with distance in it · a spring-follow camera trailing the hero → travelling with it, momentum · a light handheld drift → a calm scene, observed · a handheld about three times as strong → panic · a slight roll → unease · the hero large in frame, the key event in it → the event read · a wide that leaves the hero small → space, loneliness · a cut on the new framing's first frame → a cut that never shows the follow catching up.
+- **Native moves:** a page-tear wipe, the outgoing act still drawn under the tear (fits: chapters, a before and an after) · an iris that opens from an object in frame (fits: a detail that becomes the next place) · a paper turn, the figure squashing through edge-on to face the other way (fits: a change of mind, a reversal) · letters cut from paper that a character lands on (fits: a title as a place, a word to stand on).
+- **Close-up:** § Paper in close-up.
 
 #### Tilt-shift miniature (`tilt-shift`)
 - **Renders with:** three.js 3D.
@@ -456,6 +472,7 @@ Each entry adds **Checkable techniques** (the numbers a render is held to) and a
 - **Checkable techniques:** cut-outs carry a 2–4 px white edge plus a halftone filter; puppet joints pivot at shoulder, elbow and jaw, the mouth swaps between two or three drawings; motion deliberately stepped to 12 fps or even 6 fps with ±2 px hand-placement jitter; layer order paper ground → big colour shapes → photo cut-outs → doodles and tape → grain; transitions are a hand slapping an element on or a whole-page paper flip.
 - **Beat shape:** a portrait cut-out whose head flips open like a lid → a world spills out of it → hands slap elements onto the page → a torn-paper or page-flip transition to the end card with bold diagonal type.
 - **Renders with:** DOM / Canvas 2D with matted cut-outs, CSS/SVG edge and halftone filters, stepped on a 12 fps grid.
+- **Close-up:** § Paper in close-up.
 
 #### Liquid motion (`07-liquid`)
 - **Essence:** shapes behave like liquid — they flow, stretch into necks, drip and fuse; a transition is a splash of paint across the screen, a logo coalesces from one drop; organic, satisfying, high energy; nothing is ever a straight line.
@@ -511,11 +528,29 @@ Each entry adds **Checkable techniques** (the numbers a render is held to) and a
 - **Beat shape:** lines draw on in hierarchy → the data comes alive → a target is found → the brackets lock → everything flips to the alert colour with "locked" and a coordinate.
 - **Renders with:** DOM / SVG and Canvas 2D layers with a three.js wireframe at the centre and a glow-and-scanline pass.
 
+## Paper in close-up — every paper entry
+
+The paper entries (`papercut-red`, `paper-lantern`, `spy-titles`, `paper-popup`, `papermotion`, `06-collage`) share these
+checkable techniques for any shot where a piece fills a large part of the frame, read at 1:1 on the delivered frame of the
+tightest shot (SKILL.md § 4). Each was a defect a viewer caught in `papermotion`'s field notes.
+
+- **One silhouette per piece.** A body meant to read as one piece is ONE sheet: one outline, one drop shadow, one rim,
+  one core shadow, one texture, one cut or torn edge — parts drawn as separate pieces, each with its own edge and
+  shadow, read as a pile of parts glued together. A far-side limb is a second sheet in a darker tone; a part that moves
+  on its own (a near wing) is its own sheet. In the jointed families (`papercut-red`, `06-collage`) each limb is a piece
+  by design: each carries its one edge and one shadow, and no piece is split further.
+- **Markings inside the silhouette.** A marking is drawn clipped to its sheet and touches the sheet's edge; a marking cut
+  as its own piece stands proud like a sticker. A part recoloured (a sock, a tail tip, a hem) is the same piece redrawn
+  with the same seed inside a clip, so its cut or torn edge matches to the pixel — a separate piece leaves a toothed join.
+- **Line weights scale with zoom.** A rim, a shadow band or a line drawn in world units grows with the camera's zoom: at
+  4× a 3 px rim read as a white stripe. Scale each by about zoom^-0.55, and sample a torn or cut edge at the shot's own
+  scale, so a close-up shows neither stripes nor facets.
+
 ---
 
 ## Licence notices
 
-The entries above are derived from the two libraries named under Provenance, each under the MIT License:
+The entries above are derived from the three sources named under Provenance, each under the MIT License:
 
 ```text
 MIT License
@@ -545,6 +580,30 @@ SOFTWARE.
 MIT License
 
 Copyright (c) 2026 Vincentwei1021
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+```text
+MIT License
+
+Copyright (c) 2026 Franco Zanardi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
