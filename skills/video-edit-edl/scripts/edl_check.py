@@ -13,10 +13,12 @@ take's own next internal cut (rogue frames) when --cuts is given — except a cu
 (`accepted_cuts` + `accepted_cuts_note`: a long generation composed it and the operator kept it), printed as INFO; an
 end card spans its whole file — the finisher plays a card from its first frame and cuts the master at runtime_s, so a
 card starting past 0 FAILS, and a span shorter than the file by more than a frame FAILS unless the event declares the trim
-in `card_trim_note` (printed as INFO). The verdict line names the EDL, so a PASS read out of a run log is this file's.
+in `card_trim_note` (printed as INFO). Two adjacent events that each declare a whole-event `accepted_still` (the end card
+aside) WARN: two still shots in a row (GENRE-GRAMMAR § Ads, cutting rules). The verdict line names the EDL, so a PASS read out of a run log is this file's.
 Exit 1 on any FAIL.
 
   edl_check.py --root <project> --edl edit/<SPOT>-EDL.json [--require-endcard] [--cuts cutlists.json] [--fps 24]
+  edl_check.py --selftest                     # the two-stills-in-a-row read on in-memory event lists
 --cuts: {"<take path>": [cut times in take seconds]} — the cut lists video-take-review's qc_seed.py prints.
 """
 import argparse, glob, json, os, re, subprocess, sys
@@ -41,11 +43,40 @@ def first(pat):
     return None
 
 
+def held(x):
+    """a whole-event accepted_still (a string or True, as qc_deliverable reads it): the shot IS a still; the end card aside"""
+    v = x.get('accepted_still'); return x.get('role') != 'endcard' and bool(v) and not isinstance(v, dict)
+
+
+def still_pairs(ev):
+    """adjacent events that are both still shots — two stills in a row"""
+    return [(p, q) for p, q in zip(ev, ev[1:]) if held(p) and held(q)]
+
+
+def selftest():
+    def e(i, **k): return dict(id=i, **k)
+    ids = lambda ev: [(p['id'], q['id']) for p, q in still_pairs(ev)]
+    chk = [
+        ('two whole-event holds in a row (a string, True)', ids([e('A', accepted_still='hold'), e('B', accepted_still=True), e('C')]) == [('A', 'B')]),
+        ('three in a row = two pairs', ids([e('A', accepted_still='x'), e('B', accepted_still='x'), e('C', accepted_still='x')]) == [('A', 'B'), ('B', 'C')]),
+        ('a hold before the end card', ids([e('A'), e('B', accepted_still='x'), e('C', role='endcard', accepted_still='card')]) == []),
+        ('a hold beside a windowed hold (a source still inside a moving shot)', ids([e('A', accepted_still='x'), e('B', accepted_still={'why': 'x', 'src': [[0.5, 1.0]]})]) == []),
+        ('two holds apart', ids([e('A', accepted_still='x'), e('B'), e('C', accepted_still='x')]) == []),
+        ('an empty or false declaration is no hold', ids([e('A', accepted_still=''), e('B', accepted_still=False), e('C', accepted_still='x')]) == []),
+        ('one event, or none', ids([e('A', accepted_still='x')]) == [] and ids([]) == []),
+    ]
+    for name, ok in chk: print(f"{'ok  ' if ok else 'FAIL'} {name}")
+    ok = all(v for _, v in chk); print(f"SELFTEST {'PASS' if ok else 'FAIL'} ({sum(v for _, v in chk)}/{len(chk)})"); return 0 if ok else 1
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--root', default='.'); ap.add_argument('--edl', required=True); ap.add_argument('--require-endcard', action='store_true')
-    ap.add_argument('--cuts'); ap.add_argument('--fps', type=float, default=24.0)
-    a = ap.parse_args(); os.chdir(a.root)
+    ap.add_argument('--root', default='.'); ap.add_argument('--edl'); ap.add_argument('--require-endcard', action='store_true')
+    ap.add_argument('--cuts'); ap.add_argument('--fps', type=float, default=24.0); ap.add_argument('--selftest', action='store_true')
+    a = ap.parse_args()
+    if a.selftest: sys.exit(selftest())
+    if not a.edl: ap.error('--edl is required (or --selftest)')
+    os.chdir(a.root)
     e = json.load(open(a.edl, encoding='utf-8')); ev = e['events']; au = e.get('audio', {}); fails = []; warns = []
     cuts = json.load(open(a.cuts)) if a.cuts else {}
 
@@ -85,6 +116,8 @@ def main():
             if any(abs(c - k) <= 1 / a.fps + 1e-6 for k in acc): print(f"INFO {x['id']}: the take's cut at {c} is a declared accepted cut")
             else: fail(f"{x['id']}: window [{x['in']}, {x['out']}] crosses the take's own cut at {c} (rogue frames — a cut the take composed and the operator kept goes in accepted_cuts)")
     if abs(t - float(e.get('runtime_s', t))) > 1e-3: fail(f"runtime_s {e.get('runtime_s')} != last tl end {t}")
+    for p, q in still_pairs(ev):   # GENRE-GRAMMAR's cutting rules: a still is one pause between moving shots
+        warn(f"{p['id']} and {q['id']}: two still shots in a row (each declares a whole-event accepted_still) — merge them, drop one, or put a moving shot between")
     ecs = [x for x in ev if x.get('role') == 'endcard']
     if a.require_endcard and len(ecs) != 1: fail(f"{len(ecs)} endcard events (need exactly one, role: endcard)")
     for k, v in au.get('vo', {}).items():

@@ -21,6 +21,13 @@ Every second of the track is assigned to a generation window BEFORE any prompt: 
 Later beats are **placements paid for by trimming** the loosest stretch, never appends — the track
 does not get longer. A beat lands ON a hit (the action on the impact; the set-piece on the loudest bar).
 
+**The beats in that table come from one storyboard pass built on callbacks** (the `motion-graphics-music-video-skill`
+project, `video-production` CONTEXT-MAP: `.claude/skills/motion-graphics-music-video/references/planning.md` § Research for
+interesting details): a prop is introduced in the hook, misused in a verse,
+transformed at the drop and paid off at the ending. Each appearance is a row's `beat`, so the payoff is placed before the
+first gen is priced. Small background jokes, scale changes and diagram gags fill the stretches between. A callback
+prop is shown early by design; a reveal's asset still is not (§ 6).
+
 ## 3. Generation order is dependency-bound
 
 A gen that continues another consumes its predecessor's last state (`video-refs-continuity` § start

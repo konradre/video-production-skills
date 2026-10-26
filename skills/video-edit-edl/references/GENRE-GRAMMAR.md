@@ -16,6 +16,21 @@ operator corrects, never a taste of their own.
   sound-only event has its visual cause on screen; a reaction shot starts AFTER the turn; a line that sits "too late in the order" needs something
   between it and the previous line; a product quip only after the product is visible; a bridging shot
   where dialogue trails across a cut, with its eyeline motivation.
+- **Cutting rules** (the `3d-product` project, `video-production` CONTEXT-MAP: `skills/3d-product/references/editing.md`
+  §§ 1–3 and `shots-and-script.md`; product spots and films — the UGC sub-genre below keeps its one abrupt jump cut):
+  - No cut between two similar shots — view directions under 30° apart AND frame sizes under 1.5× apart read as a jump:
+    merge them or drop one. A generated take records neither number, so read it by eye on the cut sheet. A compilation
+    of supplied footage (`qc.native_programme: true` — an interview cut, a debate compilation) is outside this rule: its
+    joins cut between the speakers' own takes.
+  - A motion cut has the part visibly moving on both sides of it.
+  - Never two still shots in a row; a still is one pause between moving shots (the donor's reference film holds one
+    ≤ 2.5 s). The end card is outside the rule. `edl_check.py` WARNs two adjacent events that each declare a whole-event
+    `accepted_still`; a static shot that declares nothing (a locked camera on a still subject) is read on the cut sheet.
+  - Let a landing land: about a quarter second after the part comes to rest, then cut — cutting on the impact frame
+    reads as cut too soon.
+  - An action plays ONCE across a cut: split it at the cut and match on it, never replay it. Each generated take
+    performs the whole action, so a cut between two takes of it repeats it. An insert shows the state the story holds
+    at its moment in the edit, never a strong frame from another state.
 - **Length**: the hit shot plays almost to the end, a quarter second shaved off; the aftermath of a
   burst is cut short; a beat that cuts away too soon is lengthened; a shot that hangs a touch too long
   loses a second off the end.
@@ -62,7 +77,10 @@ operator corrects, never a taste of their own.
   first; if it does not land the film does not exist. A 15 s beat that exceeds the venue's clip ceiling
   is designed as two clips cut on a blink or a caught breath.
 - **Coverage → sequence**: composition over coverage; restrained camera; a held close-up cuts on the
-  breath, not on the action; the reveal's asset appears in no earlier shot (never pre-load the reveal).
+  breath, not on the action; the reveal's asset appears in no earlier shot (never pre-load the reveal). The Ads
+  cutting rules hold here too: no similar-shot cut, motion on both sides of a motion cut, no two stills in a row, a
+  landing let land, an action played once. A continuation join — one shot designed as two clips and cut on a blink or a
+  caught breath, above — is one shot, not a similar-shot cut.
 - **Sound leads**: motivated practical sources; the mix crests WITH the push-in, not before; no
   irony/knowingness; a dark ending stays dark when the brief is a dark fairy tale. Two real silences before the turn, a
   suck-out before each designed impact (`spot-audio-assembly` SFX-AND-MUSIC.md § Sound direction).

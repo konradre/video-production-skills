@@ -65,6 +65,18 @@ character's state — the enslaving world, the boundary crossed, the opponent's 
 road out, the smallest space, the same street now unbearable. Build environments before shots
 (Anderson's own method, and the generative pipeline's hardest problem is continuity between them).
 
+**The storyboard check after the beats** (the `papermotion` project, `video-production` CONTEXT-MAP: `docs/field-notes.md`
+§§ 7, 9, 11, 13, 14 — rules its author learned from viewers' reads of its films). Draw each beat as its shot, then check four things:
+
+- **The goal is in the first shot.** A glow on the horizon turns running into running toward something. It sits in the
+  frame, not in the hero's choice: the 0 % order (sympathy, then the flaw) holds, and the wish is still made at 12 %.
+- **The payoff has a readable shape.** A figure on top of a snowball read as a snowman only once two twigs from the
+  crash landed in the ball as arms. A payoff the audience has to decode does not land.
+- **The ending is a new action, not a held pose.** The 95 % final image carries its own movement (a child takes up the
+  elder's pointing gesture as the elder lowers a hand), and the set may complete the payoff as a second visual beat.
+- **The key event happens in frame and large**, the background cleared behind it. The donor's first heroes were framed
+  too small to read; its zoom number belongs to its own renderer and sets no shot size here.
+
 ## 5. What does NOT transfer
 
 The 22-step spine as structure · four-corner opposition · the agent-pipeline software of the corpus
