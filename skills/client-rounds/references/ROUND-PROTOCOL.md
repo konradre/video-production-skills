@@ -43,11 +43,19 @@ inferred from word times trimmed the wrong thing once (2026-09-15).
 | class | the client says | what it means for the build |
 |---|---|---|
 | **CUT** | "no regeneration needed, just cut it" · "a few cuts" · "holds too long" | an edit-only change on the existing keeper (`video-edit-edl`): a trim, a re-order, a drop |
-| **RECYCLE** | "keep the scene from the original clip" · "the version we had at first" | a shot from an older version, into a new EDL |
+| **RECYCLE** | "keep the scene from the original clip" · "the version we had at first" | a shot from an older version, into a new EDL — read against the state the story holds at its new place (below) |
 | **REBUILD** | "rebuild the flow" · "tweak the appearance" | a regeneration — last on the ladder, ONE generation per continuity partition, through the cost line; its structure comes from the SCRIPT (`ad-spot-preprod` § 4), never from the rejected cut's scene boundaries |
 | **CAUSALITY** | "both shots work individually, but one doesn't cause the other… one continuous joke" | a rejection of the METHOD, not a shot: chain the beats (action → consequence → payoff) with the take's own footage first, one connecting gen last |
 | **APPROVE** | "exactly as they are" · "I'm good with this version" | quoted; frozen |
 | **GATE** | "the product looks huge compared to the real one" · "does that person look like…" | a pre-production gate from now on (`ad-spot-preprod`: true-size framing, the likeness check) |
+
+**A recycled shot carries the state of the version it came from.** An older take can show a state the newer story no
+longer holds at that moment — a lid still shut after the newer cut has opened it, a product in a hand it has left. Before
+it goes in, read its state against its new neighbours; a mismatch is resolved one of four ways, and the operator picks:
+move the shot to a moment where its state holds · change the story so the state holds · make the change a beat of its
+own · choose another frame or take. The two that touch the client's script — a story change, a new beat — go to the
+client as ONE numbered ask before anything moves; the script is the client's. It never ships contradicting its neighbours (`video-edit-edl` GENRE-GRAMMAR: an
+insert shows the state the story holds at its moment).
 
 The client's **domain expertise defines what lands** for their audience — the original script gag is
 restored, not argued. The client's **wording is exact** and the operator sets the diction. Where the

@@ -28,6 +28,14 @@ transformed at the drop and paid off at the ending. Each appearance is a row's `
 first gen is priced. Small background jokes, scale changes and diagram gags fill the stretches between. A callback
 prop is shown early by design; a reveal's asset still is not (§ 6).
 
+**Calm bars before each peak.** Before the first drop, the core peak and the set-piece's loudest bar, leave one or two
+bars where one slow element moves and little else does, and mark them in the gens table's `beat` column as
+`calm → <the peak>`. A constant blizzard of hits reads as noise; the peak lands because the picture rested first —
+the chaos is choreographed, not a constant flicker (the `motion-graphics-music-video-skill-noimage` project,
+`video-production` CONTEXT-MAP: `references/planning.md` § Research for interesting details, `references/scene-cookbook.md`
+§ Structure patterns from deadstar). This is a rest in the PICTURE, apart from the song's own held breath (§ 1), and
+the slow element keeps moving: `designed-elements` CRAFT's idle-motion floor still holds.
+
 ## 3. Generation order is dependency-bound
 
 A gen that continues another consumes its predecessor's last state (`video-refs-continuity` § start

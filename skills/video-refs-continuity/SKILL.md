@@ -104,7 +104,11 @@ of an accepted still › a fresh still. Build in this order:
 5. **Product shape from the client's own photo** — single pieces cut out on grey, laid as the shot's own
    scatter (the model transfers the sheet's LAYOUT: a grid renders as rows). **Size from an
    in-world crop beside a known object** (a tie knot, a seated knee); a magnified sheet pins shape only
-   and its role sentence says so. A held product is composited standing at true scale before the gen.
+   and its role sentence says so. A held product is composited standing at true scale before the gen. **Every state
+  the script shows has its own sheet** — lid open and lid shut, empty and loaded, screen off and lit — each from the
+  client's photo of that state (`ad-spot-preprod` INTAKE § Assets to ask for, the states row). A state with no photo
+  is a named gap: it is resolved before the beat that needs it (the client sends one, or rules the beat dropped or
+  rewritten), never left for a generator to guess.
 6. **Room ref = the establishing frame with the whole cast in it.** It EMBEDS them — adding a member from
    their single ref puts that person in twice. A recast replaces the old room ref everywhere.
 7. **Text on a garment or prop is generated INTO the reference** (an image model with the string; the copy

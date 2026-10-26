@@ -9,16 +9,19 @@ speech rate over the speech span, the words per shot. Across the references: sho
 length, the first cut, the first word, the framing and motion mix. Then a BEAT GRID for --runtime: timestamped slots at
 the references' rhythm, each with the framing and motion the references use at that point of their running time — the
 skeleton our own beats are written into (one action per slot). Also one contact sheet per reference (first · middle ·
-last frame of each shot, labelled) for the written read, which is the half no instrument does.
+last frame of each shot, labelled) for the written read, which is the half no instrument does. With --dense <fps> (a
+motion-design reference: 10-12) also a dense strip per shot — its frames at that rate between its cuts, 240 px tall, rows
+no wider than 1920 px, pages no taller than 4000 px — because three frames a shot cannot show how a line draws on, how type moves or how a camera reveals.
 
 Every source is read in its DISPLAY geometry (the sample aspect applied first) and at its average rate as constant frame
 rate. Limits: a dissolve reads as a cut at its middle or as none; a whip pan can read as a cut; a profile or a small face
 reads "none"; the motion class is the frame's dominant motion, camera or subject — the sheet is read before a number is
 trusted.
 
-  reference_teardown.py --refs <a.mp4> <b.mp4> … --out <dir> [--runtime 30] [--fps 24] [--asr small.en] [--card 3.0]
+  reference_teardown.py --refs <a.mp4> <b.mp4> … --out <dir> [--runtime 30] [--fps 24] [--asr small.en] [--card 3.0] [--dense 12]
   reference_teardown.py --selftest
-Writes <dir>/teardown.json, <dir>/TEARDOWN.md and <dir>/<ref>-sheet.jpg; never overwrites an existing <dir>/teardown.json.
+Writes <dir>/teardown.json, <dir>/TEARDOWN.md, <dir>/<ref>-sheet.jpg and with --dense <dir>/<ref>-strip-<shot>-p<page>.jpg; never
+overwrites an existing <dir>/teardown.json.
 Sentinel TEARDOWN-END.
 """
 import argparse, json, os, re, shutil, subprocess, sys, tempfile
@@ -161,7 +164,92 @@ def asr_words(path, model):
     return [(w.word.strip(), round(w.start, 3), round(w.end, 3)) for s in segs for w in (s.words or [])]
 
 
-def teardown(path, fps_an, asr=None, sheet=None):
+STRIP_H, STRIP_W, STRIP_PAGE_H, STRIP_GAP = 240, 1920, 4000, 3     # tile height, max page width and height, tile gap (px)
+
+
+def strip_tile(dw, dh, height=STRIP_H, max_w=STRIP_W):
+    """the tile size for a dw x dh display frame: `height` tall, unless that would be wider than a row allows"""
+    w = max(2, int(round(height * dw / dh / 2)) * 2); room = max_w - 8 - STRIP_GAP          # one tile + its gap + the margin
+    if w > room:
+        w = room // 2 * 2; height = max(2, int(round(w * dh / dw / 2)) * 2)
+    return w, height
+
+
+def dense_rate(x):
+    """a strip rate: a finite number of frames a second above zero (argparse type and strip_indices' guard)"""
+    import math
+    v = float(x)
+    if not math.isfinite(v) or v <= 0: raise ValueError(f'--dense must be a finite rate above 0, got {x}')
+    return v
+
+
+def strip_indices(a, b, fa, rate):
+    """the analysis frames a dense strip shows for the shot [a, b): one every fa/rate frames from a, never past b — j = 0
+    is always frame a, so a shot shorter than one strip frame still shows its own first frame"""
+    import math
+    out, j, step = [], 0, max(fa / dense_rate(rate), 1.0)       # a rate above the analysis rate shows every frame once
+    while True:
+        k = a + int(math.floor(j * step + 1e-9))
+        if k >= b: break
+        out.append(k); j += 1
+    return out
+
+
+def analysis_frames(path, fa, tile):
+    """(index, frame) over the SAME normalised stream the cuts were found on — the analysis filter chain at fa, in colour
+    at `tile` size — so a strip frame is an analysis frame by index, and no timestamp is ever mapped: a fractional or a
+    variable source rate cannot move a cut. Streamed: one decode, nothing held whole."""
+    w, h = tile; n = w * h * 3
+    vf = f"scale=trunc(iw*sar/2)*2:ih,setsar=1,fps={fa:.6f},scale={w}:{h}:flags=area,format=bgr24"
+    p = subprocess.Popen(['ffmpeg', '-v', 'error', '-i', path, '-vf', vf, '-f', 'rawvideo', '-'], stdout=subprocess.PIPE)
+    i = 0
+    while True:
+        b = p.stdout.read(n)
+        if len(b) < n: break
+        yield i, np.frombuffer(b, np.uint8).reshape(h, w, 3); i += 1
+    p.stdout.close(); p.wait()
+
+
+def shot_strips(path, fa, bounds, rate, tile):
+    """one generator per shot over a single shared analysis stream: shot k's generator yields its strip frames and stops
+    after its last analysis frame, so the shots must be consumed in order"""
+    stream = analysis_frames(path, fa, tile)
+    for a, b in zip(bounds[:-1], bounds[1:]):
+        want = set(strip_indices(a, b, fa, rate))
+        def take(want=want, b=b):
+            for i, f in stream:
+                if i in want: yield f
+                if i >= b - 1: return
+        yield take()
+
+
+def write_strips(stem, name, s, frames, rate, max_w=STRIP_W, max_h=STRIP_PAGE_H):
+    """one shot's dense strip as pages: frames left to right in time, rows no wider than max_w, pages no taller than
+    max_h (a JPEG side stops at 65500 px), each page labelled. Returns (paths written, frame count)."""
+    from PIL import Image, ImageDraw
+    gap, head = STRIP_GAP, 26; paths, buf, count, per_row = [], [], 0, None
+
+    def flush(final):
+        nonlocal buf
+        if not buf: return
+        th, tw = buf[0].shape[:2]; rows = -(-len(buf) // per_row); page = len(paths) + 1
+        img = Image.new('RGB', (min(len(buf), per_row) * (tw + gap) + 8, head + rows * (th + gap)), (18, 18, 18)); d = ImageDraw.Draw(img)
+        first = count - len(buf)
+        d.text((6, 7), f"{name} #{s['i']} {s['t0']:.2f}-{s['t1']:.2f}s ({s['len']:.2f}) frames {first + 1}-{count} at {rate} fps · page {page}", fill=(255, 220, 120))
+        for k, f in enumerate(buf):
+            img.paste(Image.fromarray(np.ascontiguousarray(f[..., ::-1])), (4 + (k % per_row) * (tw + gap), head + (k // per_row) * (th + gap)))
+        out = f"{stem}-{s['i']:02d}-p{page}.jpg"; img.save(out, quality=85); paths.append(out); buf = []
+
+    for f in frames:
+        if per_row is None:
+            th, tw = f.shape[:2]; per_row = max(1, (max_w - 8) // (tw + gap)); per_page = per_row * max(1, (max_h - head) // (th + gap))
+        buf.append(f); count += 1
+        if len(buf) == per_page: flush(False)
+    flush(True)
+    return paths, count
+
+
+def teardown(path, fps_an, asr=None, sheet=None, dense=None, strip=None):
     import cv2
     m = probe(path); fps = fps_an or round(m['fps'])
     _, h, mad, hl1, dx, dy, luma, resp, crs = measure(path, fps)
@@ -187,6 +275,10 @@ def teardown(path, fps_an, asr=None, sheet=None):
     meta = dict(path=path, display=[m['w'], m['h']], fps_source=round(m['fps'], 3), fps_analysis=fps, duration=round(dur, 3),
                 audio=m['audio'], loudness_I=loudness(path) if m['audio'] else None)
     if sheet: write_sheet(sheet, os.path.basename(path), shots, thumbs)
+    if dense:
+        for s, fr in zip(shots, shot_strips(path, fps, bounds, dense, strip_tile(m['w'], m['h']))):
+            if strip: s['strips'], s['strip_frames'] = write_strips(strip, os.path.basename(path), s, fr, dense)
+            else: s['strip_frames'] = sum(1 for _ in fr)
     return dict(meta=meta, shots=shots, stats=stats, cuts_s=[round(c / fps, 3) for c in cuts])
 
 
@@ -271,7 +363,7 @@ def write_md(out, refs, agg, g):
     open(out, 'w', encoding='utf-8').write('\n'.join(L))
 
 
-def selftest():
+def selftest(dense=True):
     """Known answer: four scenes of known length (1.50 · 2.25 · 3.00 · 1.25 s at 24 fps; each its own coarse layout, level
     and detail), shot 2 panning 6 px/frame, shot 4 jittering ±3 px, shots 1 and 3 static. Cuts must come back within one frame, the pan must read pan at ~6 px/frame, the
     static shots static, the jitter handheld; the pan itself must raise NO cut. The beat grid for 9 s: the first slot 1.50 s."""
@@ -299,11 +391,77 @@ def selftest():
     mot = [s['motion'] for s in r['shots']]; sp2 = r['shots'][1]['speed_wps'] * W / fps if len(r['shots']) > 1 else 0
     ok_m = len(mot) == 4 and mot[0] == 'static' and mot[1] == 'pan' and abs(sp2 - 6) <= 0.5 and mot[2] == 'static' and mot[3] == 'handheld'
     g = grid([r], 9.0, 24); ok_g = abs(g['slots'][0]['len'] - 1.5) < 1e-6
+    ok_d, rep_d = True, ''
+    if dense: ok_d, rep_d = dense_selftest(d, src, fps, W, H)
     shutil.rmtree(d, ignore_errors=True)
-    ok = ok_c and ok_m and ok_g
+    ok = ok_c and ok_m and ok_g and ok_d
     print(f"SELFTEST cuts {got} (want {[round(x, 3) for x in want]} ±1 f) · motion {mot} (want static pan static handheld), "
-          f"pan speed {sp2:.2f} px/f (want 6) · grid first slot {g['slots'][0]['len']} s (want 1.5) -> {'PASS' if ok else 'FAIL'}")
+          f"pan speed {sp2:.2f} px/f (want 6) · grid first slot {g['slots'][0]['len']} s (want 1.5){rep_d} -> {'PASS' if ok else 'FAIL'}")
     return ok
+
+
+def dense_selftest(d, src, fps, W, H):
+    """the --dense checks, on the selftest's synthetic clip plus two more: counts, the SAVED pages read back (each shot's own
+    frames, edges included, the pan in time order), a one-frame shot, a fractional and a variable source rate across a
+    cut, a tile too wide for a row, a 90 s shot paged"""
+    from PIL import Image
+    tile = strip_tile(W, H); th, tw = tile[1], tile[0]
+    def tiles(paths, n):                                   # read the SAVED pages back, tile by tile, in order, across pages
+        g = STRIP_GAP; per = max(1, (STRIP_W - 8) // (tw + g)); page = per * max(1, (STRIP_PAGE_H - 26) // (th + g)); out = []
+        for q in paths:
+            im = np.asarray(Image.open(q).convert('L')).astype(np.float32)
+            for k in range(min(page, n - len(out))):
+                out.append(im[26 + (k // per) * (th + g):26 + (k // per) * (th + g) + th, 4 + (k % per) * (tw + g):4 + (k % per) * (tw + g) + tw])
+        return out
+    def encode(path, rate, levels):                      # flat gray frames, one level each
+        p = subprocess.Popen(['ffmpeg', '-v', 'error', '-y', '-f', 'rawvideo', '-pix_fmt', 'gray', '-s', '320x180', '-r', rate, '-i', '-',
+                              '-c:v', 'libx264', '-crf', '10', '-pix_fmt', 'yuv420p', path], stdin=subprocess.PIPE)
+        for v in levels: p.stdin.write(np.full((180, 320), v, np.uint8).tobytes())
+        p.stdin.close(); p.wait()
+    def held(path, stem):                                # teardown + readback: every tile of every shot, in order
+        r = teardown(path, None, dense=12, strip=os.path.join(d, stem))
+        fl = [[float(t.mean()) for t in tiles(sh['strips'], sh['strip_frames'])] for sh in r['shots'] if sh.get('strips')]
+        ok = (len(fl) == 3 and [len(x) for x in fl] == [sh['strip_frames'] for sh in r['shots']]
+              and all(v < 125 for v in fl[0] + fl[2]) and all(v > 125 for v in fl[1]))       # no tile leaks across a cut
+        return ok, f"{[len(x) for x in fl]} {[(round(x[0]), round(x[-1])) for x in fl if x]}"
+
+    rd = teardown(src, fps, dense=12, strip=os.path.join(d, 'synthetic-strip')); nd = [s.get('strip_frames', 0) for s in rd['shots']]
+    want_d = [round(s['len'] * 12) for s in rd['shots']]; own = [s['luma'] for s in rd['shots']]
+    saved = [tiles(s['strips'], s['strip_frames']) for s in rd['shots']] if all(s.get('strips') for s in rd['shots']) else []
+    lv = [(float(t[0].mean()), float(t[-1].mean())) for t in saved]          # each SAVED row holds its own shot, edges included
+    bd = [0] + [round(c * fps) for c in rd['cuts_s']]
+    pan = ([f.mean(2) for i, f in analysis_frames(src, fps, tile) if i in set(strip_indices(bd[1], bd[2], fps, 12))]
+           if len(bd) > 2 else [])
+    order = len(saved) > 1 and len(pan) == len(saved[1]) and all(                 # the pan's tiles in time order
+        np.abs(saved[1][k] - pan[k]).mean() < min(np.abs(saved[1][k] - pan[j]).mean() for j in (k - 2, k + 2) if 0 <= j < len(pan))
+        for k in range(len(pan)))
+    short = (strip_indices(10, 11, 30, 12) == [10] and strip_indices(0, 5, 30, 12) == [0, 2]      # a one-frame shot keeps its own
+             and len(strip_indices(0, 36, 24, 12)) == 18 and all(0 <= k < 36 for k in strip_indices(0, 36, 24, 12))
+             and strip_indices(0, 6, 24, 60) == [0, 1, 2, 3, 4, 5])                                # above fa: each frame once
+    def refused(x):
+        try: dense_rate(x); return False
+        except ValueError: return True
+    rate_ok = all(refused(x) for x in ('-12', '0', 'inf', 'nan')) and dense_rate('12') == 12.0      # never an endless index loop
+    sfr = os.path.join(d, 'f2997.mp4'); encode(sfr, '30000/1001', [40] * 500 + [210] * 6 + [40] * 30)   # a fractional source rate
+    frac, rep_f = held(sfr, 'f2997-strip')
+    a30, b60, vfr, lst = (os.path.join(d, x) for x in ('a30.mp4', 'b60.mp4', 'vfr.mkv', 'list.txt'))   # a variable source rate
+    encode(a30, '30', [40] * 496); encode(b60, '60', [210] * 12 + [40] * 30)
+    open(lst, 'w').write(f"file '{a30}'\nfile '{b60}'\n")
+    run(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', lst, '-c', 'copy', vfr])
+    vfr_ok, rep_v = held(vfr, 'vfr-strip')
+    wt = strip_tile(2400 * 4, 240 * 4); wp, _ = write_strips(os.path.join(d, 'wide'), 'wide', dict(i=1, t0=0.0, t1=1.0, len=1.0),
+                                                              iter([np.zeros((wt[1], wt[0], 3), np.uint8)]), 12)
+    wide = Image.open(wp[0]).size[0] <= STRIP_W and all(Image.open(q).size[0] <= STRIP_W for sh in rd['shots'] for q in sh.get('strips', []))
+    pg, n_pg = write_strips(os.path.join(d, 'long'), 'long', dict(i=1, t0=0.0, t1=90.0, len=90.0),
+                            (np.zeros((240, 426, 3), np.uint8) for _ in range(1080)), 12)
+    pages = n_pg == 1080 and len(pg) > 1 and all(Image.open(q).size[1] <= STRIP_PAGE_H for q in pg)
+    ok = (len(nd) == 4 and all(abs(a - b) <= 1 for a, b in zip(nd, want_d)) and len(lv) == 4
+          and all(min(range(4), key=lambda j: abs(v - own[j])) == k for k, pair in enumerate(lv) for v in pair)
+          and order and short and rate_ok and wide and pages and frac and vfr_ok)
+    return ok, (f" · dense strip frames {nd} (want {want_d} ±1 at 12 fps), saved first/last tile levels "
+                f"{[(round(x), round(y)) for x, y in lv]} (each nearest its own shot's luma of {[round(x) for x in own]}), saved pan tiles in "
+                f"order {order}, one-frame shot keeps its frame {short}, bad rates refused {rate_ok}, wide tile fits {wide}, 90 s shot paged {len(pg)} pages {pages}, "
+                f"29.97 fps cuts hold {frac} {rep_f}, VFR cuts hold {vfr_ok} {rep_v}")
 
 
 def main():
@@ -311,8 +469,9 @@ def main():
     ap.add_argument('--refs', nargs='+'); ap.add_argument('--out'); ap.add_argument('--runtime', type=float, default=30.0)
     ap.add_argument('--fps', type=int, default=24, help='the grid frame rate'); ap.add_argument('--asr', default=None, help='faster-whisper model, e.g. small.en')
     ap.add_argument('--card', type=float, default=0.0, help='seconds of end card at the end of the grid')
+    ap.add_argument('--dense', type=dense_rate, default=None, help='also a dense strip per reference at this many frames a second between cuts (10-12 for a motion-design reference)')
     ap.add_argument('--selftest', action='store_true'); a = ap.parse_args()
-    if not selftest(): sys.exit(1)
+    if not selftest(dense=bool(a.selftest or a.dense)): sys.exit(1)     # the --dense checks run when they matter
     if a.selftest: return
     if not a.refs or not a.out: ap.error('--refs and --out are required')
     os.makedirs(a.out, exist_ok=True); js = os.path.join(a.out, 'teardown.json')
@@ -320,9 +479,9 @@ def main():
     refs = []
     for p in a.refs:
         stem = re.sub(r'[^\w.-]+', '_', os.path.splitext(os.path.basename(p))[0])
-        r = teardown(p, None, a.asr, os.path.join(a.out, f'{stem}-sheet.jpg')); refs.append(r)
+        r = teardown(p, None, a.asr, os.path.join(a.out, f'{stem}-sheet.jpg'), a.dense, os.path.join(a.out, f'{stem}-strip') if a.dense else None); refs.append(r)
         st = r['stats']; print(f"{os.path.basename(p)}: {st['shots']} shots · median {st['median_len']} s · first cut {st['first_cut']} s · "
-                               f"first word {st['first_word']} · {st['wpm']} wpm · sheet {stem}-sheet.jpg")
+                               f"first word {st['first_word']} · {st['wpm']} wpm · sheet {stem}-sheet.jpg" + (f" · strips {stem}-strip-NN-pK.jpg" if a.dense else ''))
     agg = aggregate(refs); g = grid(refs, a.runtime, a.fps, a.card)
     json.dump(dict(references=refs, aggregate=agg, grid=g), open(js, 'w'), indent=1)
     write_md(os.path.join(a.out, 'TEARDOWN.md'), refs, agg, g)

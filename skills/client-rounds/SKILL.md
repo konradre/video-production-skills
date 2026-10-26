@@ -156,6 +156,11 @@ one file per final.
 
 - A note that cannot be located in the delivered file → ask the operator ONE concise question with
   the two candidate readings and their frame times; never act on a guess.
+- A note located but whose fix runs two opposite ways ("way too much depth of field": too shallow, or too deep) → the
+  same ONE question, the two directions with what each would change; never pick one and act on it.
+- A RECYCLE whose shot shows a state its new neighbours do not hold → the four ways out (ROUND-PROTOCOL.md § Classify),
+  the operator picks one, and a pick that changes the script (a story change, a new beat) is the client's ruling; it
+  never ships contradicting them.
 - The operator's answer names an older version → that version's EDL is the source; the current EDL
   is not edited in place.
 - A regen answer → the cost line first (`video-gen-cost-gate`); a "no" leaves the item open on the

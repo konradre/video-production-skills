@@ -27,7 +27,7 @@ reuses its teardown. **Not for:** choosing among the client's own footage (`FOOT
 
 ```bash
 python3 ~/.claude/skills/ad-spot-preprod/scripts/reference_teardown.py --refs <a> <b> <c> --out review/teardown-<format> \
-    --runtime <our length> [--card <seconds of end card>] [--asr small.en]
+    --runtime <our length> [--card <seconds of end card>] [--asr small.en] [--dense 12]
 ```
 
 Per reference, in its DISPLAY geometry: every shot with its start, end and length; its framing (the largest frontal face,
@@ -37,6 +37,14 @@ the speed in frame widths per second); luma and saturation; the loudness; with `
 word, the speech rate over the speech span and the words per shot. Across the references: shots per 10 s, the median shot
 and its spread, the first cut, the framing and motion mix by screen time. It writes `TEARDOWN.md`, `teardown.json` and one
 contact sheet per reference (first · middle · last frame of every shot, labelled).
+
+**A motion-design reference is read on a dense strip.** Three frames a shot fit an ad's cut rhythm and are blind to how a
+line draws on, how type moves in, how a camera reveals a scene. `--dense 12` (10–12 frames a second) also writes
+`<ref>-strip-<shot>-p<page>.jpg` per shot: its frames at that rate between its cuts, 240 px tall, rows no wider than
+1920 px and pages no taller than 4000 px so a viewer shows each near full size — the read a style brief's motion quality
+is written from (`designed-elements` STYLE-BRIEF § 5). The strip is cut from the same frames the shots were found on, so
+no frame of a neighbouring shot can enter it at any source rate (a fractional or a variable one included), and a shot
+shorter than one strip frame still shows its own first frame.
 
 **Its limits, read before its numbers:** a dissolve reads as one cut or none; a whip pan can read as a cut; a profile or
 a very small face reads "none"; "motion" is the frame's dominant motion, camera or subject. The sheet is read before a

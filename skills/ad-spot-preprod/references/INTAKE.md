@@ -55,6 +55,12 @@ ONCE for the campaign.
   fires one fill only; every shot that shows pieces names its element id.
 - Any real-person likeness the client wants — and a check that no generated cast member resembles a
   public figure.
+- **A states row**: every state of the product the script will show — open and shut, empty and loaded, off and lit —
+  with the client's photo of it, or a named GAP keyed to the beats it would expose. A gap is resolved at intake, as ONE
+  numbered ask to the client: send the photo, or rule the beat dropped or rewritten without that state — the script is
+  the client's, so the beat is never changed on our own reading. A generator asked for a state it has
+  never seen guesses it, and the guess is found at the shot that needs it (`video-refs-continuity` § 2 builds a sheet
+  per state).
 
 ## Rulings to get from the client, once
 
