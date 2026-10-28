@@ -11,13 +11,21 @@ the EDL has one) → mix → downscale → encode. Three stages, each re-runnabl
                                                       <deliverable>.limiter.json, which spot-audio-assembly sound_table.py reads);
                                                       captions overlaid AFTER the downscale; H.264 High CRF 17 slow, AAC 256k,
                                                       faststart, the length capped at runtime_s
+The deliver encode is CRF 17 slow, -tune film unless the EDL sets `deliver_encode` {crf, tune: film|grain|none, preset}: a look
+that carries grain buys it there (measured 2026-10-28 on a Dehancer 16 mm grain: CRF 17 film kept 37-83 % of the master's moving
+grain, CRF 12 grain 65-96 % at 3.2x the bytes, 74 -> 234 MB for 47 s). It is for a deliverable with NO byte cap; a capped
+outlet gets its own variant from the mezzanine (video-finish § 8: two-pass at a derived bitrate, -tune film). An unknown key
+stops the finish before stage 1.
 The script-fidelity gate (beat_sheet.py) runs BEFORE stage 1 when the beats file exists: a FAIL = no finish. So does the
 cut-edge gate (video-edit-edl edge_audit.py) wherever a take's own sound plays: a word bitten at an edge = no finish. A spot with no
 role:"endcard" event (a beat list may forbid a card) cuts its footage at the runtime.
 
   finish_spot.py --root <project> --edl edit/<SPOT>-EDL.json [--stage cut|master|deliver|all] [--look ads-clean]
                  [--in-dir edit/upscale-out] [--tag=-v3] [--cubes <dir of <look>_33.cube>] [--canvas 2160x3840] [--fps 24]
-                 [--beat-gate <beat_sheet.py>] [--edge-gate <edge_audit.py>] [--stem-builder <build_vo_stem.py>] [--captions-builder <build_captions.py>] [--no-gate]
+                 [--beat-gate <beat_sheet.py>] [--beats prompts/<SPOT>-beats.json] [--edge-gate <edge_audit.py>]
+                 [--stem-builder <build_vo_stem.py>] [--captions-builder <build_captions.py>] [--no-gate]
+The gate's beat list: --beats, else the EDL's `beats`, else prompts/<SPOT>-beats.json; a named list that does not exist stops
+the finish, and the log names the list the gate read.
 Sources per event: designed → its own render at native raster; generated → <in-dir>/<id>.mov | <id>__*.mov | <id>.mp4,
 or the event's own `src` (a hero under a fresh name), sought by handle_head (a FULL-TAKE hero needs handle_head = in).
   finish_spot.py --selftest-limiter      the limiter-cut read on a synthetic master with a known answer
@@ -145,6 +153,7 @@ def main():
     ap.add_argument('--canvas', default='2160x3840'); ap.add_argument('--fps', type=int, default=24); ap.add_argument('--handle', type=float, default=None, help='default head handle for upscaled sources (default 4 frames)')
     ap.add_argument('--beat-gate', default=f'{SK}/video-edit-edl/scripts/beat_sheet.py'); ap.add_argument('--stem-builder', default=f'{SK}/spot-audio-assembly/scripts/build_vo_stem.py')
     ap.add_argument('--captions-builder', default=f'{SK}/spot-audio-assembly/scripts/build_captions.py'); ap.add_argument('--no-gate', action='store_true')
+    ap.add_argument('--beats', default=None, help='the beat list the gate reads (default prompts/<SPOT>-beats.json); a versioned EDL names its own')
     ap.add_argument('--edge-gate', default=f'{SK}/video-edit-edl/scripts/edge_audit.py', help='the cut-edge gate: no word bitten where a take\'s sound plays')
     ap.add_argument('--min-free-gb', type=float, default=40.0, help='the HOST drive floor under which the finish warns before it runs (or 3x the spot\'s mezzanine footprint, whichever is larger); --min-free-gb 0 skips the read')
     argv = sys.argv[1:]
@@ -174,8 +183,16 @@ def main():
     for e in ev: assert e.get('take'), f"{e['id']}: take is null — pick a keeper in the EDL first"
     for e in edl['events']: assert e.get('in_matrix') in (None, 'bt709', 'bt601', 'bt2020nc'), f"{e['id']}: in_matrix {e.get('in_matrix')!r} — bt709 | bt601 | bt2020nc"
     FOOT_END = float(EC['tl'][0]) if EC else RUN
-    beats = f"prompts/{SPOT}-beats.json"
+    DENC = {'crf': 17, 'tune': 'film', 'preset': 'slow'}; _de = edl.get('deliver_encode') or {}   # grain is a bitrate tax the EDL buys on purpose
+    _bad = sorted(k for k in _de if k not in DENC and not k.startswith('_'))
+    assert not _bad, f'deliver_encode: unknown key(s) {_bad} — the finisher reads {sorted(DENC)}'
+    DENC.update({k: v for k, v in _de.items() if not k.startswith('_')})
+    assert DENC['tune'] in ('film', 'grain', 'none') and 0 <= float(DENC['crf']) <= 51, f"deliver_encode {DENC}: tune film|grain|none, crf 0-51"
+    VENC = ['-preset', str(DENC['preset']), '-crf', str(DENC['crf'])] + ([] if DENC['tune'] == 'none' else ['-tune', DENC['tune']])
+    beats = a.beats or edl.get('beats') or f"prompts/{SPOT}-beats.json"   # a versioned EDL names its own list (EDL-CONTRACT.md)
+    if (a.beats or edl.get('beats')) and not os.path.exists(beats): sys.exit(f'beats {beats}: no such file — the gate would read nothing')   # 2026-10-28: the default name held a superseded list
     if not a.no_gate and os.path.exists(beats):
+        print(f'gate: beat list {beats}', flush=True)
         subprocess.run([sys.executable, os.path.expanduser(a.beat_gate), '--root', '.', '--edl', a.edl, '--beats', beats], check=True)   # SCRIPT-FIDELITY GATE: FAIL = no finish
     elif not a.no_gate: print(f'WARNING no beats file at {beats} — the script-fidelity gate did not run', flush=True)
     NATIVE_PROG = bool((edl.get('qc') or {}).get('native_programme'))   # the takes' own speech IS the programme: a bitten edge stops the finish
@@ -373,7 +390,8 @@ def main():
         lim = f"alimiter=limit={10 ** (ln['TP'] / 20):.4f}:attack=5:release=60:level=false:latency=1"   # latency=1: the lookahead is compensated — two limiters left the audio 10 ms late (av_sync_regress.py, 2026-09-29)
         af = f"volume={g:.3f}dB,aresample=192000,{lim},aresample=48000,{lim}"   # limit at 192 kHz, where inter-sample peaks are visible; 48 kHz; limit again
         # Measured on a real master (TP target -2.4, AAC 192k): limiter after the resample only -> -1.0 dBTP; before only -> -2.0; both -> -2.1; none -> -1.9.
-        run(['ffmpeg', '-v', 'error', '-y', '-i', MASTER] + cin + ['-filter_complex', chain, '-map', f'[{last}]', '-map', '0:a', '-af', af, '-ar', '48000', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-level', '4.1', '-g', str(2 * FPS), '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-t', f'{RUN}', DELIV])   # -t: the picture is authoritative — without it AAC priming + padding set the container duration
+        print(f"deliver encode: libx264 {' '.join(VENC)}" + (' (deliver_encode)' if edl.get('deliver_encode') else ''), flush=True)
+        run(['ffmpeg', '-v', 'error', '-y', '-i', MASTER] + cin + ['-filter_complex', chain, '-map', f'[{last}]', '-map', '0:a', '-af', af, '-ar', '48000', '-c:v', 'libx264'] + VENC + ['-profile:v', 'high', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-level', '4.1', '-g', str(2 * FPS), '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-t', f'{RUN}', DELIV])   # -t: the picture is authoritative — without it AAC priming + padding set the container duration
         print(probe(DELIV)); print(os.path.getsize(DELIV) / 1e6, 'MB', DELIV)
         # the limiter's cut INSIDE each designed impact: the total hides a limiter that takes dB off exactly the loudest moments
         # the mix was built around (makevoid/motion-graphics-music-video-skill sfx_mix.py). Rendered twice; a read, not a gate.

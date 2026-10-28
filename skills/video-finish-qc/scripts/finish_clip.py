@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """finish_clip.py — a single-clip finish (a standalone asset, an alternate, a section excerpt — NOT the spot): a pre-graded
 hero clip (carries head handles) + the take's own native audio → a 1080×1920 H.264 deliverable, mirroring the spot's deliver
-stage: lanczos downscale, libx264 slow CRF 17 tune film, AAC 256k, faststart, and the spot's loudness method — ONE measured
+stage: lanczos downscale, libx264 slow CRF 17 tune film (--crf, --tune), AAC 256k, faststart, and the spot's loudness method — ONE measured
 static gain to --I, then peak limiting at --TP oversampled (aresample 192k → alimiter → 48k → alimiter, latency compensated).
 Until 2026-09-29 this was a two-pass loudnorm, whose linear=true falls back to DYNAMIC on peaky audio: lowering its TP target
 RAISED a peaky take's delivered peak (-0.9 → -0.6 dBTP), so no TP setting could hold the ceiling. --LRA is accepted and unused.
@@ -9,7 +9,10 @@ A fresh filename per render — an existing output is refused.
 
   finish_clip.py --root <project> --hero edit/hero/<clip>__<look>.mov --take takes/<take>.mp4 --in <take s> --out <take s>
                  --handle <head handle s inside the hero> --name <deliver basename> [--vol 1.0] [--fade-in 0] [--fade-out 0.2]
-                 [--I -14 --TP -2 --LRA 9] [--match-tp <dBTP>] [--canvas 1080x1920]
+                 [--I -14 --TP -2 --LRA 9] [--match-tp <dBTP>] [--canvas 1080x1920] [--crf 17] [--tune film|grain|none]
+--crf / --tune: the deliver encode, CRF 17 -tune film by default, as finish_spot.py's (whose EDL sets it in `deliver_encode`).
+A hero that carries grain buys it here: on a Dehancer 16 mm grain CRF 12 -tune grain kept 65-96 % of the moving grain where
+the default kept 37-83 %, at 3.2x the bytes (2026-10-28). For an uncapped deliverable; a capped outlet: video-finish § 8.
 --match-tp: a hit-and-silence clip has no meaningful programme loudness — match its true peak to the same beat in the
 delivered spot with a plain gain, no loudnorm.
 After the encode, two AAC checks on the DELIVERED file; either FAIL exits 1 and keeps the file: the decoded true peak
@@ -64,6 +67,7 @@ def main():
     ap.add_argument('--canvas', default='1080x1920'); ap.add_argument('--tp-ceiling', type=float, default=-1.0)
     ap.add_argument('--no-retry', action='store_true', help='keep the single attempt when the true peak lands over the ceiling')
     ap.add_argument('--in-matrix', dest='in_matrix', choices=['bt709', 'bt601', 'bt2020nc'], help="the hero's YUV matrix when its tag is missing or wrong")
+    ap.add_argument('--crf', type=float, default=17); ap.add_argument('--tune', choices=['film', 'grain', 'none'], default='film', help='the deliver encode; grain for a hero that carries grain')
     a = ap.parse_args(); os.chdir(a.root); DUR = a.tout - a.tin; DELIV = f'deliver/{a.name}.mp4'; os.makedirs('deliver', exist_ok=True)
     assert DUR > 0 and a.handle >= 0 and not os.path.exists(DELIV), f'bad range or {DELIV} exists (fresh filename per render)'
     W, H = a.canvas.lower().split('x')
@@ -87,7 +91,7 @@ def main():
             af = achain + f",volume={g:.3f}dB,aresample=192000,{lim},aresample=48000,{lim},asettb=1/48000,asetpts=N"   # the clock rebuilt from the samples after the last resample
         run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{a.handle:.4f}', '-t', f'{DUR:.4f}', '-i', a.hero, '-ss', f'{a.tin:.4f}', '-t', f'{DUR:.4f}', '-i', a.take,
              '-map', '0:v:0', '-map', '1:a:0', '-dn', '-vf', f'scale={W}:{H}:flags=lanczos,{to709(a.hero, a.in_matrix)}format=yuv420p', '-af', af, '-ar', '48000', '-shortest',
-             '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-tune', 'film', '-profile:v', 'high', '-level', '4.1', '-g', '48',
+             '-c:v', 'libx264', '-preset', 'slow', '-crf', f'{a.crf:g}'] + ([] if a.tune == 'none' else ['-tune', a.tune]) + ['-profile:v', 'high', '-level', '4.1', '-g', '48',
              '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',   # true by construction: to709() converted any non-BT.709 hero first
              '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-write_tmcd', '0', DELIV])   # -dn / -write_tmcd 0: the mov's timecode track would be re-muxed as a data track
         p = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_name,width,height,pix_fmt,r_frame_rate,sample_rate', '-show_entries', 'format=duration,size', '-of', 'default=nw=1', DELIV], capture_output=True, text=True).stdout

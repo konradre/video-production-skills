@@ -196,7 +196,9 @@ def main():
     edl = {'spot': P['spot'], 'deliver_base': P.get('deliver_base', P['spot']), 'version': P.get('version', '1.0'), 'fps': fps, 'canvas': P.get('canvas', [1080, 1920]),
            'runtime_s': RUN, 'source': P.get('source', f'built by edl_build.py from {a.plan}'), 'events': events, 'post_layers': layers, 'audio': au,
            'grade_note': P.get('grade_note', ''), 'source_script': P.get('source_script', ''), 'markers': markers}
+    if 'deliver_encode' in P: edl['deliver_encode'] = P['deliver_encode']   # the finisher's encode, carried from the plan (EDL-CONTRACT.md)
     if a.beats:
+        edl['beats'] = a.beats   # the finisher's gate reads the list this version was built against, not prompts/<SPOT>-beats.json
         B = json.load(open(a.beats, encoding='utf-8'))
         B['markers'] = {n: {'event': m['event'], 'take': float(m['take']), '_note': m.get('_note', 'rewritten by edl_build.py from the plan')} for n, m in P.get('markers', {}).items()}
         shutil.copy(a.beats, f"{a.beats}.bak-{time.strftime('%Y%m%d-%H%M%S')}-pre-build"); json.dump(B, open(a.beats, 'w', encoding='utf-8'), indent=1, ensure_ascii=False)

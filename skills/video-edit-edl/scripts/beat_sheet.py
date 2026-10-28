@@ -24,15 +24,18 @@ def vdur(v):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.', help='project root; EDL/beats paths are relative to it')
-    ap.add_argument('--edl', required=True); ap.add_argument('--beats', help='default prompts/<spot>-beats.json')
+    ap.add_argument('--edl', required=True); ap.add_argument('--beats', help="default: the EDL's own `beats`, else prompts/<spot>-beats.json")
     a = ap.parse_args(); os.chdir(a.root)
-    e = json.load(open(a.edl, encoding='utf-8')); bp = a.beats or f"prompts/{e.get('spot', 'SPOT')}-beats.json"
+    e = json.load(open(a.edl, encoding='utf-8')); bp = a.beats or e.get('beats') or f"prompts/{e.get('spot', 'SPOT')}-beats.json"   # a versioned EDL names its own list
+    print(f'beat list {bp}')
     B = json.load(open(bp, encoding='utf-8'))
     ev = {x['id']: x for x in e['events']}; order = [x['id'] for x in e['events']]; au = e['audio']; vo = au['vo']
     sfx = au.get('sfx', {}); mus = au.get('music', {}); lay = {l['id'].split()[0]: l for l in e.get('post_layers', [])}
 
     def mark(name):
-        m = B['markers'][name]; x = ev[m['event']]; return round(x['tl'][0] + m['take'] - x['in'], 6)
+        m = B['markers'][name]
+        if m['event'] not in ev: sys.exit(f"BEAT-SHEET FAIL marker {name} sits on {m['event']}, which {a.edl} does not cut — is {bp} the list this version was built against? (--beats, or the EDL's `beats`)")
+        x = ev[m['event']]; return round(x['tl'][0] + m['take'] - x['in'], 6)
 
     def sfx_t(s):   # where an sfx LANDS: its sync point when it has one (a riser starts before the beat its hit belongs to)
         sy = s.get('sync') if isinstance(s, dict) else None

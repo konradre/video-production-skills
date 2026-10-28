@@ -5,10 +5,19 @@ read nothing else; the VO stem, the captions and the loudness pass are all rebui
 this file is DERIVED by a builder — a typed number is a defect waiting for the next re-version.
 
 ```
-{ spot, deliver_base, version, fps, canvas:[w,h], runtime_s, source, source_script, grade_note,
+{ spot, deliver_base, version, fps, canvas:[w,h], runtime_s, source, source_script, grade_note, beats?, deliver_encode?,
   events:[…], post_layers:[…], audio:{vo, music, sfx, captions, caption_style, loudnorm,
   captions_dir, word_times, silence?}, markers:{NAME: absolute s} }
 ```
+
+- `beats` (optional) — the beat list this version was gated on, relative to the root. The finisher's gate reads `--beats`
+  first, then this, then `prompts/<spot>-beats.json`: a versioned EDL built against `prompts/<spot>-beats-v0.2.json` names it
+  here, or the default name gates it against a superseded list (2026-10-28: the old list named an event the new cut dropped,
+  and the gate died on it).
+- `deliver_encode` (optional) — `{crf, tune: film|grain|none, preset}` for the deliverable's H.264 encode; the default is CRF 17,
+  `-tune film`, slow. A look that carries grain buys it here — measured on a Dehancer 16 mm grain, CRF 12 `-tune grain` kept
+  65–96 % of the master's moving grain where the default kept 37–83 %, at 3.2× the bytes. For a deliverable with no byte cap;
+  a capped outlet gets its own two-pass variant (`video-finish` § 8). An unknown key stops the finish.
 
 ## events[] — one per cut, in timeline order
 

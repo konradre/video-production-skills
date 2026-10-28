@@ -13,6 +13,9 @@ back-to-back word) and never runs over the end card.
 
   build_captions.py --root <project> --edl edit/<SPOT>-EDL.json [--out-dir <captions_dir>] [--fonts-dir hyper/fonts]
                     [--canvas 1080x1920]
+  build_captions.py --selftest          an EDL with no captions writes an empty manifest with no font and no word times
+An EDL with no audio.captions (a film with no narrator) needs neither: the manifest is written empty, VO lines left uncaptioned
+are named in a WARNING, and the finisher overlays nothing.
 caption_style: font (A = Bangers-Regular.ttf · B = Inter.ttf · C = Nunito.ttf · or a font file name, all under --fonts-dir)
   · weight (a variable font's named instance: Black, SemiBold; B defaults to Black) · size_h, stroke_h, shadow_h (fractions
   of the canvas height) · shadow_alpha (0-255) · line_h (line pitch as a multiple of the size) · y (block centre, fraction
@@ -25,15 +28,32 @@ STYLE_KEYS = {'font', 'weight', 'size_h', 'stroke_h', 'shadow_h', 'shadow_alpha'
 FONTS = {'A': 'Bangers-Regular.ttf', 'B': 'Inter.ttf', 'C': 'Nunito.ttf'}
 
 
+def selftest():
+    import subprocess, tempfile
+    d = tempfile.mkdtemp(); os.makedirs(f'{d}/edit')
+    json.dump({'spot': 'X', 'events': [], 'audio': {'vo': {'stem': 'audio/vo/x.wav', 'L1': {'text': 'a line', 'at': 1.0}}}}, open(f'{d}/edit/X-EDL.json', 'w'))
+    r = subprocess.run([sys.executable, __file__, '--root', d, '--edl', 'edit/X-EDL.json', '--fonts-dir', f'{d}/no-fonts'], capture_output=True, text=True)
+    man = json.load(open(f'{d}/edit/captions/manifest.json')) if os.path.exists(f'{d}/edit/captions/manifest.json') else None
+    ok = r.returncode == 0 and man == [] and 'WARNING' in r.stdout and 'L1' in r.stdout
+    print(f"SELFTEST no captions {'PASS' if ok else 'FAIL'}: exit {r.returncode}, manifest {man}, out {(r.stdout + r.stderr).strip()[-200:]!r}"); sys.exit(0 if ok else 1)
+
+
 def main():
+    if '--selftest' in sys.argv[1:]: selftest()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--root', default='.'); ap.add_argument('--edl', required=True); ap.add_argument('--out-dir'); ap.add_argument('--fonts-dir', default='hyper/fonts')
     ap.add_argument('--canvas', default='1080x1920')
     a = ap.parse_args(); os.chdir(a.root)
-    edl = json.load(open(a.edl, encoding='utf-8')); A = edl['audio']; st = A.get('caption_style', {}); caps = A.get('captions', []); vo = A['vo']
+    edl = json.load(open(a.edl, encoding='utf-8')); A = edl['audio']; st = A.get('caption_style', {}); caps = A.get('captions', []); vo = A.get('vo') or {}
     bad = sorted(k for k in st if k not in STYLE_KEYS and not k.startswith('_'))
     if bad: sys.exit(f'caption_style: unknown key(s) {bad} — the builder reads {sorted(STYLE_KEYS)}')
-    capd = a.out_dir or A.get('captions_dir', 'edit/captions'); WT = json.load(open(A.get('word_times', f"{A.get('captions_dir', 'edit/captions')}/word-times.json"), encoding='utf-8'))
+    capd = a.out_dir or A.get('captions_dir', 'edit/captions')
+    if not caps:   # nothing to draw needs no font and no word times (2026-10-28: a film with no narrator died on a missing font)
+        lines = [k for k, v in vo.items() if isinstance(v, dict)]   # VO lines are dicts; stem, target_lufs, … are the stem's settings
+        os.makedirs(capd, exist_ok=True); json.dump([], open(f'{capd}/manifest.json', 'w', encoding='utf-8'))
+        if lines: print(f'WARNING {len(lines)} VO line(s) {lines} and no audio.captions — they play uncaptioned', flush=True)
+        print('caption layers 0 (no audio.captions in the EDL) ->', capd); return
+    WT = json.load(open(A.get('word_times', f"{A.get('captions_dir', 'edit/captions')}/word-times.json"), encoding='utf-8'))
     W, H = (int(v) for v in a.canvas.lower().split('x'))
     fk = st.get('font', 'A'); font_file = f'{a.fonts_dir}/{FONTS.get(fk, fk)}'
     if not os.path.exists(font_file): sys.exit(f'caption font missing: {font_file}')

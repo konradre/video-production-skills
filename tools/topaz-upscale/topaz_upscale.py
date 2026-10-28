@@ -11,6 +11,7 @@ Usage (WSL):
   python3 topaz_upscale.py --in <clip> [--model prob-4] [--scale 2]
       [--tvai "k=v:k=v"] [--post-scale 1080x1920] [--out-dir DIR]
 Outputs <stem>__<model>x<scale>.mp4 + JSON result + TOPAZ-UPSCALE-OK sentinel.
+  python3 topaz_upscale.py --selftest   the Windows <-> WSL path round trip the success test depends on
 """
 import argparse
 import json
@@ -47,7 +48,18 @@ def win_path(p):
 def wsl_path(p):
     if len(p) > 2 and p[1] == ":":
         return f"/mnt/{p[0].lower()}" + p[2:].replace("\\", "/")
+    for pre in (rf"\\wsl.localhost\{DISTRO}", rf"\\wsl$\{DISTRO}"):   # win_path's own UNC form maps back: an out-dir on the WSL
+        if p.lower().startswith(pre.lower() + "\\"):                     # disk once failed the success test, so the 10-bit rung read failed
+            return p[len(pre):].replace("\\", "/")
     return p
+
+
+def selftest():
+    cases = ["/opt/proj/edit/upscale-out/a__rhea-1x4.mp4", "/mnt/c/renders/a.mp4", "/mnt/d/x y/b.mp4"]
+    bad = [p for p in cases if wsl_path(win_path(p)) != p]
+    ok = not bad and wsl_path("relative/x.mp4") == "relative/x.mp4"
+    print(f"SELFTEST {'PASS' if ok else 'FAIL'}: win_path -> wsl_path round trip" + (f" broke on {bad}" if bad else ""))
+    sys.exit(0 if ok else 1)
 
 
 def is_model_dir(p):
@@ -88,6 +100,8 @@ TOPAZ, MODEL_DIR, DATA_DIR = detect_topaz()
 
 
 def main():
+    if "--selftest" in sys.argv[1:]:
+        selftest()
     ap = argparse.ArgumentParser()
     ap.add_argument("--in", dest="clips", action="append", required=True)
     ap.add_argument("--model", default="prob-4", help="tvai_up model (prob-4=Proteus, rhea-1=Rhea, ahq-12, ...)")
@@ -133,6 +147,11 @@ def main():
                 entry["status"] = "Complete"
                 entry["encoder"] = enc[1]
                 entry["seconds"] = round(time.time() - t0, 1)
+                break
+            if r.returncode == 0:   # the encoder succeeded and the file is not where we look: a path fault, never a reason to
+                entry["status"] = "OUTPUT-NOT-FOUND"   # re-encode over it with the next (8-bit) rung
+                entry["encoder"] = enc[1]
+                entry["looked_for"] = wsl_path(out_win)
                 break
             entry["status"] = "ENCODER-FAIL"
             entry["stderr_tail"] = (r.stderr or "")[-400:]

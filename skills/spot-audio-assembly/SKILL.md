@@ -245,7 +245,7 @@ and the listen at each hit found no clash.
 | `gen_vo.py --root --jobs [--voice] [--dry-run] [--preview] [--door]` | TTS takes by REST; characters before/after; skip-by-name; reel + index; door treatment |
 | `vo_word_times.py --root --edl [--engine local\|scribe] [--only]` | word times per line; `--only` preserves hand patches |
 | `build_vo_stem.py --root --edl [--out] [--floor-max]` | every placed line on the stem at target LUFS with a peak cap; each line's gap floor (refuses a line carrying a mix) and its source; each line decoded on its presentation clock (a timestamp gap becomes silence, never a shift) |
-| `build_captions.py --root --edl [--out-dir] [--fonts-dir]` | cards at delivery resolution + manifest; the script's words on the transcript's times; every style key checked; `highlight: none` = one plain layer per card |
+| `build_captions.py --root --edl [--out-dir] [--fonts-dir]` · `--selftest` | cards at delivery resolution + manifest; the script's words on the transcript's times; every style key checked; `highlight: none` = one plain layer per card; no `audio.captions` = an empty manifest, no font or word times read, uncaptioned VO lines named |
 | `sfx_onsets.py <file> [--cut a:b --out]` · `--sync transient\|peak\|end [--ordinal] [--src-in --dur] [--event T]` | the syllable map by ordinal; sample-exact cuts with fades; a sound's sync point (a hit's transient, a whoosh's pass-by peak, a riser's end) and the `at`, `sync` block and `derived` stamp that put it on its event |
 | `audio_head_scan.py --root (--edl \| --files)` | stable tones/drones in each take's head, labelled |
 | `roomtone_synth.py --ref --ss --t --dur --out` | stationary room tone coloured by a clean slice |

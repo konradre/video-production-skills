@@ -177,6 +177,58 @@ def prev_compare(D, P, events, fps):
     return rows
 
 
+def _box(z, r=2):
+    c = np.cumsum(np.cumsum(np.pad(z, r + 1, mode='edge'), 0), 1); k = 2 * r + 1
+    return (c[k:, k:] - c[:-k, k:] - c[k:, :-k] + c[:-k, :-k])[:z.shape[0], :z.shape[1]] / k / k
+
+
+def frames_at(p, t, n, W, H):
+    """n consecutive luma frames from t, at W×H (lanczos), 0–255 floats; None when the file gave fewer than two."""
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-ss', f'{t:.4f}', '-i', p, '-frames:v', str(n), '-vf', f'scale={W}:{H}:flags=lanczos,format=gray16le',
+                          '-f', 'rawvideo', '-'], capture_output=True).stdout
+    k = len(raw) // (W * H * 2)
+    return np.frombuffer(raw[:k * W * H * 2], np.uint16).reshape(k, H, W).astype(np.float64) / 257 if k >= 2 else None
+
+
+def _tex(f):
+    """(plain, high-pass) moving texture: the mean |change| between consecutive frames, and the same after a 5×5 box blur of
+    each change is subtracted — grain lives in the second; a moving edge or a pan inflates the first."""
+    d = np.diff(f, axis=0)
+    return float(np.mean(np.abs(d))), float(np.mean([np.mean(np.abs(x - _box(x))) for x in d]))
+
+
+def grain_read(D, M, events, fps, W, H, n=7, motion=2.5, floor=0.1):
+    """Per footage event, the moving texture the DELIVERED file keeps against the master it was encoded from, at the same n
+    frames from the event's middle, both at the delivered raster: (id, master high-pass, plain/high-pass, kept or None).
+    kept is None when the event is motion-dominated (plain/high-pass over `motion`: a moving picture hides the grain in the
+    read) or has no texture to keep (master high-pass under `floor`). Measured on one film (a Dehancer 16 mm
+    grain): CRF 17 -tune film kept 47–100 % per event, CRF 12 -tune grain 74–107 %; the grain-free flats of the same shots
+    through CRF 17 film kept 100–106 %."""
+    rows = []
+    for x in events:
+        if x.get('role') == 'endcard' or x.get('source') == 'designed' or len(x.get('tl', [])) < 2: continue
+        k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps)
+        if k1 - k0 < n: continue
+        t = ((k0 + k1) // 2 - n // 2 + 0.25) / fps
+        a, b = frames_at(M, t, n, W, H), frames_at(D, t, n, W, H)
+        if a is None or b is None or len(a) != len(b): rows.append((x.get('id', '?'), None, None, None)); continue
+        mp, mh = _tex(a); dh = _tex(b)[1]
+        ratio = mp / mh if mh > 0 else None
+        kept = dh / mh if mh >= floor and ratio is not None and ratio <= motion else None
+        rows.append((x.get('id', '?'), mh, ratio, kept))
+    return rows
+
+
+def find_master(D, e, mezz='edit/mezz'):
+    """The master finish_spot.py encoded D from: edit/mezz/<spot>-master-<W>x<H><tag>.mov, the tag read off the deliverable's
+    name (deliver/<deliver_base><tag>.mp4). None when the name does not carry it (a renamed file) or no single master matches."""
+    spot = e.get('spot', 'SPOT'); base = os.path.splitext(os.path.basename(D))[0]; db = e.get('deliver_base', spot)
+    if not base.startswith(db): return None
+    tag = base[len(db):]; pat = re.compile(rf'{re.escape(spot)}-master-\d+x\d+{re.escape(tag)}\.mov$')
+    hits = [p for p in glob.glob(os.path.join(mezz, f'{spot}-master-*.mov')) if pat.search(os.path.basename(p))]
+    return hits[0] if len(hits) == 1 else None
+
+
 def classify(row):
     id_, dy, sh_, off = row
     if dy is None: return 'unreadable'
@@ -245,7 +297,24 @@ def selftest():
     r3 = matrix_provenance(clip, {}, mz); r4 = matrix_provenance(base, {}, mz)                 # the record names clip, not base
     ok7 = not r1[0] and 'OWED' in r1[1] and r2[0] and 'qc.matrix_check' in r2[1] and r3[0] and 'finish_spot' in r3[1] and not r4[0]
     print(f"SELFTEST {'PASS' if ok7 else 'FAIL'}: colour-matrix provenance — owed {not r1[0]}, declared {r2[0]}, finish_spot record {r3[0]}, another file {not r4[0]}")
-    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 else 1)
+    gm = os.path.join(d, 'grain-master.mov')   # a static gradient under moving noise (the grain); two deliverables at half size
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'gradients=s=384x640:d=1:r=24:speed=0.00001', '-vf', 'noise=alls=14:allf=t,format=yuv422p10le',
+                    '-c:v', 'prores_ks', '-profile:v', '3', gm], check=True)
+    kd = {}
+    for k, vf in (('kept', 'scale=192:320:flags=lanczos'), ('erased', 'scale=192:320:flags=lanczos,hqdn3d=12:12:24:24')):
+        o = os.path.join(d, f'grain-{k}.mp4'); subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', gm, '-vf', vf + ',format=yuv420p', '-c:v', 'libx264', '-crf', '0', o], check=True)
+        kd[k] = grain_read(o, gm, [{'id': k, 'tl': [0.0, 1.0]}], 24, 192, 320)[0][3]
+    clean = os.path.join(d, 'grain-clean.mov')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'gradients=s=384x640:d=1:r=24:speed=0.00001', '-vf', 'format=yuv422p10le', '-c:v', 'prores_ks', '-profile:v', '3', clean], check=True)
+    kc = grain_read(clean, clean, [{'id': 'c', 'tl': [0.0, 1.0]}], 24, 192, 320)[0][3]
+    mz2 = os.path.join(d, 'mz2'); os.makedirs(mz2); open(os.path.join(mz2, 'SP-master-2160x3840-v0.2g.mov'), 'w').close(); open(os.path.join(mz2, 'SP-master-2160x3840-v0.2.mov'), 'w').close()
+    fm = (find_master('deliver/sp-v0.2g.mp4', {'spot': 'SP', 'deliver_base': 'sp'}, mz2), find_master('deliver/renamed.mp4', {'spot': 'SP', 'deliver_base': 'sp'}, mz2))
+    ok8 = (kd['kept'] is not None and kd['kept'] > 0.9 and kd['erased'] is not None and kd['erased'] < 0.5 and kc is None
+           and fm[0] and fm[0].endswith('SP-master-2160x3840-v0.2g.mov') and fm[1] is None)
+    print(f"SELFTEST {'PASS' if ok8 else 'FAIL'}: grain kept — a lossless encode {kd['kept'] if kd['kept'] is None else round(kd['kept'], 2)} (want > 0.9), "
+          f"a denoised one {kd['erased'] if kd['erased'] is None else round(kd['erased'], 2)} (want < 0.5), a clean master {kc} (want None: no texture); "
+          f"the master found by tag {fm[0] is not None and fm[0].endswith('v0.2g.mov')}, none for a renamed file {fm[1] is None}")
+    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8 else 1)
 
 
 def last_frame_thumb(p):
@@ -264,6 +333,8 @@ def main():
     ap.add_argument('--phone-ref', nargs='*', default=[], help="the project's real phone clips: prints the delivered file's phone-texture band against theirs as INFO (a creator-style spot)")
     ap.add_argument('--prev', default=None, help="the previous version's deliverable: every footage event's middle frame compared (regraded / moved / retimed), INFO")
     ap.add_argument('--prev-expect', default=None, help="finish = every footage event regraded, none moved or retimed; changed:<id,…> = those events differ from --prev")
+    ap.add_argument('--master', default=None, help="the master this file was encoded from (default: finish_spot.py's edit/mezz/<spot>-master-<W>x<H><tag>.mov, the tag read off the deliverable's name): the grain-kept read per footage event")
+    ap.add_argument('--grain-warn', type=float, default=0.70, help='a WARN line when a readable event keeps less than this share of the master\'s moving texture (a lead from one film)')
     ap.add_argument('--selftest', action='store_true')
     a = ap.parse_args()
     if a.selftest: selftest()
@@ -437,6 +508,17 @@ def main():
                 if edy is not None and edy > 1.0: same.remove(i); at_edge.append(f"{i} dY {edy:.1f}")
             if at_edge: print(f"INFO changed at an edge only (the middle frame reads the same): {at_edge}")
             verdict(not same, 'changes reached the picture', f"{len(want) - len(same)}/{len(want)} named events differ from the previous version" + (f"; unchanged at the middle and at both edges: {same} — a stale cache?" if same else ''))
+    # ---- grain kept by the deliver encode (INFO rows; a WARN line under --grain-warn — a lead, calibrated on one film) ----
+    M = a.master or find_master(D, e)
+    if M and os.path.exists(M):
+        gr = grain_read(D, M, e['events'], efps, int(vs.get('width') or cw), int(vs.get('height') or ch))
+        fmt = lambda r: (f"{r[0]} {r[3]:.0%}" if r[3] is not None else f"{r[0]} " + ('unreadable' if r[1] is None else 'no texture' if r[1] < 0.1 else f"motion (plain/hp {r[2]:.1f}, not read)"))
+        print(f"INFO grain kept vs the master ({M}; the moving texture at the same frames): " + ' · '.join(fmt(r) for r in gr))
+        low = [f"{r[0]} {r[3]:.0%}" for r in gr if r[3] is not None and r[3] < a.grain_warn]
+        if low: print(f"WARN grain: {low} kept under {a.grain_warn:.0%} of the master's moving texture — the deliver encode erased it; a look that carries grain "
+                      "buys it in the EDL's deliver_encode (CRF 12 -tune grain kept 74–107 % where CRF 17 film kept 47–100 %, one film, 3.2x the bytes; EDL-CONTRACT.md); "
+                      "the threshold is a lead from that film — compare the two encodes by eye before re-encoding")
+    else: print(f"INFO grain kept: not read — {'no file at ' + M if M else 'no master found for this name (pass --master)'}")
     # ---- the phone-texture band (INFO, a creator-style spot: a comparison against the project's real phone clips, never a threshold) ----
     if a.phone_ref:
         pr_ = sh([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phone_texture_probe.py'), '--json', D] + a.phone_ref)

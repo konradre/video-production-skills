@@ -9,14 +9,15 @@ The cleanup prompt at every phase boundary is this table (video-production § 5)
 Roles (overridable with --substrate-dirs / --derived-dirs, comma lists relative to the root):
   substrate: assets takes references startframes prompts tools docs brand logs receipts audio/vo audio/music audio/sfx audio/clean gen
   derived:   edit review deliver scratch audio/mixes audio/reels
-A derived file is SUPERSEDED when its name carries a version tag (`-v\\d+[a-z]?`) that is not the kept tag of its spot, when
-it is a `.bak-*` copy, or when it sits under scratch. A file under neither role is listed as "other" and never proposed.
+A derived file is SUPERSEDED when its name carries a version tag (`-v\\d+(\\.\\d+)*[a-z]?`: v7, v7o, v0.2, v0.2g) that is not
+the kept tag of its spot, when it is a `.bak-*` copy, or when it sits under scratch. A file under neither role is listed as
+"other" and never proposed.
 """
 import argparse, os, re, sys, tempfile, time
 
 SUBSTRATE = ['assets', 'takes', 'references', 'startframes', 'prompts', 'tools', 'docs', 'brand', 'logs', 'receipts', 'audio/vo', 'audio/music', 'audio/sfx', 'audio/clean', 'gen']
 DERIVED = ['edit', 'review', 'deliver', 'scratch', 'audio/mixes', 'audio/reels']
-TAG = re.compile(r'-(v\d+[a-z]?)(?=[.-]|$)')
+TAG = re.compile(r'-(v\d+(?:\.\d+)*[a-z]?)(?=[.-]|$)')   # dotted tags whole: `-v0.2.mov` read as v0 put a project's CURRENT v0.2 pair on the delete list (2026-10-28)
 
 
 def classify(root, keep, substrate, derived):
@@ -69,7 +70,17 @@ def selftest():
     got = {k: sum(s for _, s in v) for k, v in r.items()}
     want = {'substrate': 1000, 'derived-current': 4100, 'derived-superseded': 3700, 'other': 10}
     ok = got == want
-    print(f"SELFTEST {'PASS' if ok else 'FAIL'}: {got} (want {want})"); sys.exit(0 if ok else 1)
+    print(f"SELFTEST {'PASS' if ok else 'FAIL'}: {got} (want {want})")
+    d2 = tempfile.mkdtemp()   # dotted tags: v0.2 kept, v0.1 and v0.2g superseded, the deliverable under its own base name too
+    for rel, n in (('edit/mezz/SP-master-2160x3840-v0.2.mov', 7000), ('edit/mezz/SP-master-2160x3840-v0.1.mov', 600),
+                   ('deliver/sp-v0.2.mp4', 70), ('deliver/sp-v0.2g.mp4', 200), ('edit/SP-v0.2-EDL.json', 5)):
+        p = os.path.join(d2, rel); os.makedirs(os.path.dirname(p), exist_ok=True); open(p, 'wb').write(b'x' * n)
+    r2 = classify(d2, {'SP': 'v0.2'}, SUBSTRATE, DERIVED)
+    got2 = {k: sorted(x for x, _ in v) for k, v in r2.items() if k.startswith('derived')}
+    want2 = {'derived-current': ['deliver/sp-v0.2.mp4', 'edit/SP-v0.2-EDL.json', 'edit/mezz/SP-master-2160x3840-v0.2.mov'],
+             'derived-superseded': ['deliver/sp-v0.2g.mp4', 'edit/mezz/SP-master-2160x3840-v0.1.mov']}
+    ok2 = got2 == want2
+    print(f"SELFTEST dotted tags {'PASS' if ok2 else 'FAIL'}: {got2}" + ('' if ok2 else f' (want {want2})')); sys.exit(0 if ok and ok2 else 1)
 
 
 def main():
@@ -78,7 +89,7 @@ def main():
     ap.add_argument('--plan', default=None); ap.add_argument('--substrate-dirs', default=','.join(SUBSTRATE)); ap.add_argument('--derived-dirs', default=','.join(DERIVED))
     ap.add_argument('--selftest', action='store_true'); a = ap.parse_args()
     if a.selftest: selftest()
-    keep = {kv.split('=')[0]: kv.split('=')[1] for kv in a.keep_tags.split(',') if '=' in kv}
+    keep = {kv.split('=')[0]: kv.split('=')[1].lstrip('-') for kv in a.keep_tags.split(',') if '=' in kv}   # `-v0.2` and `v0.2` name one tag
     rows = classify(a.root, keep, [x for x in a.substrate_dirs.split(',') if x], [x for x in a.derived_dirs.split(',') if x])
     print(report(rows, a.plan))
 

@@ -8,7 +8,11 @@ clips across a shared path. `look-library/GUIDE.md` §5 covers the topology, the
 
 Drives the bundled ffmpeg (`tvai_up`) of [Topaz Video](https://www.topazlabs.com/topaz-video), called Topaz Video AI
 before the rename, from WSL. Log in to Topaz once in its GUI (the models download on first use).
-`video-finish-qc/scripts/upscale_local.sh` wraps it.
+`video-finish-qc/scripts/upscale_local.sh` wraps it, and calls a take done only on this tool's own `TOPAZ-UPSCALE-OK`,
+naming the encoder and pixel format and flagging an 8-bit result. An encode that succeeds with its output not where
+the tool looks stops as `OUTPUT-NOT-FOUND` rather than re-encoding over it on the next rung; `--selftest` checks the
+Windows ↔ WSL path round trip that test depends on (an output folder on the WSL disk once read as failed, and the
+8-bit rung re-encoded over the 10-bit file).
 
 The wrapper looks for the renamed app first and the old one second. The renamed app keeps its models in
 `C:\ProgramData\Topaz Labs LLC\Topaz Video\models\models` (Topaz's troubleshooting page); Topaz Video AI used the
