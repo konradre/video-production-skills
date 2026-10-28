@@ -29,7 +29,7 @@ for T in "${TAKES[@]}"; do
   ENC=$(sed -n 's/.*"encoder": "\([^"]*\)".*/\1/p' "$TLOG" | tail -1)
   if [ $RC -eq 0 ] && [ "$(tail -1 "$TLOG")" = "TOPAZ-UPSCALE-OK" ] && [ -s "$UP" ]; then
     PIX=$(ffprobe -v error -select_streams v:0 -show_entries stream=pix_fmt -of csv=p=0 "$UP" 2>/dev/null)
-    case "$PIX" in *10le|*10be|p010*) B="";; *) B=" ⚠ 8-BIT ($PIX) — the 10-bit rung failed; read $TLOG";; esac
+    case "$PIX" in *10le|*10be|p010*) B="";; '') B=" ⚠ pixel format unknown (ffprobe failed) — check the file by hand";; *) B=" ⚠ 8-BIT ($PIX) — the 10-bit rung failed; read $TLOG";; esac
     echo "[$(date +%H:%M:%S)] RHEA-OK $stem ← $(basename "$UP") (${ENC:-?}, ${PIX:-?})$B"
   else
     FAILS=$((FAILS + 1)); echo "[$(date +%H:%M:%S)] RHEA-FAILED $stem (tool exit $RC, $(tail -1 "$TLOG")) — read $TLOG"

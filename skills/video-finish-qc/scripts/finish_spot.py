@@ -187,8 +187,10 @@ def main():
     _bad = sorted(k for k in _de if k not in DENC and not k.startswith('_'))
     assert not _bad, f'deliver_encode: unknown key(s) {_bad} — the finisher reads {sorted(DENC)}'
     DENC.update({k: v for k, v in _de.items() if not k.startswith('_')})
-    assert DENC['tune'] in ('film', 'grain', 'none') and 0 <= float(DENC['crf']) <= 51, f"deliver_encode {DENC}: tune film|grain|none, crf 0-51"
-    VENC = ['-preset', str(DENC['preset']), '-crf', str(DENC['crf'])] + ([] if DENC['tune'] == 'none' else ['-tune', DENC['tune']])
+    _c = DENC['crf']   # a number, not a bool (json true passes float()); 1-51, since x264 encodes any CRF under 1 lossless and -profile:v high refuses it
+    assert DENC['tune'] in ('film', 'grain', 'none') and isinstance(_c, (int, float)) and not isinstance(_c, bool) and 1 <= float(_c) <= 51, \
+        f"deliver_encode {DENC}: tune film|grain|none, crf a number from 1 to 51"
+    VENC = ['-preset', str(DENC['preset']), '-crf', f"{float(_c):g}"] + ([] if DENC['tune'] == 'none' else ['-tune', DENC['tune']])
     beats = a.beats or edl.get('beats') or f"prompts/{SPOT}-beats.json"   # a versioned EDL names its own list (EDL-CONTRACT.md)
     if (a.beats or edl.get('beats')) and not os.path.exists(beats): sys.exit(f'beats {beats}: no such file — the gate would read nothing')   # 2026-10-28: the default name held a superseded list
     if not a.no_gate and os.path.exists(beats):

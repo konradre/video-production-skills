@@ -68,7 +68,9 @@ def main():
     ap.add_argument('--no-retry', action='store_true', help='keep the single attempt when the true peak lands over the ceiling')
     ap.add_argument('--in-matrix', dest='in_matrix', choices=['bt709', 'bt601', 'bt2020nc'], help="the hero's YUV matrix when its tag is missing or wrong")
     ap.add_argument('--crf', type=float, default=17); ap.add_argument('--tune', choices=['film', 'grain', 'none'], default='film', help='the deliver encode; grain for a hero that carries grain')
-    a = ap.parse_args(); os.chdir(a.root); DUR = a.tout - a.tin; DELIV = f'deliver/{a.name}.mp4'; os.makedirs('deliver', exist_ok=True)
+    a = ap.parse_args()
+    if not 1 <= a.crf <= 51: ap.error('--crf: 1 to 51 (x264 encodes any CRF under 1 lossless, which -profile:v high refuses)')
+    os.chdir(a.root); DUR = a.tout - a.tin; DELIV = f'deliver/{a.name}.mp4'; os.makedirs('deliver', exist_ok=True)
     assert DUR > 0 and a.handle >= 0 and not os.path.exists(DELIV), f'bad range or {DELIV} exists (fresh filename per render)'
     W, H = a.canvas.lower().split('x')
 

@@ -209,7 +209,7 @@ def grain_read(D, M, events, fps, W, H, n=7, motion=2.5, floor=0.1):
         if x.get('role') == 'endcard' or x.get('source') == 'designed' or len(x.get('tl', [])) < 2: continue
         k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps)
         if k1 - k0 < n: continue
-        t = ((k0 + k1) // 2 - n // 2 + 0.25) / fps
+        t = grain_seek(k0, k1, n, fps)
         a, b = frames_at(M, t, n, W, H), frames_at(D, t, n, W, H)
         if a is None or b is None or len(a) != len(b): rows.append((x.get('id', '?'), None, None, None)); continue
         mp, mh = _tex(a); dh = _tex(b)[1]
@@ -219,14 +219,31 @@ def grain_read(D, M, events, fps, W, H, n=7, motion=2.5, floor=0.1):
     return rows
 
 
-def find_master(D, e, mezz='edit/mezz'):
-    """The master finish_spot.py encoded D from: edit/mezz/<spot>-master-<W>x<H><tag>.mov, the tag read off the deliverable's
-    name (deliver/<deliver_base><tag>.mp4). None when the name does not carry it (a renamed file) or no single master matches."""
+def grain_seek(k0, k1, n, fps):
+    """The seek time for n consecutive frames from an event's middle, all inside [k0, k1): a quarter frame BEFORE the first
+    frame's own start, because -ss keeps the first frame at or after the time (a quarter frame after it sampled frames 1-7 of
+    a 7-frame event and crossed into the next shot)."""
+    s = max(k0, min(k1 - n, (k0 + k1) // 2 - n // 2))
+    return max(0.0, (s - 0.25) / fps)
+
+
+def master_candidates(D, e, mezz='edit/mezz'):
+    """Every master finish_spot.py could have encoded D from: edit/mezz/<spot>-master-<W>x<H><tag>.mov, the tag read off the
+    deliverable's name (deliver/<deliver_base><tag>.mp4). A finish with no --tag writes <base>-v1.mp4 from the UNTAGGED master,
+    so -v1 matches that one too. Empty for a renamed file."""
     spot = e.get('spot', 'SPOT'); base = os.path.splitext(os.path.basename(D))[0]; db = e.get('deliver_base', spot)
-    if not base.startswith(db): return None
-    tag = base[len(db):]; pat = re.compile(rf'{re.escape(spot)}-master-\d+x\d+{re.escape(tag)}\.mov$')
-    hits = [p for p in glob.glob(os.path.join(mezz, f'{spot}-master-*.mov')) if pat.search(os.path.basename(p))]
-    return hits[0] if len(hits) == 1 else None
+    if not base.startswith(db): return []
+    tag = base[len(db):]; tags = [tag] + ([''] if tag == '-v1' else [])
+    pats = [re.compile(rf'^{re.escape(spot)}-master-\d+x\d+{re.escape(t)}\.mov$') for t in tags]
+    return sorted(p for p in glob.glob(os.path.join(mezz, f'{spot}-master-*.mov')) if any(q.match(os.path.basename(p)) for q in pats))
+
+
+def find_master(D, e, mezz='edit/mezz'):
+    """The one master D's name points at, or None — for no match, and for two (a -v1 deliverable with both an untagged and a
+    -v1 master on disk): nothing on disk says which one the deliver stage read, and a guess compares the grain against the
+    wrong source, so the caller passes --master."""
+    c = master_candidates(D, e, mezz)
+    return c[0] if len(c) == 1 else None
 
 
 def classify(row):
@@ -309,11 +326,23 @@ def selftest():
     kc = grain_read(clean, clean, [{'id': 'c', 'tl': [0.0, 1.0]}], 24, 192, 320)[0][3]
     mz2 = os.path.join(d, 'mz2'); os.makedirs(mz2); open(os.path.join(mz2, 'SP-master-2160x3840-v0.2g.mov'), 'w').close(); open(os.path.join(mz2, 'SP-master-2160x3840-v0.2.mov'), 'w').close()
     fm = (find_master('deliver/sp-v0.2g.mp4', {'spot': 'SP', 'deliver_base': 'sp'}, mz2), find_master('deliver/renamed.mp4', {'spot': 'SP', 'deliver_base': 'sp'}, mz2))
+    mz3 = os.path.join(d, 'mz3'); os.makedirs(mz3); open(os.path.join(mz3, 'SP-master-2160x3840.mov'), 'w').close()   # a finish with no --tag
+    dv = os.path.join(d, 'sp-v1.mp4'); open(dv, 'w').close(); fm_untagged = find_master(dv, {'spot': 'SP', 'deliver_base': 'sp'}, mz3)
+    open(os.path.join(mz3, 'SP-master-2160x3840-v1.mov'), 'w').close()   # and an explicit -v1 master too: ambiguous, never guessed
+    fm_both = find_master(dv, {'spot': 'SP', 'deliver_base': 'sp'}, mz3); n_both = len(master_candidates(dv, {'spot': 'SP', 'deliver_base': 'sp'}, mz3))
+    num = os.path.join(d, 'numbered.mp4')   # frame i has luma 16 + 12*i: the sampled frames must be exactly the event's own
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=1:r=24', '-vf', "geq=lum='16+12*N':cb=128:cr=128",
+                    '-frames:v', '14', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-crf', '0', '-preset', 'ultrafast', '-profile:v', 'high444', num], check=True)
+    ref = [float(f.mean()) for f in frames_at(num, 0.0, 14, 64, 64)]   # each frame's own decoded level identifies it
+    idx = lambda k0, k1: [min(range(len(ref)), key=lambda j: abs(ref[j] - float(f.mean()))) for f in frames_at(num, grain_seek(k0, k1, 7, 24), 7, 64, 64)]
+    seek_ok = idx(0, 7) == list(range(0, 7)) and idx(7, 14) == list(range(7, 14))
     ok8 = (kd['kept'] is not None and kd['kept'] > 0.9 and kd['erased'] is not None and kd['erased'] < 0.5 and kc is None
-           and fm[0] and fm[0].endswith('SP-master-2160x3840-v0.2g.mov') and fm[1] is None)
+           and fm[0] and fm[0].endswith('SP-master-2160x3840-v0.2g.mov') and fm[1] is None
+           and fm_untagged is not None and fm_untagged.endswith('SP-master-2160x3840.mov') and fm_both is None and n_both == 2 and seek_ok)
     print(f"SELFTEST {'PASS' if ok8 else 'FAIL'}: grain kept — a lossless encode {kd['kept'] if kd['kept'] is None else round(kd['kept'], 2)} (want > 0.9), "
           f"a denoised one {kd['erased'] if kd['erased'] is None else round(kd['erased'], 2)} (want < 0.5), a clean master {kc} (want None: no texture); "
-          f"the master found by tag {fm[0] is not None and fm[0].endswith('v0.2g.mov')}, none for a renamed file {fm[1] is None}")
+          f"the master found by tag {fm[0] is not None and fm[0].endswith('v0.2g.mov')}, none for a renamed file {fm[1] is None}, "
+          f"the untagged master for -v1 {fm_untagged is not None}, none when two masters match {fm_both is None and n_both == 2}; frames sampled inside a 7-frame event: {idx(0, 7)} and {idx(7, 14)}")
     sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8 else 1)
 
 
@@ -518,7 +547,10 @@ def main():
         if low: print(f"WARN grain: {low} kept under {a.grain_warn:.0%} of the master's moving texture — the deliver encode erased it; a look that carries grain "
                       "buys it in the EDL's deliver_encode (CRF 12 -tune grain kept 74–107 % where CRF 17 film kept 47–100 %, one film, 3.2x the bytes; EDL-CONTRACT.md); "
                       "the threshold is a lead from that film — compare the two encodes by eye before re-encoding")
-    else: print(f"INFO grain kept: not read — {'no file at ' + M if M else 'no master found for this name (pass --master)'}")
+    else:
+        nc = len(master_candidates(D, e)) if not M else 0
+        print(f"INFO grain kept: not read — " + (f'no file at {M}' if M else f'{nc} masters match this name and nothing says which one the deliver stage read (pass --master)' if nc > 1
+              else 'no master found for this name (pass --master)'))
     # ---- the phone-texture band (INFO, a creator-style spot: a comparison against the project's real phone clips, never a threshold) ----
     if a.phone_ref:
         pr_ = sh([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'phone_texture_probe.py'), '--json', D] + a.phone_ref)
