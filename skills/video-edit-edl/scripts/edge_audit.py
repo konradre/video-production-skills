@@ -48,6 +48,17 @@ BITE and 10 TIGHT, among them a word heard cut off at review (2026-10-22). Decla
 true (the takes ARE the programme) or false (every take's sound is muted), or native_audio_vol on the events. An EDL
 from edl_build.py always carries native_audio_vol, so this fires only on a builder that never said.
 
+A split edit (an L-cut): `audio_lead` on an event = its take's sound starts that many seconds BEFORE its picture, laid
+over the previous event's last `audio_lead` seconds, which it replaces. The sound join is then at the picture join minus
+the lead, and that is where both audible edges are read — the previous event's out at `out − audio_lead` (its tail is
+replaced there) and this event's in at `in − audio_lead`, in takes mode and on the delivered file alike. At the picture
+join the sound runs on by design: --deliv prints it as L-CUT, never judges it. Without the model the read lands on the
+picture join, where the next take's own word is playing: one compilation's L-cut read 2 BITE on every delivered version
+while its sound was continuous (envelope NCC 0.998 against the source; 2026-10-29). And a read at the previous
+event's picture out cannot see a lead that starts inside its last word, because the lead replaces that sound: only the
+read at out − audio_lead does. finish_spot.py does not implement audio_lead and
+refuses an EDL that carries it; a project builder that cuts the L-cut declares it so the gate reads the right edges.
+
 A source that itself starts or ends mid-word (a supplied clip cut that way) cannot be repaired by a cut. Declare it on
 the event as "accepted_edges": {"in": "<why>"}; it prints as INFO, and the operator hears about it once. A word's
 tail carried as an sfx (the sfx file is the take, its src_in within a frame of the audible out) prints as INFO.
@@ -174,6 +185,11 @@ def undeclared_sound(edl):
     return out
 
 
+def lead_of(x):
+    """the event's split-edit lead in seconds (audio_lead, 0 when absent): its sound starts this much before its picture"""
+    return max(0.0, float(x.get('audio_lead') or 0.0))
+
+
 def plays(x, allnative):
     return bool(x.get('take')) and x.get('source') != 'designed' and (allnative or float(x.get('native_audio_vol', 0) or 0) > 0)
 
@@ -200,9 +216,11 @@ def takes_mode(a, edl):
         else:
             print('INFO no event plays its take sound (native_audio_vol 0 everywhere, no qc.native_programme) — no edge to read; '
                   'a builder whose takes ARE the programme declares qc.native_programme: true')
-    for x in edl['events']:
+    evs = edl['events']
+    for xi, x in enumerate(evs):
         if only and x['id'] not in only: continue
         if not plays(x, allnative): continue
+        nxt_lead = lead_of(evs[xi + 1]) if xi + 1 < len(evs) else 0.0
         take = x['take']
         if not os.path.exists(take): print(f"FAIL {x['id']}: take missing {take}"); rows.append({'id': x['id'], 'verdict': 'MISSING'}); continue
         if take not in cache:
@@ -210,7 +228,8 @@ def takes_mode(a, edl):
             cache[take] = (env, float(np.percentile(live, 10)) if len(live) else -100.0, words_for(a.transcripts, take),
                            (envelope(sig, VOICED), envelope(sig, SIBIL)))
         env, bed, words, bands = cache[take]
-        T_in = float(x.get('native_audio_from', x['in'])); T_out = float(x.get('native_audio_to', x['out']))
+        T_in = float(x.get('native_audio_from', float(x['in']) - lead_of(x)))   # an L-cut's sound starts audio_lead before the picture
+        T_out = min(float(x.get('native_audio_to', x['out'])), float(x['out']) - nxt_lead)   # the next event's lead replaces this tail
         i0, i1 = int(round(T_in * 100)), int(round(T_out * 100)); w = env[i0:i1]
         ref = float(np.percentile(w, 90)) if len(w) else -60.0; quiet = max(ref + a.quiet_db, bed + a.bed_margin)
         L = over_silence(bands, i0, i1); qm = (env < quiet) & (L < 0)   # silent on all three reads
@@ -280,9 +299,13 @@ def deliv_mode(a, edl):
             print('INFO no event plays its take sound (native_audio_vol 0 everywhere, no qc.native_programme) — no join to read; '
                   'a builder whose takes ARE the programme declares qc.native_programme: true')
     for e0, e1 in zip(evs, evs[1:]):
-        J = float(e1['tl'][0]); sides = []
-        if plays(e0, allnative) and float(e0.get('native_audio_to', e0['out'])) >= float(e0['out']) - 1e-6: sides.append(('out', e0))
-        if plays(e1, allnative) and float(e1.get('native_audio_from', e1['in'])) <= float(e1['in']) + 1e-6: sides.append(('in', e1))
+        P = float(e1['tl'][0]); ld = lead_of(e1); J = P - ld; sides = []   # J = the SOUND join: the picture join less an L-cut's lead
+        if plays(e0, allnative) and float(e0.get('native_audio_to', e0['out'])) >= float(e0['out']) - ld - 1e-6: sides.append(('out', e0))
+        if plays(e1, allnative) and float(e1.get('native_audio_from', float(e1['in']) - ld)) <= float(e1['in']) - ld + 1e-6: sides.append(('in', e1))
+        if ld and sides:
+            print(f"L-CUT   {int(P // 60):02d}:{P % 60:05.2f}  {e0['id']:>6s}|{e1['id']:<6s}  {e1['id']}'s sound runs across the picture join by design "
+                  f"(audio_lead {ld:.2f} s) — its edges are read at the sound join {int(J // 60):02d}:{J % 60:05.2f}")
+            rows.append({'J': P, 'verdict': 'L-CUT', 'lead': ld})
         if not sides: continue
         mm = f"{int(J // 60):02d}:{J % 60:05.2f}"
         cov = [n for n, s0, s1 in spans if s0 < J - 0.05 and s1 > J + 0.05]
@@ -334,11 +357,12 @@ def selftest():
     edl = {'fps': 25, 'events': [
         ev('S_TAIL', 0.30, 0.76), ev('GAP', 0.30, 0.95), ev('MIDWORD', 0.95, 1.30), ev('IN_MID', 1.30, 1.65),
         ev('IN_ONSET', 1.10, 1.65), ev('IN_GAP', 1.65, 2.45), ev('ACC', 0.95, 1.30, accepted_edges={'out': 'test'}),
-        ev('CARRY', 1.65, 2.05), dict(ev('MUTED', 0.95, 1.30), native_audio_vol=0), ev('CLOSURE', 3.10, 3.43), ev('FASTJOIN', 3.10, 3.93)],
+        ev('CARRY', 1.65, 2.05), dict(ev('MUTED', 0.95, 1.30), native_audio_vol=0), ev('CLOSURE', 3.10, 3.43), ev('FASTJOIN', 3.10, 3.93),
+        ev('LP', 1.65, 2.65), ev('LN', 2.70, 3.20, audio_lead=0.15)],   # an L-cut: LN's sound from 2.55 (a gap) replaces LP's tail from 2.50
         'audio': {'sfx': {'tail': {'file': take, 'at': 9.0, 'dur': 0.3, 'src_in': 2.05}}}}
     want = {('S_TAIL', 'out'): {'BITE', 'TIGHT'}, ('GAP', 'out'): {'ok'}, ('MIDWORD', 'out'): {'BITE'}, ('IN_MID', 'in'): {'BITE'},
             ('IN_ONSET', 'in'): {'TIGHT'}, ('IN_GAP', 'in'): {'ok'}, ('ACC', 'out'): {'ACCEPT'}, ('CARRY', 'out'): {'CARRIED'},
-            ('CLOSURE', 'out'): {'TIGHT', 'BITE'}, ('FASTJOIN', 'out'): {'ok'}}
+            ('CLOSURE', 'out'): {'TIGHT', 'BITE'}, ('FASTJOIN', 'out'): {'ok'}, ('LP', 'out'): {'ok'}, ('LN', 'in'): {'ok'}}
     ns = argparse.Namespace(all_native=False, cuts='', only='', transcripts='', band=(120.0, 7800.0), speech_db=-15.0, quiet_db=-22.0, bed_margin=6.0,
                             min_gap_ms=60.0, two_band_bite_db=12.0)
     print('-- takes mode'); rows = takes_mode(ns, edl); got = {(r['id'], r['edge']): r['verdict'] for r in rows if 'edge' in r}
@@ -361,6 +385,20 @@ def selftest():
     for k, v in {('D0', 'out'): 'BITE', ('D1', 'in'): 'ok'}.items():
         if dv.get(k) != v: bad.append(f"deliv {k}: {dv.get(k)} (want {v})")
     if not any(r.get('verdict') == 'COVERED' and abs(r['J'] - 1.8) < 1e-6 for r in rd): bad.append('deliv: the join under the VO line (the contract keys vo by name) was not reported COVERED')
+    # the L-cut known answers: both audible edges sit in the 2.30-2.60 gap; the PICTURE edges (2.65, 2.70) sit inside the word
+    # 2.60-3.00, so the same pair read without the model must flag them (the control proves the model is what passes it)
+    lc = {'fps': 25, 'events': [ev('LP', 1.65, 2.65), ev('LN', 2.70, 3.20)]}
+    rc = {(r['id'], r['edge']): r['verdict'] for r in takes_mode(ns, lc) if 'edge' in r}
+    if rc.get(('LP', 'out')) == 'ok' or rc.get(('LN', 'in')) == 'ok': bad.append(f"L-cut control: without audio_lead the picture edges must flag ({rc})")
+    dlc = np.concatenate([seg(1.65, 2.50), seg(2.55, 3.20)]); dlp = os.path.join(d, 'deliv_lcut.wav'); _wav(dlp, dlc, sr)
+    lcd = {'fps': 25, 'events': [ev('L0', 1.65, 2.65, tl=[0.0, 1.0]), ev('L1', 2.70, 3.20, tl=[1.0, 1.5], audio_lead=0.15)]}
+    nsl = argparse.Namespace(**{**vars(ns), 'deliv': dlp})
+    rl = deliv_mode(nsl, lcd); dl_ = {(r['id'], r['edge']): r['verdict'] for r in rl if 'edge' in r}
+    if dl_ != {('L0', 'out'): 'ok', ('L1', 'in'): 'ok'}: bad.append(f"deliv L-cut: the sound join must read ok at both edges ({dl_})")
+    if not any(r.get('verdict') == 'L-CUT' and abs(r['J'] - 1.0) < 1e-6 for r in rl): bad.append('deliv L-cut: the picture join was not reported L-CUT')
+    rl0 = deliv_mode(nsl, {'fps': 25, 'events': [{**lcd['events'][0]}, {k: v for k, v in lcd['events'][1].items() if k != 'audio_lead'}]})
+    if not any(r.get('verdict') in ('BITE', 'TIGHT') for r in rl0): bad.append('deliv L-cut control: without audio_lead the picture join must flag')
+    os.remove(dlp)
     # 0 read: undeclared + a take with sound = NOT READ; declared muted = an honest 0; a take with no audio stream = an honest 0
     sil = os.path.join(d, 'silent.mp4')
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=32x32:r=25:d=1', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', sil], check=True)

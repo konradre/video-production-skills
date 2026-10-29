@@ -180,6 +180,11 @@ def main():
     ecs = [e for e in edl['events'] if e.get('role') == 'endcard']; assert len(ecs) <= 1, f'{len(ecs)} endcard events — at most one (role: endcard)'
     EC = ecs[0] if ecs else None   # optional: edl_check --require-endcard holds a card where the script has one
     ev = [e for e in edl['events'] if e.get('role') != 'endcard']
+    # a split edit (audio_lead, EDL-CONTRACT) is read by the edge gate but not cut here: finishing it would play the take's
+    # sound from its in-point and drop the lead the edit was approved with — refuse rather than ship a different sound
+    lcut = [e['id'] for e in edl['events'] if float(e.get('audio_lead') or 0) > 0]
+    if lcut: sys.exit(f"finish_spot.py does not implement audio_lead (split edits on {', '.join(lcut)}): finish this spot with the project "
+                      f"builder that cut it, or remove the lead in the plan and re-gate")
     for e in ev: assert e.get('take'), f"{e['id']}: take is null — pick a keeper in the EDL first"
     for e in edl['events']: assert e.get('in_matrix') in (None, 'bt709', 'bt601', 'bt2020nc'), f"{e['id']}: in_matrix {e.get('in_matrix')!r} — bt709 | bt601 | bt2020nc"
     FOOT_END = float(EC['tl'][0]) if EC else RUN

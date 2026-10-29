@@ -42,7 +42,18 @@
                previous version (a changed crop reached the picture — a builder cache keyed by event id once shipped the stale
                render and every other row passed); an event whose middle frame reads `same` is read again
                at four frames near its two edges, because a change confined to a hold, a fade or a trim at an edge never
-               reaches the middle (a tail hold over a source dissolve read 'unchanged — a stale cache?')
+               reaches the middle (a tail hold over a source dissolve read 'unchanged — a stale cache?');
+               one still 'same' after that is read TILE-WISE (32 × 18 tiles, 60 px at 1080p, mean |dY| per tile) at its
+               middle, its edges and --prev-scan frames spread over it: a tile ≥ 3 levels and ≥ 4 × the frame's median tile + 2
+               is a change. A whole-frame mean cannot see a changed pop-up time or a dropped name label (0.27 and 3.6 levels
+               over the frame, 15.6 and 166 in the tile), where a re-render of an unchanged event reads 0.0 and a crf 20
+               re-encode of one 2.1 at most (2026-10-29: the bar sits 1.5× over that noise). `same` = a
+               finish that re-encodes nothing (look none, the approved file copied or remuxed): byte-identical passes at once,
+               otherwise every footage event must read same, tile-wise too.
+               --prev-edl <the previous version's EDL> maps each event to ITS OWN timeline position in the previous
+               version. Without it the comparison is at the same timeline second, which is right only when no event before
+               it changed length: one version that inserted four VOs read every later event as changed (2026-10-29) — a
+               changed:<ids> pass that proves nothing. An event the previous EDL lacks reads `new`.
   contract     INFO: the colour range tag, the keyframe spacing and the edit lists — the platform-contract encode wants `tv`, a
                closed 2 s GOP and no edit lists (look-library GUIDE § 7)
   decoded      (decoded_checks.py) frame 0's median RGB within 2 code values of qc.frame0_bg (a limited-range master read as full
@@ -73,7 +84,7 @@ at the right frame); `judgement` rows change the content (duration, loudness, cu
 Exit 1 on any FAIL; the summary names the failures by kind.
 
   qc_deliverable.py --root <project> --edl edit/<SPOT>-EDL.json --deliv deliver/<file>.mp4 [--placement <qc_vo_placement.py>] [--no-card] [--tp-ceiling] [--max-still-s]
-                    [--prev deliver/<previous version>.mp4 [--prev-expect finish|changed:<id,…>]]
+                    [--prev deliver/<previous version>.mp4 [--prev-edl edit/<previous EDL>] [--prev-expect finish|same|changed:<id,…>] [--prev-scan 24]]
   qc_deliverable.py --selftest        # near-black: a black event FAILS, a declared one passes · vs previous: regraded / moved / retimed read back
 """
 import argparse, glob, json, os, re, subprocess, sys
@@ -135,16 +146,53 @@ def still_windows(x, key='accepted_still'):
     return [(a_, b_) for a_, b_ in out if b_ > a_]
 
 
-def edge_dy(D, P, x, fps):
+TILE_MIN, TILE_K, TILE_C = 3.0, 4.0, 2.0   # a tile change: ≥ 3 levels and ≥ 4 × the median tile + 2 (calibrated on one compilation, 32 × 18 tiles)
+
+
+def tile_dy(a, b, gx=32, gy=18):
+    """(the largest, the median) mean |dY| (0–255) over a gx × gy grid of tiles: a change confined to a small region — a
+    pop-up's text, a name label — that the whole-frame mean averages away"""
+    H, W = a.shape; d = np.abs(a - b) * 255
+    t = np.array([d[j * H // gy:(j + 1) * H // gy, i * W // gx:(i + 1) * W // gx].mean() for j in range(gy) for i in range(gx)])
+    return float(t.max()), float(np.median(t))
+
+
+def tile_changed(mx, med): return mx >= TILE_MIN and mx >= TILE_K * med + TILE_C
+
+
+def local_scan(D, P, x, fps, pk0=None, n=24):
+    """(changed, the largest tile dY, its timeline second, frames read): the event read tile-wise at its middle, two frames in
+    from each edge and n frames spread over it. pk0 = the event's first frame in P (--prev-edl), else the same frame as in D."""
+    k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps); p0 = k0 if pk0 is None else pk0
+    ks = sorted({(k0 + k1) // 2, k0 + 1, k0 + 3, k1 - 4, k1 - 2} | {k0 + (k1 - k0) * (i + 1) // (n + 1) for i in range(n)})
+    best = (False, 0.0, None, 0)
+    for k in ks:
+        if not k0 <= k < k1: continue
+        a = luma_at(D, (k + 0.5) / fps)
+        if a is None: continue
+        b = luma_at(P, (p0 + k - k0 + 0.5) / fps, a.shape[1], a.shape[0])
+        if b is None: continue
+        mx, med = tile_dy(a, b); ch = tile_changed(mx, med); best = (best[0] or ch, max(best[1], mx), k / fps if mx >= best[1] else best[2], best[3] + 1)
+        if ch: return (True, mx, k / fps, best[3])
+    return best
+
+
+def prev_map(path):
+    """{event id: its first timeline frame second} from the previous version's EDL (--prev-edl)"""
+    if not path: return None
+    return {x.get('id'): float(x['tl'][0]) for x in json.load(open(path)).get('events', []) if len(x.get('tl', [])) >= 2}
+
+
+def edge_dy(D, P, x, fps, pk0=None):
     """The largest mean |dY| (0–255) between D and P over two frames in from each edge of the event (1 and 3 after its first
     frame, 4 and 2 before its last): a change confined to an edge — a tail hold, a fade, a trim — that the middle frame never
     sees. None when nothing could be read."""
-    k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps); best = None
+    k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps); best = None; p0 = k0 if pk0 is None else pk0
     for k in sorted({k0 + 1, k0 + 3, k1 - 4, k1 - 2}):
         if not k0 <= k < k1: continue
         a = luma_at(D, (k + 0.5) / fps)
         if a is None: continue
-        b = luma_at(P, (k + 0.5) / fps, a.shape[1], a.shape[0])
+        b = luma_at(P, (p0 + k - k0 + 0.5) / fps, a.shape[1], a.shape[0])
         if b is None: continue
         dy = float(np.mean(np.abs(a - b)) * 255); best = dy if best is None else max(best, dy)
     return best
@@ -156,20 +204,22 @@ def _shift(x, y):
     return (int(iy if iy < c.shape[0] // 2 else iy - c.shape[0]), int(ix if ix < c.shape[1] // 2 else ix - c.shape[1]))
 
 
-def prev_compare(D, P, events, fps):
+def prev_compare(D, P, events, fps, pmap=None):
     """Each footage event's middle frame of D against the same timeline frame of P and its two neighbours: (id, mean |dY| /255,
     the phase shift at the same frame, the frame offset or None). A grade changes dY and nothing else; a one-frame slip matches a
     NEIGHBOUR best in structure (gradient NCC, blind to a grade) and at a (0, 0) phase shift; a crop, scale or warp moves the
-    phase peak at every one of the three."""
+    phase peak at every one of the three. pmap (prev_map) reads each event at its own position in P; an event pmap lacks is 'new'."""
     rows = []
     g = lambda z: np.hypot(*np.gradient(z))
     ncc = lambda x, y: float(((x - x.mean()) * (y - y.mean())).sum() / (np.sqrt(((x - x.mean()) ** 2).sum() * ((y - y.mean()) ** 2).sum()) + 1e-12))
     for x in events:
         if x.get('role') == 'endcard' or x.get('source') == 'designed' or len(x.get('tl', [])) < 2: continue
         k0, k1 = round(float(x['tl'][0]) * fps), round(float(x['tl'][1]) * fps); m = (k0 + k1) // 2
+        if pmap is not None and x.get('id') not in pmap: rows.append((x.get('id', '?'), 'new', None, None)); continue
+        pm = m if pmap is None else round(pmap[x.get('id')] * fps) + (m - k0)
         a = luma_at(D, (m + 0.5) / fps)
         if a is None: continue
-        H, W = a.shape; b = {d: luma_at(P, (m + d + 0.5) / fps, W, H) for d in (-1, 0, 1)}
+        H, W = a.shape; b = {d: luma_at(P, (pm + d + 0.5) / fps, W, H) for d in (-1, 0, 1)}
         if b[0] is None: rows.append((x.get('id', '?'), None, None, None)); continue
         ga = g(a); best = max((d for d in (-1, 0, 1) if b[d] is not None), key=lambda d: ncc(ga, g(b[d])))
         sh0 = _shift(a, b[0]); off = best if best and _shift(a, b[best]) == (0, 0) else (0 if sh0 == (0, 0) else None)
@@ -248,6 +298,7 @@ def find_master(D, e, mezz='edit/mezz'):
 
 def classify(row):
     id_, dy, sh_, off = row
+    if dy == 'new': return 'new'
     if dy is None: return 'unreadable'
     return 'moved' if off is None else 'retimed' if off else 'regraded' if dy > 1.0 else 'same'
 
@@ -343,7 +394,23 @@ def selftest():
           f"a denoised one {kd['erased'] if kd['erased'] is None else round(kd['erased'], 2)} (want < 0.5), a clean master {kc} (want None: no texture); "
           f"the master found by tag {fm[0] is not None and fm[0].endswith('v0.2g.mov')}, none for a renamed file {fm[1] is None}, "
           f"the untagged master for -v1 {fm_untagged is not None}, none when two masters match {fm_both is None and n_both == 2}; frames sampled inside a 7-frame event: {idx(0, 7)} and {idx(7, 14)}")
-    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8 else 1)
+    # a small region changed (a pop-up's text): the whole frame reads same, the tile read must see it; an untouched copy must not
+    small = os.path.join(d, 'small.mp4')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', base, '-vf', 'drawbox=x=10:y=10:w=14:h=8:color=white:t=fill', '-pix_fmt', 'yuv420p', '-crf', '12', small], check=True)
+    ev9 = {'id': 's', 'tl': [0.0, 2.0]}; mid9 = classify(prev_compare(small, base, [ev9], 24)[0])
+    ch9 = local_scan(small, base, ev9, 24, n=4); nc9 = local_scan(base, base, ev9, 24, n=4)
+    ok9 = mid9 == 'same' and ch9[0] and not nc9[0]
+    print(f"SELFTEST {'PASS' if ok9 else 'FAIL'}: a small region changed — whole frame reads {mid9} (want same), tile read {ch9[0]} at {ch9[1]:.1f} (want True), "
+          f"an unchanged copy {nc9[0]} (want False)")
+    # an event moved later on the timeline (an insert before it): --prev-edl reads it at its own place, the same second does not
+    ins = os.path.join(d, 'ins.mp4')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', base, '-vf', 'tpad=start=12:start_mode=add:color=black', '-pix_fmt', 'yuv420p', '-crf', '12', ins], check=True)
+    ev10 = [{'id': 'k', 'tl': [0.5, 2.5]}, {'id': 'n', 'tl': [0.0, 0.5]}]   # 0.5 s inserted: unmapped, k's middle lands 12 frames off INSIDE the clip
+    mapped = {r[0]: classify(r) for r in prev_compare(ins, base, ev10, 24, {'k': 0.0})}; unmapped = classify(prev_compare(ins, base, ev10[:1], 24)[0])
+    ok10 = mapped == {'k': 'same', 'n': 'new'} and unmapped not in ('same', 'unreadable', 'new')
+    print(f"SELFTEST {'PASS' if ok10 else 'FAIL'}: an event moved by an insert — with the previous EDL {mapped} (want k same, n new), "
+          f"at the same second {unmapped} (want a readable wrong-frame read: moved, retimed or regraded)")
+    sys.exit(0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 and ok7 and ok8 and ok9 and ok10 else 1)
 
 
 def last_frame_thumb(p):
@@ -361,7 +428,9 @@ def main():
     ap.add_argument('--black-luma', type=float, default=16.0, help='an event whose three sampled frames all read under this mean luma (0–255) fails unless it declares accepted_black')
     ap.add_argument('--phone-ref', nargs='*', default=[], help="the project's real phone clips: prints the delivered file's phone-texture band against theirs as INFO (a creator-style spot)")
     ap.add_argument('--prev', default=None, help="the previous version's deliverable: every footage event's middle frame compared (regraded / moved / retimed), INFO")
-    ap.add_argument('--prev-expect', default=None, help="finish = every footage event regraded, none moved or retimed; changed:<id,…> = those events differ from --prev")
+    ap.add_argument('--prev-expect', default=None, help="finish = every footage event regraded, none moved or retimed; same = a finish that re-encodes nothing (byte-identical, or every event the same, tile-wise too); changed:<id,…> = those events differ from --prev")
+    ap.add_argument('--prev-edl', default=None, help="the previous version's EDL: each event is read at its own position there (without it, at the same timeline second — wrong after any event before it changed length)")
+    ap.add_argument('--prev-scan', type=int, default=24, help='frames spread over an event read tile-wise when its middle and edges read the same (changed: and same)')
     ap.add_argument('--master', default=None, help="the master this file was encoded from (default: finish_spot.py's edit/mezz/<spot>-master-<W>x<H><tag>.mov, the tag read off the deliverable's name): the grain-kept read per footage event")
     ap.add_argument('--grain-warn', type=float, default=0.70, help='a WARN line when a readable event keeps less than this share of the master\'s moving texture (a lead from one film)')
     ap.add_argument('--selftest', action='store_true')
@@ -524,18 +593,43 @@ def main():
             else: print(f"{lvl} {label}: {det}")
     # ---- against the previous version (INFO; a verdict with --prev-expect) ----
     if a.prev:
-        rows = prev_compare(D, a.prev, e['events'], efps); cls = {r[0]: classify(r) for r in rows}
-        print(f"INFO vs previous ({a.prev}): " + ' · '.join(f"{r[0]} {cls[r[0]]}" + (f" dY {r[1]:.1f}" if r[1] is not None else '') + (f" shift {r[2]}" if r[2] not in (None, (0, 0)) else '') + (f" off {r[3]:+d} frame" if r[3] else '') for r in rows))
-        if a.prev_expect == 'finish':
+        pmap = prev_map(a.prev_edl); rows = prev_compare(D, a.prev, e['events'], efps, pmap); cls = {r[0]: classify(r) for r in rows}
+        pk0 = lambda i: None if pmap is None or i not in pmap else round(pmap[i] * efps)
+        if pmap is None:
+            print(f"INFO vs previous: read at the SAME timeline second (no --prev-edl) — right only when no earlier event changed length")
+        print(f"INFO vs previous ({a.prev}): " + ' · '.join(f"{r[0]} {cls[r[0]]}" + (f" dY {r[1]:.1f}" if isinstance(r[1], float) else '') + (f" shift {r[2]}" if r[2] not in (None, (0, 0)) else '') + (f" off {r[3]:+d} frame" if r[3] else '') for r in rows))
+        if a.prev_expect == 'same':
+            import hashlib
+            def sha(f):
+                h = hashlib.sha256()
+                with open(f, 'rb') as fh:
+                    for blk in iter(lambda: fh.read(1 << 20), b''): h.update(blk)
+                return h.hexdigest()
+            if sha(D) == sha(a.prev): verdict(True, 'finish copies the approved file', 'byte-identical to --prev (sha256)')
+            else:
+                byid = {x.get('id'): x for x in e['events'] if len(x.get('tl', [])) >= 2}
+                off = [f"{i} {c}" for i, c in cls.items() if c != 'same']
+                for i, c in cls.items():
+                    if c == 'same' and i in byid:
+                        ch, mx, t_, n_ = local_scan(D, a.prev, byid[i], efps, pk0(i), a.prev_scan)
+                        if ch: off.append(f"{i} tile dY {mx:.1f} at {t_:.2f} s")
+                verdict(not off, 'finish copies the approved file', f"not byte-identical; {len(rows) - len(off)}/{len(rows)} footage events the same" + (f"; not: {off}" if off else ''))
+        elif a.prev_expect == 'finish':
             off = [f"{i} {c}" for i, c in cls.items() if c != 'regraded']
             verdict(not off, 'finish vs previous', f"{len(rows) - len(off)}/{len(rows)} footage events regraded with no move and no retime" + (f"; not: {off}" if off else ''))
         elif a.prev_expect and a.prev_expect.startswith('changed:'):
             want = [i for i in a.prev_expect.split(':', 1)[1].split(',') if i]; same = [i for i in want if cls.get(i, 'missing') in ('same', 'missing', 'unreadable')]
-            byid = {x.get('id'): x for x in e['events'] if len(x.get('tl', [])) >= 2}; at_edge = []
+            byid = {x.get('id'): x for x in e['events'] if len(x.get('tl', [])) >= 2}; at_edge = []; local = []
             for i in list(same):   # the middle frame missed it: read the edges (a tail hold, a fade, a trim) — and a designed event, which the middle read skips
-                edy = edge_dy(D, a.prev, byid[i], efps) if i in byid else None
+                edy = edge_dy(D, a.prev, byid[i], efps, pk0(i)) if i in byid else None
                 if edy is not None and edy > 1.0: same.remove(i); at_edge.append(f"{i} dY {edy:.1f}")
+            for i in list(same):   # still the same over the whole frame: read it tile-wise (a pop-up's text, a name label)
+                if i not in byid: continue
+                ch, mx, t_, n_ = local_scan(D, a.prev, byid[i], efps, pk0(i), a.prev_scan)
+                if ch: same.remove(i); local.append(f"{i} tile dY {mx:.1f} at {t_:.2f} s")
+                else: print(f"INFO {i}: no tile changed over {n_} frames (largest {mx:.1f} at {t_ if t_ is None else round(t_, 2)} s) — a change shorter than the scan's spacing can still hide")
             if at_edge: print(f"INFO changed at an edge only (the middle frame reads the same): {at_edge}")
+            if local: print(f"INFO changed in a region only (the whole-frame mean reads the same): {local}")
             verdict(not same, 'changes reached the picture', f"{len(want) - len(same)}/{len(want)} named events differ from the previous version" + (f"; unchanged at the middle and at both edges: {same} — a stale cache?" if same else ''))
     # ---- grain kept by the deliver encode (INFO rows; a WARN line under --grain-warn — a lead, calibrated on one film) ----
     M = a.master or find_master(D, e)
